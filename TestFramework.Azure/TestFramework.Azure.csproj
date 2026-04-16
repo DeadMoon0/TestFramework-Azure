@@ -2,8 +2,20 @@
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
-		<ImplicitUsings>disable</ImplicitUsings>
+		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<Title>TestFramework Azure</Title>
+		<Version>0.1.0</Version>
+		<Authors>DeadMoon0</Authors>
+		<Product>TestFramework</Product>
+		<Description>Interact with Azure infrastructure inside of a TestFramework Timeline.</Description>
+		<PackageProjectUrl>https://github.com/DeadMoon0/TestFramework-Azure</PackageProjectUrl>
+		<PackageIcon>Icon.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryUrl>https://github.com/DeadMoon0/TestFramework-Azure.git</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageTags>Test;UnitTest;IntegrationTest,Framework;Fluent;Timeline;Azure</PackageTags>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -32,7 +44,21 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<None Include="..\Modules\TestFramework-Common\Assets\Icon.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
 		<Folder Include="Documentation\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
 	</ItemGroup>
 
 </Project>
