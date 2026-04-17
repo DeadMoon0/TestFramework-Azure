@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
@@ -70,12 +71,9 @@ internal class ServiceBusCreateTempSubscriptionStep(
             ruleOptions = new CreateRuleOptions("TempFilter", filter);
         }
 
-        var adminClient = new ServiceBusAdministrationClient(config.ConnectionString);
+        IServiceBusAdministrationAdapter adminClient = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
 
-        if (ruleOptions is not null)
-            await adminClient.CreateSubscriptionAsync(subOptions, ruleOptions, cancellationToken);
-        else
-            await adminClient.CreateSubscriptionAsync(subOptions, cancellationToken);
+        await adminClient.CreateSubscriptionAsync(subOptions, ruleOptions, cancellationToken);
 
         logger.LogInformation(
             $"Created temp subscription '{tempSubscriptionName}' on topic '{config.TopicName}' (TTL {ttl}).");

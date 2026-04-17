@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Events;
 using TestFramework.Core.Logging;
@@ -84,64 +85,13 @@ public class ServiceBusProcessEvent(
             ? TempSubscriptionName
             : config.SubscriptionNameRequired;
 
-        await using ServiceBusClient client = new ServiceBusClient(config.ConnectionString);
-        if (config.RequiredSession)
-        {
-            ServiceBusSessionProcessor processor;
-            if (config.IsTopic) processor = client.CreateSessionProcessor(config.TopicName, subscriptionName, new ServiceBusSessionProcessorOptions { AutoCompleteMessages = false });
-            else processor = client.CreateSessionProcessor(config.EntityName, new ServiceBusSessionProcessorOptions { AutoCompleteMessages = false });
-
-            TaskCompletionSource<ServiceBusReceivedMessage> tcs = new();
-
-            processor.ProcessMessageAsync += async args =>
-            {
-                if (messageId?.GetValue(variableStore) is { } _messageId && args.Message.MessageId != _messageId) return;
-                if (correlationId?.GetValue(variableStore) is { } _correlationId && args.Message.CorrelationId != _correlationId) return;
-                if (predicate?.GetValue(variableStore) is { } _predicate && _predicate(args.Message)) return;
-                tcs.SetResult(args.Message);
-                if (completeMessage?.GetValue(variableStore) == true)
-                    await args.CompleteMessageAsync(args.Message, cancellationToken);
-            };
-
-            processor.ProcessErrorAsync += args =>
-            {
-                tcs.SetException(args.Exception);
-                return Task.CompletedTask;
-            };
-
-            await processor.StartProcessingAsync(cancellationToken);
-            ServiceBusReceivedMessage message = await tcs.Task.WaitAsync(cancellationToken);
-            await processor.DisposeAsync();
-            return message;
-        }
-        else
-        {
-            ServiceBusProcessor processor;
-            if (config.IsTopic) processor = client.CreateProcessor(config.TopicName, subscriptionName, new ServiceBusProcessorOptions { AutoCompleteMessages = false });
-            else processor = client.CreateProcessor(config.EntityName, new ServiceBusProcessorOptions { AutoCompleteMessages = false });
-
-            TaskCompletionSource<ServiceBusReceivedMessage> tcs = new();
-
-            processor.ProcessMessageAsync += async args =>
-            {
-                if (messageId?.GetValue(variableStore) is { } _messageId && args.Message.MessageId != _messageId) return;
-                if (correlationId?.GetValue(variableStore) is { } _correlationId && args.Message.CorrelationId != _correlationId) return;
-                if (predicate?.GetValue(variableStore) is { } _predicate && _predicate(args.Message)) return;
-                tcs.SetResult(args.Message);
-                if (completeMessage?.GetValue(variableStore) == true)
-                    await args.CompleteMessageAsync(args.Message, cancellationToken);
-            };
-
-            processor.ProcessErrorAsync += args =>
-            {
-                tcs.SetException(args.Exception);
-                return Task.CompletedTask;
-            };
-
-            await processor.StartProcessingAsync(cancellationToken);
-            ServiceBusReceivedMessage message = await tcs.Task.WaitAsync(cancellationToken);
-            await processor.DisposeAsync();
-            return message;
-        }
+        await using IServiceBusMessagePump pump = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateMessagePump(config, subscriptionName);
+        return await pump.ReceiveMessageAsync(
+            new ServiceBusReceiveRequest(
+                messageId?.GetValue(variableStore),
+                correlationId?.GetValue(variableStore),
+                predicate?.GetValue(variableStore),
+                completeMessage?.GetValue(variableStore) == true),
+            cancellationToken);
     }
 }

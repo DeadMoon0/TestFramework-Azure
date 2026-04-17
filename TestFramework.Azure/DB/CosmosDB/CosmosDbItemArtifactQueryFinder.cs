@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Variables;
@@ -18,21 +19,15 @@ public class CosmosDbItemArtifactQueryFinder<TItem>(CosmosContainerIdentifier db
     public override async Task<ArtifactFinderResult?> FindAsync(IServiceProvider serviceProvider, VariableStore variableStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(dbIdentifier);
-        CosmosClient client = new CosmosClient(config.ConnectionString);
-        Database database = client.GetDatabase(config.DatabaseName);
-        Container container = database.GetContainer(config.ContainerName);
+        ICosmosContainerAdapter container = serviceProvider.GetAzureComponentFactory().Cosmos.CreateContainer(config);
 
-        FeedIterator<TItem> itemResp = container.GetItemQueryIterator<TItem>(query.GetRequiredValue(variableStore));
         bool found = false;
         TItem? data = default;
-        while (itemResp.HasMoreResults)
+        await foreach (TItem item in container.QueryItemsAsync<TItem>(query.GetRequiredValue(variableStore), cancellationToken))
         {
-            foreach (var item in await itemResp.ReadNextAsync(cancellationToken))
-            {
-                data = item;
-                found = true;
-                break;
-            }
+            data = item;
+            found = true;
+            break;
         }
         if (!found) return null;
 
@@ -43,20 +38,14 @@ public class CosmosDbItemArtifactQueryFinder<TItem>(CosmosContainerIdentifier db
     public override async Task<ArtifactFinderResultMulti> FindMultiAsync(IServiceProvider serviceProvider, VariableStore variableStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(dbIdentifier);
-        CosmosClient client = new CosmosClient(config.ConnectionString);
-        Database database = client.GetDatabase(config.DatabaseName);
-        Container container = database.GetContainer(config.ContainerName);
+        ICosmosContainerAdapter container = serviceProvider.GetAzureComponentFactory().Cosmos.CreateContainer(config);
 
         ICosmosDbIdentifierResolver resolver = serviceProvider.GetService<ICosmosDbIdentifierResolver>() ?? new DefaultCosmosDbIdentifierResolver();
 
-        FeedIterator<TItem> itemResp = container.GetItemQueryIterator<TItem>(query.GetRequiredValue(variableStore));
         List<ArtifactFinderResult> data = [];
-        while (itemResp.HasMoreResults)
+        await foreach (TItem item in container.QueryItemsAsync<TItem>(query.GetRequiredValue(variableStore), cancellationToken))
         {
-            foreach (var item in await itemResp.ReadNextAsync(cancellationToken))
-            {
-                data.Add(new ArtifactFinderResult(new CosmosDbItemArtifactReference<TItem>(dbIdentifier, resolver.ResolvePartitionKey(item), resolver.ResolveId(item))));
-            }
+            data.Add(new ArtifactFinderResult(new CosmosDbItemArtifactReference<TItem>(dbIdentifier, resolver.ResolvePartitionKey(item), resolver.ResolveId(item))));
         }
 
         return new ArtifactFinderResultMulti([.. data]);

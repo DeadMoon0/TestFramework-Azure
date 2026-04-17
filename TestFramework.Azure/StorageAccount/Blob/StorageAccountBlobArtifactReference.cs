@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps.Options;
@@ -28,14 +29,13 @@ public class StorageAccountBlobArtifactReference(StorageAccountIdentifier identi
     public override async Task<ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference>> ResolveToDataAsync(IServiceProvider serviceProvider, ArtifactVersionIdentifier versionIdentifier, VariableStore variableStore, ScopedLogger logger)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(Identifier);
-        BlobServiceClient client = new BlobServiceClient(config.ConnectionString);
-        BlobContainerClient container = client.GetBlobContainerClient(config.BlobContainerNameRequired);
-        BlobClient blob = container.GetBlobClient(GetPath(variableStore));
-        if (!await blob.ExistsAsync()) return new ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference> { Found = false };
+        IBlobContainerAdapter container = serviceProvider.GetAzureComponentFactory().Blob.CreateContainer(config);
+        BlobReadResponse blob = await container.ReadBlobAsync(GetPath(variableStore));
+        if (!blob.Found) return new ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference> { Found = false };
         return new ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference>
         {
             Found = true,
-            Data = new StorageAccountBlobArtifactData((await blob.DownloadContentAsync()).Value.Content.ToArray(), (await blob.GetPropertiesAsync()).Value.Metadata.ToDictionary())
+            Data = new StorageAccountBlobArtifactData(blob.Data ?? [], blob.Metadata?.ToDictionary() ?? [])
             {
                 Identifier = versionIdentifier
             }

@@ -4,6 +4,7 @@ using System;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Variables;
@@ -16,8 +17,7 @@ public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableSto
     public override async Task Setup(IServiceProvider serviceProvider, TableStorageEntityArtifactData<T> data, TableStorageEntityArtifactReference<T> reference, VariableStore variableStore, ScopedLogger logger)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
-        TableServiceClient serviceClient = new TableServiceClient(config.ConnectionString);
-        TableClient tableClient = serviceClient.GetTableClient(reference.GetTableName(variableStore));
+        ITableAdapter tableClient = serviceProvider.GetAzureComponentFactory().Table.CreateTable(config, reference.GetTableName(variableStore));
         await tableClient.CreateIfNotExistsAsync();
         await tableClient.UpsertEntityAsync(data.Entity);
 
@@ -27,8 +27,7 @@ public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableSto
     public override async Task Deconstruct(IServiceProvider serviceProvider, TableStorageEntityArtifactReference<T> reference, VariableStore variableStore, ScopedLogger logger)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
-        TableServiceClient serviceClient = new TableServiceClient(config.ConnectionString);
-        TableClient tableClient = serviceClient.GetTableClient(reference.GetTableName(variableStore));
+        ITableAdapter tableClient = serviceProvider.GetAzureComponentFactory().Table.CreateTable(config, reference.GetTableName(variableStore));
         await tableClient.DeleteEntityAsync(reference.GetPartitionKey(variableStore), reference.GetRowKey(variableStore));
 
         logger.LogInformation($"Table entity {reference.GetPartitionKey(variableStore)}/{reference.GetRowKey(variableStore)} deleted.");

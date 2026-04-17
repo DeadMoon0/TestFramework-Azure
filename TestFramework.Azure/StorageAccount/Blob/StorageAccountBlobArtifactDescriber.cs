@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Variables;
@@ -17,9 +18,8 @@ public class StorageAccountBlobArtifactDescriber : ArtifactDescriber<StorageAcco
     public override async Task Deconstruct(IServiceProvider serviceProvider, StorageAccountBlobArtifactReference reference, VariableStore variableStore, ScopedLogger logger)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
-        BlobServiceClient client = new BlobServiceClient(config.ConnectionString);
-        BlobContainerClient container = client.GetBlobContainerClient(config.BlobContainerNameRequired);
-        await container.DeleteBlobAsync(reference.GetPath(variableStore), DeleteSnapshotsOption.IncludeSnapshots);
+        IBlobContainerAdapter container = serviceProvider.GetAzureComponentFactory().Blob.CreateContainer(config);
+        await container.DeleteBlobAsync(reference.GetPath(variableStore));
 
         logger.LogInformation($"Blob {reference.GetPath(variableStore)} deleted.");
     }
@@ -27,12 +27,9 @@ public class StorageAccountBlobArtifactDescriber : ArtifactDescriber<StorageAcco
     public override async Task Setup(IServiceProvider serviceProvider, StorageAccountBlobArtifactData data, StorageAccountBlobArtifactReference reference, VariableStore variableStore, ScopedLogger logger)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
-        BlobServiceClient client = new BlobServiceClient(config.ConnectionString);
-        BlobContainerClient container = client.GetBlobContainerClient(config.BlobContainerNameRequired);
+        IBlobContainerAdapter container = serviceProvider.GetAzureComponentFactory().Blob.CreateContainer(config);
         await container.CreateIfNotExistsAsync();
-        BlobClient blob = container.GetBlobClient(reference.GetPath(variableStore));
-        await blob.UploadAsync(new BinaryData(data.Data), true);
-        await blob.SetMetadataAsync((IDictionary<string, string>)data.MetaData);
+        await container.UploadBlobAsync(reference.GetPath(variableStore), data.Data, data.MetaData);
 
         logger.LogInformation($"Blob {reference.GetPath(variableStore)} uploaded.");
     }

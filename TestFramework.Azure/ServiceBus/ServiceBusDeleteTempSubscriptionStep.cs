@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
@@ -34,11 +35,12 @@ internal class ServiceBusDeleteTempSubscriptionStep(
     {
         ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
 
-        var adminClient = new ServiceBusAdministrationClient(config.ConnectionString);
+        IServiceBusAdministrationAdapter adminClient = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
         try
         {
-            await adminClient.DeleteSubscriptionAsync(config.TopicName, tempSubscriptionName, cancellationToken);
-            logger.LogInformation($"Deleted temp subscription '{tempSubscriptionName}' from topic '{config.TopicName}'.");
+            string topicName = config.TopicName ?? throw new InvalidOperationException("A topic name is required for deleting a temporary subscription.");
+            await adminClient.DeleteSubscriptionAsync(topicName, tempSubscriptionName, cancellationToken);
+            logger.LogInformation($"Deleted temp subscription '{tempSubscriptionName}' from topic '{topicName}'.");
         }
         catch (ServiceBusException ex) when (ex.Reason == ServiceBusFailureReason.MessagingEntityNotFound)
         {

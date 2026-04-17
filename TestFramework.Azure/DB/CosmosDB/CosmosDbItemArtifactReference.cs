@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps.Options;
@@ -43,13 +44,13 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
     public override async Task<ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>>> ResolveToDataAsync(IServiceProvider serviceProvider, ArtifactVersionIdentifier versionIdentifier, VariableStore variableStore, ScopedLogger logger)
     {
         CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(DbIdentifier);
-        CosmosClient client = new CosmosClient(config.ConnectionString);
-        Database database = client.GetDatabase(config.DatabaseName);
-        Container container = database.GetContainer(config.ContainerName);
+        ICosmosContainerAdapter container = serviceProvider.GetAzureComponentFactory().Cosmos.CreateContainer(config);
 
-        ResponseMessage itemResp = await container.ReadItemStreamAsync(GetId(variableStore), GetPartitionKey(variableStore));
-        if (itemResp.StatusCode == HttpStatusCode.NotFound) return new ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>> { Found = false };
-        if (itemResp.IsSuccessStatusCode)
+        CosmosReadResponse itemResp = await container.ReadItemAsync(GetId(variableStore), GetPartitionKey(variableStore));
+        if (!itemResp.Found)
+            return new ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>> { Found = false };
+
+        if (itemResp.Content is not null)
         {
             CosmosDbItemArtifactData<TItem> data = new CosmosDbItemArtifactData<TItem>(FromStream<TItem>(itemResp.Content)) { Identifier = versionIdentifier };
             return new ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>,
@@ -60,7 +61,6 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
             };
         }
 
-        itemResp.EnsureSuccessStatusCode();
         throw new UnreachableException();
     }
 

@@ -9,6 +9,7 @@ using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
@@ -44,8 +45,8 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
         HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Post, fullTriggerUri);
         message.Headers.Add("x-functions-key", functionConfig.Code);
         message.Content = new StringContent("{}", new System.Net.Http.Headers.MediaTypeHeaderValue(MediaTypeNames.Application.Json));
-        using HttpClient client = new HttpClient();
-        using HttpResponseMessage response = await client.SendAsync(message, cancellationToken);
+        IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
+        using HttpResponseMessage response = await sender.SendAsync(message, cancellationToken);
         string? responseBody = response.Content is null
             ? null
             : await response.Content.ReadAsStringAsync(cancellationToken);

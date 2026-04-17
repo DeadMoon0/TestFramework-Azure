@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Variables;
@@ -20,10 +21,9 @@ public class TableStorageEntityArtifactQueryFinder<T>(StorageAccountIdentifier i
     public override async Task<ArtifactFinderResult?> FindAsync(IServiceProvider serviceProvider, VariableStore variableStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(identifier);
-        TableServiceClient serviceClient = new TableServiceClient(config.ConnectionString);
-        TableClient tableClient = serviceClient.GetTableClient(tableName.GetRequiredValue(variableStore));
+        ITableAdapter tableClient = serviceProvider.GetAzureComponentFactory().Table.CreateTable(config, tableName.GetRequiredValue(variableStore));
 
-        await foreach (T entity in tableClient.QueryAsync<T>(filter, cancellationToken: cancellationToken))
+        await foreach (T entity in tableClient.QueryEntitiesAsync<T>(filter, cancellationToken))
         {
             return new ArtifactFinderResult(new TableStorageEntityArtifactReference<T>(identifier, tableName, entity.PartitionKey, entity.RowKey));
         }
@@ -34,11 +34,10 @@ public class TableStorageEntityArtifactQueryFinder<T>(StorageAccountIdentifier i
     public override async Task<ArtifactFinderResultMulti> FindMultiAsync(IServiceProvider serviceProvider, VariableStore variableStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(identifier);
-        TableServiceClient serviceClient = new TableServiceClient(config.ConnectionString);
-        TableClient tableClient = serviceClient.GetTableClient(tableName.GetRequiredValue(variableStore));
+        ITableAdapter tableClient = serviceProvider.GetAzureComponentFactory().Table.CreateTable(config, tableName.GetRequiredValue(variableStore));
 
         List<ArtifactFinderResult> data = [];
-        await foreach (T entity in tableClient.QueryAsync<T>(filter, cancellationToken: cancellationToken))
+        await foreach (T entity in tableClient.QueryEntitiesAsync<T>(filter, cancellationToken))
         {
             data.Add(new ArtifactFinderResult(new TableStorageEntityArtifactReference<T>(identifier, tableName, entity.PartitionKey, entity.RowKey)));
         }
