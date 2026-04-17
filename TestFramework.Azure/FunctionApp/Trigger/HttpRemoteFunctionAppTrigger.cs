@@ -7,6 +7,7 @@ using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
@@ -41,8 +42,8 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         HttpRequestMessage message = new HttpRequestMessage(_trigger.Method, fullTriggerUri);
         _request.ApplyToHttpRequestMessage(message);
         message.Headers.Add("x-functions-key", functionConfig.Code);
-        using HttpClient client = new HttpClient();
-        return await client.SendAsync(message, cancellationToken);
+        IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
+        return await sender.SendAsync(message, cancellationToken);
     }
 
     public override StepInstance<Step<HttpResponseMessage>, HttpResponseMessage> GetInstance() =>

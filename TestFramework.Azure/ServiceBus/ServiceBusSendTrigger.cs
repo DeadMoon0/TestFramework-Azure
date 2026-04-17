@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
@@ -35,8 +36,7 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
         ScopedLogger logger, CancellationToken cancellationToken)
     {
         ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
-        await using ServiceBusClient client = new ServiceBusClient(config.ConnectionString);
-        await using ServiceBusSender sender = client.CreateSender(config.EntityName);
+        await using IServiceBusSenderAdapter sender = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateSender(config);
 
         ServiceBusMessage _message = message.GetRequiredValue(variableStore);
         if (config.RequiredSession && _message.SessionId is null)
@@ -44,7 +44,7 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
             _message.SessionId = Guid.NewGuid().ToString();
         }
 
-        await sender.SendMessageAsync(message.GetValue(variableStore), cancellationToken);
+        await sender.SendMessageAsync(_message, cancellationToken);
 
         logger.LogInformation("Sent message to Service Bus: {0}", _message);
 

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps.Options;
@@ -35,25 +36,21 @@ public class TableStorageEntityArtifactReference<T>(StorageAccountIdentifier ide
         IServiceProvider serviceProvider, ArtifactVersionIdentifier versionIdentifier, VariableStore variableStore, ScopedLogger logger)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(Identifier);
-        TableServiceClient serviceClient = new TableServiceClient(config.ConnectionString);
-        TableClient tableClient = serviceClient.GetTableClient(GetTableName(variableStore));
-
-        try
+        ITableAdapter tableClient = serviceProvider.GetAzureComponentFactory().Table.CreateTable(config, GetTableName(variableStore));
+        TableReadResponse<T> response = await tableClient.GetEntityAsync<T>(GetPartitionKey(variableStore), GetRowKey(variableStore));
+        if (response.Found)
         {
-            Response<T> response = await tableClient.GetEntityAsync<T>(GetPartitionKey(variableStore), GetRowKey(variableStore));
             return new ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>
             {
                 Found = true,
-                Data = new TableStorageEntityArtifactData<T>(response.Value) { Identifier = versionIdentifier }
+                Data = new TableStorageEntityArtifactData<T>(response.Entity ?? throw new InvalidOperationException("Found table response without entity.")) { Identifier = versionIdentifier }
             };
         }
-        catch (RequestFailedException e) when (e.Status == 404)
+
+        return new ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>
         {
-            return new ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>
-            {
-                Found = false
-            };
-        }
+            Found = false
+        };
     }
 
     public override void DeclareIO(StepIOContract contract)
