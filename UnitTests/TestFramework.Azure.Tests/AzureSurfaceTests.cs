@@ -55,6 +55,24 @@ public class AzureSurfaceTests
         Assert.IsType<ServiceBusDeleteTempSubscriptionStep>(cleanupStep);
     }
 
+    [Fact]
+    public void AzureTF_IsLive_ReturnsStepsForKnownTargets()
+    {
+        Step<object?> functionApp = AzureTF.Trigger.IsLive.FunctionApp("func");
+        Step<object?> serviceBus = AzureTF.Trigger.IsLive.ServiceBus("bus");
+        Step<object?> blob = AzureTF.Trigger.IsLive.Blob("storage");
+        Step<object?> table = AzureTF.Trigger.IsLive.Table("storage");
+        Step<object?> cosmos = AzureTF.Trigger.IsLive.Cosmos("cosmos");
+        Step<object?> sql = AzureTF.Trigger.IsLive.Sql("sql");
+
+        Assert.Equal("FunctionApp IsLive Trigger", functionApp.Name);
+        Assert.Equal("ServiceBus IsLive Trigger", serviceBus.Name);
+        Assert.Equal("Blob Storage IsLive Trigger", blob.Name);
+        Assert.Equal("Table Storage IsLive Trigger", table.Name);
+        Assert.Equal("Cosmos Container IsLive Trigger", cosmos.Name);
+        Assert.Equal("SqlDatabase IsLive Trigger", sql.Name);
+    }
+
     private sealed class StubAzureComponentFactory : IAzureComponentFactory
     {
         public ICosmosComponentFactory Cosmos { get; } = new StubCosmosFactory();

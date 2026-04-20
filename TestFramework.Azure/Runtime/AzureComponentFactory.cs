@@ -32,6 +32,7 @@ internal interface IBlobComponentFactory
 
 internal interface IBlobContainerAdapter
 {
+    Task ValidateConnectionAsync(CancellationToken cancellationToken);
     Task CreateIfNotExistsAsync();
     Task DeleteBlobAsync(string path);
     Task UploadBlobAsync(string path, byte[] data, IReadOnlyDictionary<string, string> metadata);
@@ -47,6 +48,7 @@ internal interface ITableComponentFactory
 
 internal interface ITableAdapter
 {
+    Task ValidateConnectionAsync(CancellationToken cancellationToken);
     Task CreateIfNotExistsAsync();
     Task UpsertEntityAsync<T>(T entity) where T : class, ITableEntity;
     Task DeleteEntityAsync(string partitionKey, string rowKey);
@@ -63,6 +65,7 @@ internal interface ICosmosComponentFactory
 
 internal interface ICosmosContainerAdapter
 {
+    Task ValidateConnectionAsync(CancellationToken cancellationToken);
     Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey);
     Task UpsertItemAsync<TItem>(TItem item, PartitionKey partitionKey);
     Task<CosmosReadResponse> ReadItemAsync(string id, PartitionKey partitionKey);
@@ -96,6 +99,7 @@ internal interface IServiceBusMessagePump : IAsyncDisposable
 
 internal interface IServiceBusAdministrationAdapter
 {
+    Task ValidateConnectionAsync(CancellationToken cancellationToken);
     Task CreateSubscriptionAsync(CreateSubscriptionOptions options, CreateRuleOptions? ruleOptions, CancellationToken cancellationToken);
     Task DeleteSubscriptionAsync(string topicName, string subscriptionName, CancellationToken cancellationToken);
 }
@@ -152,6 +156,14 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
     private sealed class DefaultBlobContainerAdapter(BlobContainerClient container) : IBlobContainerAdapter
     {
+        public async Task ValidateConnectionAsync(CancellationToken cancellationToken)
+        {
+            if (!await container.ExistsAsync(cancellationToken))
+            {
+                throw new InvalidOperationException($"Blob container '{container.Name}' was not found or is not accessible.");
+            }
+        }
+
         public Task CreateIfNotExistsAsync() => container.CreateIfNotExistsAsync();
 
         public Task DeleteBlobAsync(string path) => container.DeleteBlobAsync(path, DeleteSnapshotsOption.IncludeSnapshots);
@@ -189,6 +201,15 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
     private sealed class DefaultTableAdapter(TableClient tableClient) : ITableAdapter
     {
+        public async Task ValidateConnectionAsync(CancellationToken cancellationToken)
+        {
+            await foreach (Page<TableEntity> _ in tableClient.QueryAsync<TableEntity>(maxPerPage: 1, cancellationToken: cancellationToken)
+                .AsPages(pageSizeHint: 1))
+            {
+                break;
+            }
+        }
+
         public Task CreateIfNotExistsAsync() => tableClient.CreateIfNotExistsAsync();
 
         public Task UpsertEntityAsync<T>(T entity) where T : class, ITableEntity => tableClient.UpsertEntityAsync(entity);
@@ -219,6 +240,12 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
     private sealed class DefaultCosmosContainerAdapter(Container container) : ICosmosContainerAdapter
     {
+        public async Task ValidateConnectionAsync(CancellationToken cancellationToken)
+        {
+            using ResponseMessage response = await container.ReadContainerStreamAsync(cancellationToken: cancellationToken);
+            response.EnsureSuccessStatusCode();
+        }
+
         public async Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey)
         {
             await container.DeleteItemAsync<TItem>(id, partitionKey);
@@ -392,10 +419,23 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
     private sealed class DefaultServiceBusAdministrationAdapter : IServiceBusAdministrationAdapter
     {
         private readonly ServiceBusAdministrationClient _client;
+        private readonly ServiceBusConfig _config;
 
         public DefaultServiceBusAdministrationAdapter(ServiceBusConfig config)
         {
+            _config = config;
             _client = new ServiceBusAdministrationClient(config.ConnectionString);
+        }
+
+        public async Task ValidateConnectionAsync(CancellationToken cancellationToken)
+        {
+            if (_config.IsTopic)
+            {
+                await _client.GetTopicRuntimePropertiesAsync(_config.TopicName!, cancellationToken);
+                return;
+            }
+
+            await _client.GetQueueRuntimePropertiesAsync(_config.QueueName!, cancellationToken);
         }
 
         public Task CreateSubscriptionAsync(CreateSubscriptionOptions options, CreateRuleOptions? ruleOptions, CancellationToken cancellationToken)
