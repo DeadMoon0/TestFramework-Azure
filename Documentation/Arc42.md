@@ -1,4 +1,4 @@
-# TestFrameworkAzure — arc42 Architecture Documentation
+# TestFramework.Azure — arc42 Architecture Documentation
 
 > **Version:** 1.1
 > **Date:** April 2026
@@ -28,7 +28,7 @@
 
 ### 1.1 Purpose
 
-**TestFrameworkAzure** is the Azure extension package for TestFrameworkCore. It provides ready-to-use implementations for:
+**TestFramework.Azure** is the Azure extension package for TestFramework.Core. It provides ready-to-use implementations for:
 
 - **Triggers** — Azure Functions (HTTP, Managed, InProcess), sending Service Bus messages
 - **Artifacts** — Blob Storage, Table Storage, Cosmos DB, SQL Server (EF Core) — automatic setup, versioning, and teardown
@@ -73,7 +73,7 @@
 
 | Constraint | Detail |
 |------------|--------|
-| Dependency | Builds on `TestFrameworkCore` (engine) and `TestFrameworkConfig` (configuration) |
+| Dependency | Builds on `TestFramework.Core` (engine) and `TestFramework.Config` (configuration) |
 | Config source | JSON file (e.g. `local.testSettings.json`) with sections per Azure service |
 | Azure resources | Must be pre-provisioned — the framework does not create infrastructure |
 
@@ -85,12 +85,12 @@
 
 ```mermaid
 C4Context
-    title TestFrameworkAzure — Business Context
+    title TestFramework.Azure — Business Context
 
     Person(dev, "Test Developer", "Writes Azure integration tests")
-    System(azure_tf, "TestFrameworkAzure", "Azure extension for the test framework")
-    System_Ext(core, "TestFrameworkCore", "Timeline, Steps, Variables, Artifacts")
-    System_Ext(config, "TestFrameworkConfig", "ConfigInstance, DI builder")
+    System(azure_tf, "TestFramework.Azure", "Azure extension for the test framework")
+    System_Ext(core, "TestFramework.Core", "Timeline, Steps, Variables, Artifacts")
+    System_Ext(config, "TestFramework.Config", "ConfigInstance, DI builder")
     System_Ext(xunit, "xUnit", "Test runner")
     System_Ext(blob, "Azure Blob Storage", "Files / blobs")
     System_Ext(table, "Azure Table Storage", "Key-value entities")
@@ -115,7 +115,7 @@ C4Context
 
 ```mermaid
 graph TB
-    subgraph TestFrameworkAzure
+    subgraph TestFramework.Azure
         ATF[AzureTF static API]
         CFG[Configuration]
         TRG[Triggers]
@@ -132,8 +132,8 @@ graph TB
         AFW[Azure.Functions.Worker]
     end
     subgraph Project references
-        CORE[TestFrameworkCore]
-        CONF[TestFrameworkConfig]
+        CORE[TestFramework.Core]
+        CONF[TestFramework.Config]
     end
     ATF --> TRG
     ATF --> ART
@@ -171,7 +171,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph TestFrameworkAzure
+    subgraph TestFramework.Azure
         ATF[AzureTF]
         subgraph Triggers
             FHTTP[HttpRemoteFunctionAppTrigger]
@@ -532,9 +532,9 @@ graph TB
     subgraph "Developer machine / CI agent"
         subgraph "Test process (dotnet test)"
             TESTS[MyTests.dll]
-            AZ[TestFrameworkAzure.dll]
-            CORE[TestFrameworkCore.dll]
-            CFG[TestFrameworkConfig.dll]
+            AZ[TestFramework.Azure.dll]
+            CORE[TestFramework.Core.dll]
+            CFG[TestFramework.Config.dll]
             SETTINGS["local.testSettings.json"]
         end
     end
@@ -822,12 +822,12 @@ mindmap
 
 ### 13.1 Prerequisites
 
-**Project references** in your test project:
+**Package references** in your test project:
 
 ```xml
-<ProjectReference Include="..\TestFrameworkCore\TestFrameworkCore.csproj" />
-<ProjectReference Include="..\TestFrameworkAzure\TestFrameworkAzure.csproj" />
-<ProjectReference Include="..\TestFrameworkConfig\TestFrameworkConfig.csproj" />
+<PackageReference Include="TestFramework.Core" Version="0.1.0" />
+<PackageReference Include="TestFramework.Azure" Version="0.1.0" />
+<PackageReference Include="TestFramework.Config" Version="0.1.0" />
 ```
 
 **`local.testSettings.json`** (set as Content / Copy to Output):
@@ -876,7 +876,7 @@ Azure resources must exist before running tests (Storage Account, Service Bus Na
 
 ```csharp
 using TestFramework.Config;
-using TestFrameworkAzure.Extensions;
+using TestFramework.Azure.Extensions;
 
 var serviceProvider = ConfigInstance
     .FromJsonFile("local.testSettings.json")
@@ -895,7 +895,7 @@ public async Task Blob_Upload_And_Verify()
         Encoding.UTF8.GetBytes("{\"key\": \"value\"}"),
         new Dictionary<string, string> { ["version"] = "1.0" });
 
-    var timeline = Timeline.Create("BlobTest")
+    var timeline = Timeline.Create()
         .SetupArtifact("testBlob")
         .CaptureArtifactVersion("testBlob")
         .Build();
@@ -921,7 +921,7 @@ public async Task Function_HTTP_Trigger()
         .WithBody("{\"input\": \"test\"}")
         .Call();
 
-    var timeline = Timeline.Create("FuncTest")
+    var timeline = Timeline.Create()
         .Trigger(trigger)
             .WithTimeOut(TimeSpan.FromSeconds(60))
             .WithRetry(2, CalcDelays.Linear(TimeSpan.FromSeconds(3)))
@@ -940,7 +940,7 @@ public async Task ServiceBus_Send_Receive()
 {
     var correlationId = Guid.NewGuid().ToString();
 
-    var timeline = Timeline.Create("SBTest")
+    var timeline = Timeline.Create()
         .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived(
             "MainSBTopic",
             correlationId: correlationId,
@@ -968,7 +968,7 @@ public async Task Cosmos_Item_Lifecycle()
     var cosmosRef = AzureTF.Artifact.DB.CosmosRef<MyItem>("MainDb", itemId, itemId);
     var cosmosData = new CosmosDbItemArtifactData<MyItem>(new MyItem(itemId, itemId, "TestItem"));
 
-    var timeline = Timeline.Create("CosmosTest")
+    var timeline = Timeline.Create()
         .SetupArtifact("myDoc")
         .CaptureArtifactVersion("myDoc")
         .Build();
@@ -997,7 +997,7 @@ services.AddSqlArtifactContexts(registry =>
 var sqlRef  = AzureTF.Artifact.DB.SqlRef<OrderEntity>("MainSql", orderId.ToString());
 var sqlData = new SqlRowArtifactData<OrderEntity>(new OrderEntity { Id = orderId, Name = "TestOrder" });
 
-var timeline = Timeline.Create("SqlTest")
+var timeline = Timeline.Create()
     .SetupArtifact("order")
     .Trigger(myBusinessStep)
     .CaptureArtifactVersion("order")
