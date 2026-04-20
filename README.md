@@ -32,3 +32,14 @@ With this solution you can:
 - Read the package-level overview in [TestFramework.Azure/README.md](./TestFramework.Azure/README.md)
 - Use the Showroom repository for example-driven learning and begin with `TestFramework.Showroom.Azure/A1_BlobStorage.cs`, `A4_ServiceBus.cs`, and `A6_IntegratedAzure.cs`
 - Keep TestFramework-Core nearby because most Azure timelines build directly on its timeline and configuration model
+
+## CI Pull Requests
+
+- Pull requests run unit tests through the GitHub Actions workflow `unit-tests`.
+- If branch protection requires status checks, `unit-tests` must pass before merge.
+
+Local pre-PR test command:
+
+```bash
+dotnet test UnitTests/TestFramework.Azure.Tests/TestFramework.Azure.Tests.csproj --configuration Release
+```
