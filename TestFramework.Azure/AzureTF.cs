@@ -14,6 +14,7 @@ using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.ServiceBus;
 using TestFramework.Azure.StorageAccount.Blob;
+using TestFramework.Azure.Trigger.IsLive;
 using TestFramework.Azure.StorageAccount.Table;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Variables;
@@ -31,6 +32,7 @@ public static class AzureTF
     {
         public FunctionAppTrigger FunctionApp { get; } = new FunctionAppTrigger();
         public ServiceBusTrigger ServiceBus { get; } = new ServiceBusTrigger();
+        public IsLiveTrigger IsLive { get; } = new IsLiveTrigger();
     }
 
     public class FunctionAppTrigger

@@ -2,6 +2,7 @@ using Azure.Data.Tables;
 using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.Azure.Cosmos;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Generic;
@@ -12,6 +13,7 @@ using System.Text;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.DB.CosmosDB;
+using TestFramework.Azure.DB.SqlServer;
 using TestFramework.Azure.Exceptions;
 using TestFramework.Azure.FunctionApp;
 using TestFramework.Azure.FunctionApp.Results;
@@ -24,6 +26,7 @@ using TestFramework.Azure.StorageAccount.Blob;
 using TestFramework.Azure.StorageAccount.Table;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
+using TestFramework.Core.Steps;
 using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.Tests;
@@ -196,6 +199,124 @@ public class AzureConfigurationTests
         Assert.Equal("https://example.test/api/admin/functions/cleanup", sender.Request!.RequestUri!.ToString());
         Assert.Equal("secret", sender.Request.Headers.GetValues("x-functions-key").Single());
         Assert.Equal("{}", await sender.Request.Content!.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task FunctionAppIsLiveTrigger_UsesHostStatusEndpointAndConfiguredKey()
+    {
+        HttpResponseMessage response = new(HttpStatusCode.OK);
+        FakeHttpRequestSender sender = new(response);
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("func", new FunctionAppConfig
+            {
+                BaseUrl = "https://example.test/api/",
+                Code = "function-code",
+                AdminCode = "admin-code",
+            }));
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.FunctionApp("func");
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.Equal("https://example.test/api/admin/host/status", sender.Request!.RequestUri!.ToString());
+        Assert.Equal("admin-code", sender.Request.Headers.GetValues("x-functions-key").Single());
+    }
+
+    [Fact]
+    public async Task ServiceBusIsLiveTrigger_UsesAdministrationValidation()
+    {
+        FakeServiceBusAdministrationAdapter administration = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("bus", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = "orders",
+                TopicName = null,
+                SubscriptionName = null,
+                RequiredSession = false,
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.ServiceBus("bus");
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.True(administration.ValidateCalled);
+    }
+
+    [Fact]
+    public async Task BlobStorageIsLiveTrigger_UsesContainerValidation()
+    {
+        FakeBlobContainerAdapter container = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            {
+                ConnectionString = "UseDevelopmentStorage=true",
+                BlobContainerName = "blob",
+                QueueContainerName = null,
+                TableContainerName = "table",
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.Blob("storage");
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.True(container.ValidateCalled);
+    }
+
+    [Fact]
+    public async Task TableStorageIsLiveTrigger_UsesTableValidation()
+    {
+        FakeTableAdapter table = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            {
+                ConnectionString = "UseDevelopmentStorage=true",
+                BlobContainerName = "blob",
+                QueueContainerName = null,
+                TableContainerName = "table",
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.Table("storage");
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.True(table.ValidateCalled);
+        Assert.Equal("table", table.LastTableName);
+    }
+
+    [Fact]
+    public async Task CosmosContainerIsLiveTrigger_UsesContainerValidation()
+    {
+        FakeCosmosContainerAdapter container = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            {
+                ConnectionString = "AccountEndpoint=https://cosmos.test/",
+                DatabaseName = "db",
+                ContainerName = "items",
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.Cosmos("cosmos");
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.True(container.ValidateCalled);
     }
 
     [Fact]
@@ -585,6 +706,7 @@ public class AzureConfigurationTests
 
     private sealed class FakeCosmosContainerAdapter : ICosmosContainerAdapter
     {
+        public bool ValidateCalled { get; private set; }
         public TestItem? UpsertedItem { get; private set; }
         public PartitionKey UpsertedPartitionKey { get; private set; } = PartitionKey.Null;
         public string? DeletedId { get; private set; }
@@ -594,6 +716,12 @@ public class AzureConfigurationTests
         public CosmosReadResponse ReadResponse { get; set; } = new(false, null);
         public QueryDefinition? LastQuery { get; private set; }
         public List<object> QueryItems { get; } = [];
+
+        public Task ValidateConnectionAsync(CancellationToken cancellationToken)
+        {
+            ValidateCalled = true;
+            return Task.CompletedTask;
+        }
 
         public Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey)
         {
@@ -635,12 +763,19 @@ public class AzureConfigurationTests
     private sealed class FakeBlobContainerAdapter : IBlobContainerAdapter
     {
         public bool CreateCalled { get; private set; }
+        public bool ValidateCalled { get; private set; }
         public string? UploadedPath { get; private set; }
         public byte[]? UploadedData { get; private set; }
         public IReadOnlyDictionary<string, string>? UploadedMetadata { get; private set; }
         public string? DeletedPath { get; private set; }
         public string? ReadPath { get; private set; }
         public BlobReadResponse ReadResponse { get; set; } = new(false, null, null);
+
+        public Task ValidateConnectionAsync(CancellationToken cancellationToken)
+        {
+            ValidateCalled = true;
+            return Task.CompletedTask;
+        }
 
         public Task CreateIfNotExistsAsync()
         {
@@ -681,6 +816,7 @@ public class AzureConfigurationTests
     private sealed class FakeTableAdapter : ITableAdapter
     {
         public bool CreateCalled { get; private set; }
+        public bool ValidateCalled { get; private set; }
         public string? LastTableName { get; set; }
         public object? UpsertedEntity { get; private set; }
         public (string PartitionKey, string RowKey)? DeletedEntity { get; private set; }
@@ -688,6 +824,12 @@ public class AzureConfigurationTests
         public object? ReadEntity { get; set; }
         public string? LastFilter { get; private set; }
         public List<object> QueryResults { get; } = [];
+
+        public Task ValidateConnectionAsync(CancellationToken cancellationToken)
+        {
+            ValidateCalled = true;
+            return Task.CompletedTask;
+        }
 
         public Task CreateIfNotExistsAsync()
         {
@@ -776,9 +918,16 @@ public class AzureConfigurationTests
 
     private sealed class FakeServiceBusAdministrationAdapter : IServiceBusAdministrationAdapter
     {
+        public bool ValidateCalled { get; private set; }
         public CreateSubscriptionOptions? CreatedOptions { get; private set; }
         public CreateRuleOptions? CreatedRuleOptions { get; private set; }
         public (string TopicName, string SubscriptionName)? DeletedSubscription { get; private set; }
+
+        public Task ValidateConnectionAsync(CancellationToken cancellationToken)
+        {
+            ValidateCalled = true;
+            return Task.CompletedTask;
+        }
 
         public Task CreateSubscriptionAsync(CreateSubscriptionOptions options, CreateRuleOptions? ruleOptions, CancellationToken cancellationToken)
         {
