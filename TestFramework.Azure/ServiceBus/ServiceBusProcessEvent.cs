@@ -79,11 +79,15 @@ public class ServiceBusProcessEvent(
         ScopedLogger logger, CancellationToken cancellationToken)
     {
         ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
+        bool useTempSubscription = createTempSubscription?.GetValue(variableStore) == true;
 
-        // When a temp subscription was created, use it; otherwise fall back to the configured one.
-        string subscriptionName = createTempSubscription?.GetValue(variableStore) == true
-            ? TempSubscriptionName
-            : config.SubscriptionNameRequired;
+        string? subscriptionName = config.GetReceiveMode(useTempSubscription) switch
+        {
+            ServiceBusConfigReceiveMode.Queue => null,
+            ServiceBusConfigReceiveMode.TopicSubscription => config.SubscriptionNameRequired,
+            ServiceBusConfigReceiveMode.TopicTemporarySubscription => TempSubscriptionName,
+            _ => throw new InvalidOperationException($"Unsupported Service Bus receive mode for '{identifier}'."),
+        };
 
         await using IServiceBusMessagePump pump = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateMessagePump(config, subscriptionName);
         return await pump.ReceiveMessageAsync(

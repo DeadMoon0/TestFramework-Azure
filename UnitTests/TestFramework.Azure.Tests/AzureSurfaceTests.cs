@@ -100,7 +100,7 @@ public class AzureSurfaceTests
     private sealed class StubServiceBusFactory : IServiceBusComponentFactory
     {
         public IServiceBusSenderAdapter CreateSender(Configuration.SpecificConfigs.ServiceBusConfig config) => throw new NotSupportedException();
-        public IServiceBusMessagePump CreateMessagePump(Configuration.SpecificConfigs.ServiceBusConfig config, string subscriptionName) => throw new NotSupportedException();
+        public IServiceBusMessagePump CreateMessagePump(Configuration.SpecificConfigs.ServiceBusConfig config, string? subscriptionName) => throw new NotSupportedException();
         public IServiceBusAdministrationAdapter CreateAdministration(Configuration.SpecificConfigs.ServiceBusConfig config) => throw new NotSupportedException();
     }
 

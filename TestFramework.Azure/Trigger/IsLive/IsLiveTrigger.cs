@@ -136,8 +136,28 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
     public override async Task<object?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(identifier);
+        TimeSpan timeout = TimeOutOptions.TimeOut.GetValue(variableStore);
+        if (timeout <= TimeSpan.Zero)
+        {
+            throw new InvalidOperationException($"Cosmos IsLive timeout for '{identifier}' must be greater than zero.");
+        }
+
         ICosmosContainerAdapter container = serviceProvider.GetAzureComponentFactory().Cosmos.CreateContainer(config);
-        await container.ValidateConnectionAsync(cancellationToken);
+
+        using CancellationTokenSource timeoutTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutTokenSource.CancelAfter(timeout);
+
+        try
+        {
+            await container.ValidateConnectionAsync(timeoutTokenSource.Token).WaitAsync(timeout, cancellationToken);
+        }
+        catch (TimeoutException exception)
+        {
+            throw new TimeoutException(
+                $"Cosmos container '{identifier}' did not respond within {timeout}. Configure the timeline step timeout, for example with .WithTimeOut(...), for slower local or emulator environments.",
+                exception);
+        }
+
         return null;
     }
 }

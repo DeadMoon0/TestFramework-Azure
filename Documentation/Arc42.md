@@ -598,10 +598,14 @@ public record StorageAccountIdentifier(string Identifier)
     "MainDb": {
       "ConnectionString": "AccountEndpoint=...;AccountKey=...",
       "DatabaseName": "TestDb",
-      "ContainerName": "Items"
+            "ContainerName": "Items"
     }
   },
   "ServiceBus": {
+        "MainSBQueue": {
+            "ConnectionString": "Endpoint=sb://...;SharedAccessKey=...",
+            "QueueName": "test-queue"
+        },
     "MainSBTopic": {
       "ConnectionString": "Endpoint=sb://...;SharedAccessKey=...",
       "TopicName":  "test-topic",
@@ -653,6 +657,18 @@ public record StorageAccountIdentifier(string Identifier)
 
 ### 8.5 Service Bus Temp Subscription Lifecycle
 
+### 8.5 Service Bus Receive Modes
+
+| Mode | Required config fields | Runtime behaviour |
+|------|------------------------|-------------------|
+| Queue | `ConnectionString`, `QueueName` | `MessageReceived(...)` listens directly on the queue. No subscription is required. |
+| Topic + subscription | `ConnectionString`, `TopicName`, `SubscriptionName` | `MessageReceived(...)` uses the configured subscription. |
+| Topic + temp subscription | `ConnectionString`, `TopicName` | `MessageReceived(..., createTempSubscription: true)` creates a filtered temp subscription during pre-step and deletes it during cleanup. |
+
+`RequiredSession` applies to queue and topic receive modes.
+
+### 8.6 Service Bus Temp Subscription Lifecycle
+
 ```mermaid
 stateDiagram-v2
     [*] --> PreStep : Timeline run starts
@@ -672,7 +688,13 @@ stateDiagram-v2
     end note
 ```
 
-### 8.6 SQL Migration Tracking
+### 8.7 Cosmos Client Options
+
+Register `ICosmosClientOptionsProvider` or call `ConfigureCosmosClientOptions(...)` to customize `CosmosClientOptions` for Cosmos SDK behavior.
+
+`AzureTF.Trigger.IsLive.Cosmos(...)` does not use a separate Cosmos config timeout. It uses the normal step timeout configured by the timeline, for example `.WithTimeOut(...)` on the builder.
+
+### 8.8 SQL Migration Tracking
 
 ```mermaid
 stateDiagram-v2
@@ -851,10 +873,14 @@ mindmap
     "MainDb": {
       "ConnectionString": "AccountEndpoint=https://localhost:8081;AccountKey=...",
       "DatabaseName": "TestDb",
-      "ContainerName": "Items"
+            "ContainerName": "Items"
     }
   },
   "ServiceBus": {
+        "MainSBQueue": {
+            "ConnectionString": "Endpoint=sb://...;SharedAccessKeyName=...;SharedAccessKey=...",
+            "QueueName": "test-queue"
+        },
     "MainSBTopic": {
       "ConnectionString": "Endpoint=sb://...;SharedAccessKeyName=...;SharedAccessKey=...",
       "TopicName": "test-topic",
@@ -932,11 +958,34 @@ public async Task Function_HTTP_Trigger()
 }
 ```
 
-### 13.5 Service Bus Send + Receive
+### 13.5 Service Bus Queue Send + Receive
 
 ```csharp
 [Fact]
-public async Task ServiceBus_Send_Receive()
+public async Task ServiceBus_Queue_Send_Receive()
+{
+    var correlationId = Guid.NewGuid().ToString();
+
+    var timeline = Timeline.Create()
+        .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived(
+            "MainSBQueue",
+            correlationId: correlationId,
+            completeMessage: true))
+            .WithTimeOut(TimeSpan.FromMinutes(2))
+        .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBQueue",
+            new ServiceBusMessage("payload") { CorrelationId = correlationId }))
+        .Build();
+
+    var run = await timeline.SetupRun(serviceProvider, _output).RunAsync();
+    run.EnsureRanToCompletion();
+}
+```
+
+### 13.6 Service Bus Topic Send + Temp Subscription Receive
+
+```csharp
+[Fact]
+public async Task ServiceBus_Topic_Send_Receive_With_Temp_Subscription()
 {
     var correlationId = Guid.NewGuid().ToString();
 
@@ -956,7 +1005,7 @@ public async Task ServiceBus_Send_Receive()
 }
 ```
 
-### 13.6 Cosmos DB Artifact
+### 13.7 Cosmos DB Artifact
 
 ```csharp
 public record MyItem(string id, string partitionKey, string Name);

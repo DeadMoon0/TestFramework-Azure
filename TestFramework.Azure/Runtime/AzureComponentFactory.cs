@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration.SpecificConfigs;
@@ -77,7 +78,7 @@ internal readonly record struct CosmosReadResponse(bool Found, Stream? Content);
 internal interface IServiceBusComponentFactory
 {
     IServiceBusSenderAdapter CreateSender(ServiceBusConfig config);
-    IServiceBusMessagePump CreateMessagePump(ServiceBusConfig config, string subscriptionName);
+    IServiceBusMessagePump CreateMessagePump(ServiceBusConfig config, string? subscriptionName);
     IServiceBusAdministrationAdapter CreateAdministration(ServiceBusConfig config);
 }
 
@@ -116,29 +117,37 @@ internal interface IHttpRequestSender
 
 internal static class AzureComponentFactoryServiceProviderExtensions
 {
+    private static readonly ConditionalWeakTable<IServiceProvider, IAzureComponentFactory> DefaultFactories = new();
+
     internal static IAzureComponentFactory GetAzureComponentFactory(this IServiceProvider serviceProvider)
     {
-        return serviceProvider.GetService<IAzureComponentFactory>() ?? DefaultAzureComponentFactory.Instance;
+        return serviceProvider.GetService<IAzureComponentFactory>()
+            ?? DefaultFactories.GetValue(serviceProvider, provider => new DefaultAzureComponentFactory(provider));
     }
 }
 
 internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 {
-    internal static IAzureComponentFactory Instance { get; } = new DefaultAzureComponentFactory();
-
-    public ICosmosComponentFactory Cosmos { get; } = new DefaultCosmosComponentFactory();
+    public ICosmosComponentFactory Cosmos { get; }
     public IBlobComponentFactory Blob { get; } = new DefaultBlobComponentFactory();
     public ITableComponentFactory Table { get; } = new DefaultTableComponentFactory();
     public IServiceBusComponentFactory ServiceBus { get; } = new DefaultServiceBusComponentFactory();
     public IHttpComponentFactory Http { get; } = new DefaultHttpComponentFactory();
 
-    private DefaultAzureComponentFactory() { }
+    private readonly IServiceProvider _serviceProvider;
 
-    private sealed class DefaultCosmosComponentFactory : ICosmosComponentFactory
+    internal DefaultAzureComponentFactory(IServiceProvider serviceProvider)
+    {
+        _serviceProvider = serviceProvider;
+        Cosmos = new DefaultCosmosComponentFactory(_serviceProvider);
+    }
+
+    private sealed class DefaultCosmosComponentFactory(IServiceProvider serviceProvider) : ICosmosComponentFactory
     {
         public ICosmosContainerAdapter CreateContainer(CosmosContainerDbConfig config)
         {
-            CosmosClient client = new CosmosClient(config.ConnectionString);
+            CosmosClientOptions options = CosmosClientOptionsResolver.Resolve(serviceProvider, config);
+            CosmosClient client = new CosmosClient(config.ConnectionString, options);
             Container container = client.GetDatabase(config.DatabaseName).GetContainer(config.ContainerName);
             return new DefaultCosmosContainerAdapter(container);
         }
@@ -292,7 +301,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
             return new DefaultServiceBusSenderAdapter(config);
         }
 
-        public IServiceBusMessagePump CreateMessagePump(ServiceBusConfig config, string subscriptionName)
+        public IServiceBusMessagePump CreateMessagePump(ServiceBusConfig config, string? subscriptionName)
         {
             return new DefaultServiceBusMessagePump(config, subscriptionName);
         }
@@ -332,7 +341,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         private readonly ServiceBusProcessor? _processor;
         private readonly ServiceBusSessionProcessor? _sessionProcessor;
 
-        public DefaultServiceBusMessagePump(ServiceBusConfig config, string subscriptionName)
+        public DefaultServiceBusMessagePump(ServiceBusConfig config, string? subscriptionName)
         {
             _client = new ServiceBusClient(config.ConnectionString);
             if (config.RequiredSession)
