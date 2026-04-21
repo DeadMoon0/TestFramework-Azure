@@ -52,7 +52,17 @@ TimelineRun run = await timeline.SetupRun(config.BuildServiceProvider())
 run.EnsureRanToCompletion();
 ```
 
-## Sample: Service Bus Send + Wait
+## Service Bus Support Matrix
+
+`ServiceBusConfig` supports three receive modes:
+
+| Mode | Required fields | Notes |
+|------|-----------------|-------|
+| Queue | `ConnectionString`, `QueueName` | `SubscriptionName` must be omitted. Works with session and non-session queues. |
+| Topic + subscription | `ConnectionString`, `TopicName`, `SubscriptionName` | Use when the test should receive from a fixed subscription. |
+| Topic + temp subscription | `ConnectionString`, `TopicName` | Call `AzureTF.Event.ServiceBus.MessageReceived(..., createTempSubscription: true)` to create and clean up a filtered temp subscription automatically. |
+
+## Sample: Service Bus Queue Send + Wait
 
 ```csharp
 using Azure.Messaging.ServiceBus;
@@ -60,13 +70,59 @@ using TestFrameworkAzure;
 using TestFramework.Core.Timelines;
 
 Timeline timeline = Timeline.Create()
-    .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBTopic",
+    .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBQueue",
         new ServiceBusMessage("Test message") { CorrelationId = "1234 :)" }))
     .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived(
-        "MainSBTopic",
+        "MainSBQueue",
         correlationId: "1234 :)",
         completeMessage: true))
     .WithTimeOut(TimeSpan.FromSeconds(10))
+    .Build();
+```
+
+## Sample: Service Bus Topic Send + Temp Subscription Wait
+
+```csharp
+Timeline timeline = Timeline.Create()
+    .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived(
+        "MainSBTopic",
+        correlationId: "topic-1234",
+        createTempSubscription: true,
+        completeMessage: true))
+    .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBTopic",
+        new ServiceBusMessage("Test message") { CorrelationId = "topic-1234" }))
+    .WithTimeOut(TimeSpan.FromSeconds(10))
+    .Build();
+```
+
+## Cosmos Client Options Note
+
+Use `ConfigureCosmosClientOptions(...)` when you need to customize the underlying Cosmos SDK client.
+
+For `AzureTF.Trigger.IsLive.Cosmos(...)`, timeout control comes from the normal timeline step timeout, for example via `.WithTimeOut(...)` on the builder.
+
+```csharp
+using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.DependencyInjection;
+using TestFramework.Azure;
+using TestFramework.Azure.Extensions;
+using TestFramework.Config;
+using TestFramework.Core.Timelines;
+
+ConfigInstance config = ConfigInstance.FromJsonFile("local.testSettings.json")
+    .AddService((services, configuration) =>
+    {
+        services.LoadAzureConfigs(configuration)
+            .ConfigureCosmosClientOptions(_ => new CosmosClientOptions
+            {
+                ConnectionMode = ConnectionMode.Gateway,
+            });
+    })
+    .Build();
+
+Timeline timeline = Timeline.Create()
+    .Trigger(AzureTF.Trigger.IsLive.Cosmos("MainDb"))
+        .WithTimeOut(TimeSpan.FromSeconds(5))
     .Build();
 ```
 

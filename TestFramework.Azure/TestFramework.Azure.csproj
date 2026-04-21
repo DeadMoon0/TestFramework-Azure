@@ -5,7 +5,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<Title>TestFramework Azure</Title>
-		<Version>0.1.0</Version>
+		<Version>0.1.1</Version>
 		<Authors>DeadMoon0</Authors>
 		<Product>TestFramework</Product>
 		<Description>Interact with Azure infrastructure inside of a TestFramework Timeline.</Description>

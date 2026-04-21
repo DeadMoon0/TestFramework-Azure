@@ -69,6 +69,12 @@ public class AzureConfigurationTests
         DefaultConfigProvider provider = new();
         ServiceBusConfig busConfig = provider.LoadServiceBusConfig(configuration, "orders");
         FunctionAppConfig functionAppConfig = provider.LoadFunctionAppConfig(configuration, "notify");
+        CosmosContainerDbConfig cosmosConfig = provider.LoadCosmosDbConfig(BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["CosmosDb:cosmos:ConnectionString"] = "AccountEndpoint=https://cosmos.test/",
+            ["CosmosDb:cosmos:DatabaseName"] = "db",
+            ["CosmosDb:cosmos:ContainerName"] = "items",
+        }), "cosmos");
 
         Assert.Equal(new[] { "orders" }, provider.LoadAllServiceBusIdentifier(configuration));
         Assert.Equal(new[] { "notify" }, provider.LoadAllFunctionAppIdentifier(configuration));
@@ -77,6 +83,7 @@ public class AzureConfigurationTests
         Assert.True(busConfig.RequiredSession);
         Assert.Equal("https://example.test", functionAppConfig.BaseUrl);
         Assert.Equal("secret", functionAppConfig.Code);
+        Assert.Equal("items", cosmosConfig.ContainerName);
     }
 
     [Fact]
@@ -317,6 +324,56 @@ public class AzureConfigurationTests
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
         Assert.True(container.ValidateCalled);
+    }
+
+    [Fact]
+    public async Task CosmosContainerIsLiveTrigger_UsesConfiguredTimeoutForLocalEndpoint()
+    {
+        FakeCosmosContainerAdapter container = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            {
+                ConnectionString = "AccountEndpoint=https://localhost:8081/;AccountKey=emulator;",
+                DatabaseName = "db",
+                ContainerName = "items",
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.Cosmos("cosmos");
+        trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.True(container.ValidateCalled);
+    }
+
+    [Fact]
+    public async Task CosmosContainerIsLiveTrigger_TimesOutHungValidation()
+    {
+        FakeCosmosContainerAdapter container = new()
+        {
+            ValidateConnectionAsyncHandler = _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously).Task,
+        };
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            {
+                ConnectionString = "AccountEndpoint=https://localhost:8081/;AccountKey=emulator;",
+                DatabaseName = "db",
+                ContainerName = "items",
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.Cosmos("cosmos");
+        trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(50));
+
+        TimeoutException exception = await Assert.ThrowsAsync<TimeoutException>(() =>
+            trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+
+        Assert.Contains("WithTimeOut", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -619,13 +676,12 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
-        ServiceBusProcessEvent step = new(
+        ServiceBusProcessEvent step = AzureTF.Event.ServiceBus.MessageReceived(
             "topic",
-            Var.Const("m1"),
-            Var.Const("c1"),
-            Var.Const<Func<ServiceBusReceivedMessage, bool>>(message => message.MessageId == "m1"),
-            Var.Const(true),
-            Var.Const(false));
+            messageId: Var.Const("m1"),
+            correlationId: Var.Const("c1"),
+            predicate: Var.Const<Func<ServiceBusReceivedMessage, bool>>(message => message.MessageId == "m1"),
+            completeMessage: Var.Const(true));
 
         ServiceBusReceivedMessage? result = await step.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -635,6 +691,127 @@ public class AzureConfigurationTests
         Assert.True(pump.LastRequest.Value.CompleteMessage);
         Assert.Equal("default-sub", pump.SubscriptionName);
         Assert.True(pump.LastRequest.Value.Predicate!(receivedMessage));
+    }
+
+    [Fact]
+    public async Task ServiceBusProcessEvent_AllowsQueueConfigWithoutSubscription_NonSession()
+    {
+        ServiceBusReceivedMessage receivedMessage = ServiceBusModelFactory.ServiceBusReceivedMessage(messageId: "q1", body: new BinaryData("payload"));
+        FakeServiceBusMessagePump pump = new() { MessageToReturn = receivedMessage };
+        FakeServiceBusSender sender = new();
+        FakeServiceBusComponentFactory serviceBusFactory = new(sender: sender, pump: pump);
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("queue", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = "orders-queue",
+                TopicName = null,
+                SubscriptionName = null,
+                RequiredSession = false,
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = serviceBusFactory });
+        });
+
+        ServiceBusMessage sendMessage = new("payload") { MessageId = "q1" };
+        ServiceBusSendTrigger sendTrigger = AzureTF.Trigger.ServiceBus.Send("queue", Var.Const(sendMessage));
+        ServiceBusProcessEvent receiveEvent = AzureTF.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q1"));
+
+        await sendTrigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        ServiceBusReceivedMessage? result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.Same(sendMessage, sender.MessageSent);
+        Assert.Same(receivedMessage, result);
+        Assert.Null(pump.SubscriptionName);
+        Assert.Equal("q1", pump.LastRequest!.Value.MessageId);
+    }
+
+    [Fact]
+    public async Task ServiceBusProcessEvent_AllowsQueueConfigWithoutSubscription_Session()
+    {
+        ServiceBusReceivedMessage receivedMessage = ServiceBusModelFactory.ServiceBusReceivedMessage(messageId: "q2", body: new BinaryData("payload"));
+        FakeServiceBusMessagePump pump = new() { MessageToReturn = receivedMessage };
+        FakeServiceBusSender sender = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("queue", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = "orders-session-queue",
+                TopicName = null,
+                SubscriptionName = null,
+                RequiredSession = true,
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender, pump: pump) });
+        });
+
+        ServiceBusMessage sendMessage = new("payload") { MessageId = "q2" };
+        ServiceBusSendTrigger sendTrigger = AzureTF.Trigger.ServiceBus.Send("queue", Var.Const(sendMessage));
+        ServiceBusProcessEvent receiveEvent = AzureTF.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q2"));
+
+        await sendTrigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        ServiceBusReceivedMessage? result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.Same(sendMessage, sender.MessageSent);
+        Assert.False(string.IsNullOrWhiteSpace(sendMessage.SessionId));
+        Assert.Same(receivedMessage, result);
+        Assert.Null(pump.SubscriptionName);
+        Assert.Equal("q2", pump.LastRequest!.Value.MessageId);
+    }
+
+    [Fact]
+    public async Task ServiceBusProcessEvent_UsesTemporarySubscriptionForTopicReceive()
+    {
+        ServiceBusReceivedMessage receivedMessage = ServiceBusModelFactory.ServiceBusReceivedMessage(messageId: "t1", body: new BinaryData("payload"));
+        FakeServiceBusMessagePump pump = new() { MessageToReturn = receivedMessage };
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("topic", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = null,
+                TopicName = "orders-topic",
+                SubscriptionName = null,
+                RequiredSession = false,
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
+        });
+
+        ServiceBusProcessEvent receiveEvent = AzureTF.Event.ServiceBus.MessageReceived("topic", messageId: Var.Const("t1"), createTempSubscription: true);
+
+        StepGeneric? preStep = ((IHasPreStep)receiveEvent).CreatePreStep(runtime.VariableStore);
+        StepGeneric? cleanupStep = ((IHasCleanupStep)receiveEvent).CreateCleanupStep(runtime.VariableStore);
+        ServiceBusReceivedMessage? result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.IsType<ServiceBusCreateTempSubscriptionStep>(preStep);
+        Assert.IsType<ServiceBusDeleteTempSubscriptionStep>(cleanupStep);
+        Assert.Same(receivedMessage, result);
+        Assert.NotNull(pump.SubscriptionName);
+        Assert.StartsWith("tmp-", pump.SubscriptionName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ServiceBusProcessEvent_ThrowsWhenTopicConfigIsMissingSubscription()
+    {
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("topic", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = null,
+                TopicName = "orders-topic",
+                SubscriptionName = null,
+                RequiredSession = false,
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory());
+        });
+
+        ServiceBusProcessEvent receiveEvent = AzureTF.Event.ServiceBus.MessageReceived("topic", messageId: Var.Const("missing-sub"));
+
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+
+        Assert.Contains("createTempSubscription", exception.Message, StringComparison.Ordinal);
     }
 
     private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
@@ -707,6 +884,7 @@ public class AzureConfigurationTests
     private sealed class FakeCosmosContainerAdapter : ICosmosContainerAdapter
     {
         public bool ValidateCalled { get; private set; }
+        public Func<CancellationToken, Task>? ValidateConnectionAsyncHandler { get; set; }
         public TestItem? UpsertedItem { get; private set; }
         public PartitionKey UpsertedPartitionKey { get; private set; } = PartitionKey.Null;
         public string? DeletedId { get; private set; }
@@ -720,7 +898,7 @@ public class AzureConfigurationTests
         public Task ValidateConnectionAsync(CancellationToken cancellationToken)
         {
             ValidateCalled = true;
-            return Task.CompletedTask;
+            return ValidateConnectionAsyncHandler?.Invoke(cancellationToken) ?? Task.CompletedTask;
         }
 
         public Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey)
@@ -877,9 +1055,11 @@ public class AzureConfigurationTests
         private readonly FakeServiceBusMessagePump _pump = pump ?? new FakeServiceBusMessagePump();
         private readonly FakeServiceBusAdministrationAdapter _admin = admin ?? new FakeServiceBusAdministrationAdapter();
 
+        public FakeServiceBusSender Sender => _sender;
+
         public IServiceBusSenderAdapter CreateSender(ServiceBusConfig config) => _sender;
 
-        public IServiceBusMessagePump CreateMessagePump(ServiceBusConfig config, string subscriptionName)
+        public IServiceBusMessagePump CreateMessagePump(ServiceBusConfig config, string? subscriptionName)
         {
             _pump.SubscriptionName = subscriptionName;
             return _pump;
