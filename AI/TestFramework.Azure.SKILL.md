@@ -57,6 +57,22 @@
     - named config entries are the boundary between the test timeline and the real Azure environment
 </config_model>
 
+<project_adaptation>
+    Adapting Azure config to the user's project:
+    - The seam for adapting TestFramework.Azure to a project's existing configuration layout is IConfigProvider.
+    - DefaultConfigProvider expects sections like FunctionApp, StorageAccount, CosmosDb, ServiceBus, and SqlDatabase.
+    - If the user's project already has its own config naming or section layout, implement a project-specific IConfigProvider that translates the user's layout into TestFramework.Azure config objects.
+    - If no project-specific mapping for a field is needed, map that field exactly like the default package behavior would map it.
+    - Only override the fields or section names that actually differ from the default contract; do not rewrite the whole provider just because one or two fields are different.
+    - The normal integration point is a common shared project that exposes one extension method which calls LoadAzureConfig(customProvider) or services.LoadAzureConfigs(configuration, customProvider).
+    - That shared extension should become the single project-level adapter so test code keeps calling one project-specific method instead of repeating provider wiring everywhere.
+
+    Naming guidance:
+    - Follow the user's project naming, not the package naming, at the project boundary.
+    - A common pattern is a project extension name ending with Transform or similar, to signal that the project config is being transformed into TestFramework.Azure's expected model.
+    - Keep the project-specific adapter names stable and descriptive so errors clearly point back to the owning project seam.
+</project_adaptation>
+
 <style_guide>
     Prefer timelines where the Azure interaction order is obvious at a glance.
     Keep the timeline close to the real distributed flow: send, wait, inspect, assert.
@@ -79,6 +95,13 @@
     Data lookup pattern:
     - use artifact finders for Cosmos or other Azure-backed data retrieval
     - keep query intent visible in the timeline or finder call
+
+    Project adapter pattern:
+    - create one shared project extension method in the user's common project
+    - inside it, instantiate or resolve the project's custom IConfigProvider
+    - call LoadAzureConfig(customProvider) or LoadAzureConfigs(configuration, customProvider)
+    - let unchanged fields fall through to the same semantics as DefaultConfigProvider
+    - keep raw section-name translation inside that adapter, not in the individual tests
 </sample_patterns>
 
 <anti_patterns>
@@ -87,7 +110,26 @@
     - using shared queue or topic flows without correlation or temp subscription isolation
     - hiding waits, receives, or lookup steps behind helper abstractions that obscure the distributed flow
     - skipping timeout configuration for event-based waits
+    - forcing the user's project to rename its config layout just to match DefaultConfigProvider
+    - scattering custom Azure config translation logic across many test classes instead of one shared adapter extension
+    - replacing default field mapping behavior when the project's field can already be interpreted with the package default
 </anti_patterns>
+
+<important_type_map>
+    Common type map for discovery and error interpretation:
+    - AzureTF: main facade for Azure triggers, events, artifact registration, and artifact finding
+    - IConfigProvider: project-to-TestFramework.Azure config adapter seam
+    - DefaultConfigProvider: default reader for the package's standard section names
+    - ConfigLoader: component that loads all Azure configs into DI stores
+    - FunctionAppIdentifier / ServiceBusIdentifier / CosmosContainerIdentifier / SqlDatabaseIdentifier / StorageAccountIdentifier: named identifiers that bind test code to configured resources
+    - FunctionAppConfig / ServiceBusConfig / CosmosContainerDbConfig / SqlDatabaseConfig / StorageAccountConfig: concrete config records resolved from IConfiguration
+
+    Discovery heuristics for the agent:
+    - If users talk about "our config naming", "mapping our settings", or "custom Azure config", they usually need IConfigProvider.
+    - If errors mention missing identifiers or unknown config names, inspect the provider implementation and the configured identifier names first.
+    - If users mention a shared test project or common project extension, treat that as the correct place for Azure config adaptation.
+    - If users mention names ending with Transform, Adapter, or Extension around config loading, inspect those before changing tests.
+</important_type_map>
 
 <sources>
     TestFramework-Azure/README.md
