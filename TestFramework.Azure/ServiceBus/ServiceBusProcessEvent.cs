@@ -9,6 +9,7 @@ using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Events;
+using TestFramework.Core.Environment;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Steps.Options;
@@ -23,7 +24,7 @@ public class ServiceBusProcessEvent(
     VariableReference<Func<ServiceBusReceivedMessage, bool>>? predicate = null,
     VariableReference<bool>? completeMessage = null,
     VariableReference<bool>? createTempSubscription = null)
-    : AsyncEvent<ServiceBusProcessEvent, ServiceBusReceivedMessage>, IHasPreStep, IHasCleanupStep
+    : AsyncEvent<ServiceBusProcessEvent, ServiceBusReceivedMessage>, IHasPreStep, IHasCleanupStep, IHasEnvironmentRequirements
 {
     public override string Name => "ServiceBus Process Event";
     public override string Description => "An event that is triggered when a message is received from a Service Bus.";
@@ -72,6 +73,9 @@ public class ServiceBusProcessEvent(
         if (createTempSubscription?.GetValue(variableStore) != true) return null;
         return new ServiceBusDeleteTempSubscriptionStep(identifier, TempSubscriptionName);
     }
+
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.ServiceBus, identifier)];
 
 
     // ── DoEventPolling ────────────────────────────────────────────────────────

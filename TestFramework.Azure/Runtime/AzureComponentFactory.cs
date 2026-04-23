@@ -71,6 +71,7 @@ internal interface ICosmosContainerAdapter
     Task ValidateAccountReachabilityAsync(CancellationToken cancellationToken);
     Task ValidateAccountConnectionAsync(CancellationToken cancellationToken);
     Task ValidateConnectionAsync(CancellationToken cancellationToken);
+    Task EnsureContainerExistsAsync<TItem>(TItem item);
     Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey);
     Task UpsertItemAsync<TItem>(TItem item, PartitionKey partitionKey);
     Task<CosmosReadResponse> ReadItemAsync(string id, PartitionKey partitionKey);
@@ -153,8 +154,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         {
             CosmosClientOptions options = CosmosClientOptionsResolver.Resolve(serviceProvider, config);
             CosmosClient client = new CosmosClient(config.ConnectionString, options);
-            Container container = client.GetDatabase(config.DatabaseName).GetContainer(config.ContainerName);
-            return new DefaultCosmosContainerAdapter(client, container);
+            return new DefaultCosmosContainerAdapter(client, config.DatabaseName, config.ContainerName);
         }
     }
 
@@ -220,9 +220,14 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
     private sealed class DefaultTableAdapter(TableServiceClient serviceClient, TableClient tableClient) : ITableAdapter
     {
-        public Task ValidateServiceConnectionAsync(CancellationToken cancellationToken)
+        public async Task ValidateServiceConnectionAsync(CancellationToken cancellationToken)
         {
-            return serviceClient.GetPropertiesAsync(cancellationToken);
+            await foreach (var _ in serviceClient.QueryAsync(cancellationToken: cancellationToken)
+                .AsPages(pageSizeHint: 1)
+                .ConfigureAwait(false))
+            {
+                break;
+            }
         }
 
         public async Task ValidateConnectionAsync(CancellationToken cancellationToken)
@@ -262,8 +267,13 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         }
     }
 
-    private sealed class DefaultCosmosContainerAdapter(CosmosClient client, Container container) : ICosmosContainerAdapter
+    private sealed class DefaultCosmosContainerAdapter(CosmosClient client, string databaseName, string containerName) : ICosmosContainerAdapter
     {
+        private Container GetContainer()
+        {
+            return client.GetDatabase(databaseName).GetContainer(containerName);
+        }
+
         public async Task ValidateAccountReachabilityAsync(CancellationToken cancellationToken)
         {
             using HttpClient httpClient = new HttpClient();
@@ -278,23 +288,30 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
         public async Task ValidateConnectionAsync(CancellationToken cancellationToken)
         {
-            using ResponseMessage response = await container.ReadContainerStreamAsync(cancellationToken: cancellationToken);
+            using ResponseMessage response = await GetContainer().ReadContainerStreamAsync(cancellationToken: cancellationToken);
             response.EnsureSuccessStatusCode();
+        }
+
+        public async Task EnsureContainerExistsAsync<TItem>(TItem item)
+        {
+            Database database = await client.CreateDatabaseIfNotExistsAsync(databaseName, throughput: 400);
+            string partitionKeyPath = ResolvePartitionKeyPath<TItem>();
+            await database.CreateContainerIfNotExistsAsync(containerName, partitionKeyPath, throughput: 400);
         }
 
         public async Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey)
         {
-            await container.DeleteItemAsync<TItem>(id, partitionKey);
+            await GetContainer().DeleteItemAsync<TItem>(id, partitionKey);
         }
 
         public async Task UpsertItemAsync<TItem>(TItem item, PartitionKey partitionKey)
         {
-            await container.UpsertItemAsync(item, partitionKey);
+            await GetContainer().UpsertItemAsync(item, partitionKey);
         }
 
         public async Task<CosmosReadResponse> ReadItemAsync(string id, PartitionKey partitionKey)
         {
-            using ResponseMessage response = await container.ReadItemStreamAsync(id, partitionKey);
+            using ResponseMessage response = await GetContainer().ReadItemStreamAsync(id, partitionKey);
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 return new CosmosReadResponse(false, null);
@@ -310,7 +327,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
         public async IAsyncEnumerable<TItem> QueryItemsAsync<TItem>(QueryDefinition query, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            FeedIterator<TItem> iterator = container.GetItemQueryIterator<TItem>(query);
+            FeedIterator<TItem> iterator = GetContainer().GetItemQueryIterator<TItem>(query);
             while (iterator.HasMoreResults)
             {
                 foreach (TItem item in await iterator.ReadNextAsync(cancellationToken))
@@ -318,6 +335,17 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
                     yield return item;
                 }
             }
+        }
+
+        private static string ResolvePartitionKeyPath<TItem>()
+        {
+            System.Reflection.PropertyInfo? property = typeof(TItem).GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+                .FirstOrDefault(x => string.Equals(x.Name, "partitionKey", StringComparison.OrdinalIgnoreCase));
+
+            if (property is null)
+                throw new InvalidOperationException($"Cannot find a fitting PartitionKey Property in Type ({typeof(TItem).FullName}). A PartitionKey is required.");
+
+            return "/" + property.Name;
         }
     }
 

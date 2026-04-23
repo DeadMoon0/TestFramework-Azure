@@ -12,6 +12,7 @@ using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
+using TestFramework.Core.Environment;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Steps.Options;
@@ -101,7 +102,7 @@ internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier,
     }
 }
 
-internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel)
+internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel), IHasEnvironmentRequirements
 {
     public override string Name => "ServiceBus IsLive Trigger";
 
@@ -123,9 +124,12 @@ internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, V
         await admin.ValidateNamespaceConnectionAsync(cancellationToken);
         return null;
     }
+
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.ServiceBus, identifier)];
 }
 
-internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel)
+internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel), IHasEnvironmentRequirements
 {
     public override string Name => "Blob Storage IsLive Trigger";
 
@@ -147,9 +151,12 @@ internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifi
         await container.ValidateServiceConnectionAsync(cancellationToken);
         return null;
     }
+
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.Storage, identifier)];
 }
 
-internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel)
+internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel), IHasEnvironmentRequirements
 {
     public override string Name => "Table Storage IsLive Trigger";
 
@@ -171,9 +178,12 @@ internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identif
         await table.ValidateServiceConnectionAsync(cancellationToken);
         return null;
     }
+
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.Storage, identifier)];
 }
 
-internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel)
+internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel), IHasEnvironmentRequirements
 {
     public override string Name => "Cosmos Container IsLive Trigger";
 
@@ -213,6 +223,9 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
         };
     }
 
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.Cosmos, identifier)];
+
     private static async Task<object?> ExecuteWithTimeoutAsync(TimeSpan timeout, CancellationToken cancellationToken, Func<CancellationToken, Task> action, string timeoutMessage)
     {
         using CancellationTokenSource timeoutTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -235,7 +248,7 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
     }
 }
 
-internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel)
+internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel), IHasEnvironmentRequirements
 {
     public override string Name => "SqlDatabase IsLive Trigger";
 
@@ -254,4 +267,7 @@ internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier,
 
         return null;
     }
+
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.Sql, identifier)];
 }

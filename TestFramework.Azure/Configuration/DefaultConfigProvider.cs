@@ -30,6 +30,7 @@ public class DefaultConfigProvider : IConfigProvider
             ConnectionString = configuration.GetSection(CosmosDbSelector).GetSection(identifier).GetSection(nameof(CosmosContainerDbConfig.ConnectionString)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.ConnectionString)),
             DatabaseName = configuration.GetSection(CosmosDbSelector).GetSection(identifier).GetSection(nameof(CosmosContainerDbConfig.DatabaseName)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.DatabaseName)),
             ContainerName = configuration.GetSection(CosmosDbSelector).GetSection(identifier).GetSection(nameof(CosmosContainerDbConfig.ContainerName)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.ContainerName)),
+            PartitionKeyPath = configuration.GetSection(CosmosDbSelector).GetSection(identifier).GetSection(nameof(CosmosContainerDbConfig.PartitionKeyPath)).Value,
         };
     }
 

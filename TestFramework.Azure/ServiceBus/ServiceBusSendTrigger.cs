@@ -8,6 +8,7 @@ using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
+using TestFramework.Core.Environment;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Steps.Options;
@@ -15,7 +16,7 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.ServiceBus;
 
-public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableReference<ServiceBusMessage> message) : Step<object?>
+public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableReference<ServiceBusMessage> message) : Step<object?>, IHasEnvironmentRequirements
 {
     public override string Name => "ServiceBus Send Trigger";
     public override string Description => "Triggers a message to be sent to a Service Bus.";
@@ -52,4 +53,7 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
     }
 
     public override StepInstance<Step<object?>, object?> GetInstance() => new StepInstance<Step<object?>, object?>(this);
+
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.ServiceBus, identifier)];
 }
