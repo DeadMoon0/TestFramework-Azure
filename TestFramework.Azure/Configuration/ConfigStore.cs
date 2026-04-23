@@ -2,17 +2,32 @@
 
 namespace TestFramework.Azure.Configuration;
 
-internal class ConfigStore<TConfig>
+public class ConfigStore<TConfig>
 {
     private readonly Dictionary<string, TConfig> _config = [];
+    private readonly object _syncRoot = new();
 
-    internal void AddConfig(string identifier, TConfig config)
+    public void AddConfig(string identifier, TConfig config)
     {
-        _config[identifier] = config;
+        lock (_syncRoot)
+        {
+            _config[identifier] = config;
+        }
     }
 
-    internal TConfig GetConfig(string identifier)
+    public TConfig GetConfig(string identifier)
     {
-        return _config[identifier];
+        lock (_syncRoot)
+        {
+            return _config[identifier];
+        }
+    }
+
+    public IReadOnlyDictionary<string, TConfig> Snapshot()
+    {
+        lock (_syncRoot)
+        {
+            return new Dictionary<string, TConfig>(_config);
+        }
     }
 }

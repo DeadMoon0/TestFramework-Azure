@@ -74,6 +74,7 @@ public class AzureConfigurationTests
             ["CosmosDb:cosmos:ConnectionString"] = "AccountEndpoint=https://cosmos.test/",
             ["CosmosDb:cosmos:DatabaseName"] = "db",
             ["CosmosDb:cosmos:ContainerName"] = "items",
+            ["CosmosDb:cosmos:PartitionKeyPath"] = "/partitionKey",
         }), "cosmos");
 
         Assert.Equal(new[] { "orders" }, provider.LoadAllServiceBusIdentifier(configuration));
@@ -84,6 +85,7 @@ public class AzureConfigurationTests
         Assert.Equal("https://example.test", functionAppConfig.BaseUrl);
         Assert.Equal("secret", functionAppConfig.Code);
         Assert.Equal("items", cosmosConfig.ContainerName);
+        Assert.Equal("/partitionKey", cosmosConfig.PartitionKeyPath);
     }
 
     [Fact]
@@ -112,6 +114,7 @@ public class AzureConfigurationTests
         using ServiceProvider provider = services.BuildServiceProvider();
         Assert.Equal("https://functions.test", provider.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig("func").BaseUrl);
         Assert.Equal("db", provider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig("cosmos").DatabaseName);
+        Assert.Equal("/partitionKey", provider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig("cosmos").PartitionKeyPath);
         Assert.Equal("queue", provider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig("bus").EntityName);
         Assert.Equal("blob", provider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig("storage").BlobContainerNameRequired);
         Assert.Equal("main", provider.GetRequiredService<ConfigStore<SqlDatabaseConfig>>().GetConfig("sql").DatabaseName);
@@ -389,6 +392,7 @@ public class AzureConfigurationTests
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
+                PartitionKeyPath = "/PartitionKey",
             }));
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
@@ -411,6 +415,7 @@ public class AzureConfigurationTests
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
+                PartitionKeyPath = "/PartitionKey",
             }));
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
@@ -436,6 +441,7 @@ public class AzureConfigurationTests
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
+                PartitionKeyPath = "/PartitionKey",
             }));
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
@@ -511,6 +517,7 @@ public class AzureConfigurationTests
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
+                PartitionKeyPath = "/PartitionKey",
             }));
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
@@ -524,6 +531,7 @@ public class AzureConfigurationTests
 
         Assert.Equal("42", reference.GetId(runtime.VariableStore));
         Assert.Equal(new PartitionKey("tenant-1"), reference.GetPartitionKey(runtime.VariableStore));
+        Assert.False(container.EnsureContainerExistsCalled);
         Assert.Equal("42", container.UpsertedItem!.id);
         Assert.Equal(new PartitionKey("tenant-1"), container.UpsertedPartitionKey);
         Assert.Equal("42", container.DeletedId);
@@ -1010,6 +1018,7 @@ public class AzureConfigurationTests
         public bool ValidateReachabilityCalled { get; private set; }
         public bool ValidateAccountCalled { get; private set; }
         public bool ValidateCalled { get; private set; }
+        public bool EnsureContainerExistsCalled { get; private set; }
         public Func<CancellationToken, Task>? ValidateReachabilityAsyncHandler { get; set; }
         public Func<CancellationToken, Task>? ValidateAccountConnectionAsyncHandler { get; set; }
         public Func<CancellationToken, Task>? ValidateConnectionAsyncHandler { get; set; }
@@ -1039,6 +1048,12 @@ public class AzureConfigurationTests
         {
             ValidateCalled = true;
             return ValidateConnectionAsyncHandler?.Invoke(cancellationToken) ?? Task.CompletedTask;
+        }
+
+        public Task EnsureContainerExistsAsync<TItem>(TItem item)
+        {
+            EnsureContainerExistsCalled = true;
+            return Task.CompletedTask;
         }
 
         public Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey)
@@ -1318,7 +1333,7 @@ public class AzureConfigurationTests
         public string[] LoadAllStorageAccountIdentifier(IConfiguration configuration) => new[] { "storage" };
         public StorageAccountConfig LoadStorageAccountConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "UseDevelopmentStorage=true", BlobContainerName = "blob", QueueContainerName = "queue", TableContainerName = "table" };
         public string[] LoadAllCosmosDbIdentifier(IConfiguration configuration) => new[] { "cosmos" };
-        public CosmosContainerDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "AccountEndpoint=https://cosmos.test/", DatabaseName = "db", ContainerName = "items" };
+        public CosmosContainerDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "AccountEndpoint=https://cosmos.test/", DatabaseName = "db", ContainerName = "items", PartitionKeyPath = "/partitionKey" };
         public string[] LoadAllServiceBusIdentifier(IConfiguration configuration) => new[] { "bus" };
         public ServiceBusConfig LoadServiceBusConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "Endpoint=sb://bus/", QueueName = "queue", TopicName = null, SubscriptionName = null, RequiredSession = false };
         public string[] LoadAllSqlDatabaseIdentifier(IConfiguration configuration) => new[] { "sql" };
