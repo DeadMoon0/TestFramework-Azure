@@ -9,6 +9,7 @@ using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
+using TestFramework.Core.Environment;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Steps.Options;
@@ -16,7 +17,7 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.FunctionApp.Trigger;
 
-internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier, VariableReference<TriggerHttpRouting> trigger, VariableReference<CommonHttpRequest> request) : Step<HttpResponseMessage>
+internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier, VariableReference<TriggerHttpRouting> trigger, VariableReference<CommonHttpRequest> request) : Step<HttpResponseMessage>, IHasEnvironmentRequirements
 {
     public override string Name => "Http Remote FunctionApp Trigger";
 
@@ -56,4 +57,7 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         if (request.HasIdentifier)
             contract.Inputs.Add(new StepIOEntry(request.Identifier!.Identifier, StepIOKind.Variable, true, typeof(CommonHttpRequest)));
     }
+
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.FunctionApp, appIdentifier)];
 }

@@ -5,6 +5,7 @@ using Microsoft.Azure.Cosmos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -74,7 +75,6 @@ public class AzureConfigurationTests
             ["CosmosDb:cosmos:ConnectionString"] = "AccountEndpoint=https://cosmos.test/",
             ["CosmosDb:cosmos:DatabaseName"] = "db",
             ["CosmosDb:cosmos:ContainerName"] = "items",
-            ["CosmosDb:cosmos:PartitionKeyPath"] = "/partitionKey",
         }), "cosmos");
 
         Assert.Equal(new[] { "orders" }, provider.LoadAllServiceBusIdentifier(configuration));
@@ -85,7 +85,6 @@ public class AzureConfigurationTests
         Assert.Equal("https://example.test", functionAppConfig.BaseUrl);
         Assert.Equal("secret", functionAppConfig.Code);
         Assert.Equal("items", cosmosConfig.ContainerName);
-        Assert.Equal("/partitionKey", cosmosConfig.PartitionKeyPath);
     }
 
     [Fact]
@@ -114,10 +113,38 @@ public class AzureConfigurationTests
         using ServiceProvider provider = services.BuildServiceProvider();
         Assert.Equal("https://functions.test", provider.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig("func").BaseUrl);
         Assert.Equal("db", provider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig("cosmos").DatabaseName);
-        Assert.Equal("/partitionKey", provider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig("cosmos").PartitionKeyPath);
         Assert.Equal("queue", provider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig("bus").EntityName);
         Assert.Equal("blob", provider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig("storage").BlobContainerNameRequired);
         Assert.Equal("main", provider.GetRequiredService<ConfigStore<SqlDatabaseConfig>>().GetConfig("sql").DatabaseName);
+    }
+
+    [Fact]
+    public void DefaultConfigExporter_ExportsSectionShapedKeys()
+    {
+        DefaultConfigExporter exporter = new();
+
+        IReadOnlyDictionary<string, string> cosmos = exporter.ExportCosmosDbConfig("cosmos", new CosmosContainerDbConfig
+        {
+            ConnectionString = "AccountEndpoint=https://cosmos.test/",
+            DatabaseName = "db",
+            ContainerName = "items",
+        });
+        IReadOnlyDictionary<string, string> serviceBus = exporter.ExportServiceBusConfig("bus", new ServiceBusConfig
+        {
+            ConnectionString = "Endpoint=sb://localhost/;UseDevelopmentEmulator=true;",
+            QueueName = null,
+            TopicName = "orders",
+            SubscriptionName = "Default",
+            RequiredSession = false,
+        });
+
+        Assert.Equal("AccountEndpoint=https://cosmos.test/", cosmos["CosmosDb:cosmos:ConnectionString"]);
+        Assert.Equal("db", cosmos["CosmosDb:cosmos:DatabaseName"]);
+        Assert.Equal("items", cosmos["CosmosDb:cosmos:ContainerName"]);
+        Assert.Equal("Endpoint=sb://localhost/;UseDevelopmentEmulator=true;", serviceBus["ServiceBus:bus:ConnectionString"]);
+        Assert.Equal("orders", serviceBus["ServiceBus:bus:TopicName"]);
+        Assert.Equal("Default", serviceBus["ServiceBus:bus:SubscriptionName"]);
+        Assert.Equal(bool.FalseString, serviceBus["ServiceBus:bus:RequiredSession"]);
     }
 
     [Fact]
@@ -126,7 +153,7 @@ public class AzureConfigurationTests
         FakeServiceBusSender sender = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("bus", new ServiceBusConfig
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("bus", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders",
@@ -153,7 +180,7 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(response);
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("func", new FunctionAppConfig
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/api/",
                 Code = "secret",
@@ -189,7 +216,7 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(response);
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("func", new FunctionAppConfig
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/api/",
                 Code = "secret",
@@ -218,7 +245,7 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(response);
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("func", new FunctionAppConfig
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/api/",
                 Code = "function-code",
@@ -242,7 +269,7 @@ public class AzureConfigurationTests
         FakeServiceBusAdministrationAdapter administration = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("bus", new ServiceBusConfig
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("bus", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders",
@@ -266,7 +293,7 @@ public class AzureConfigurationTests
         FakeServiceBusAdministrationAdapter administration = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("bus", new ServiceBusConfig
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("bus", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders",
@@ -291,7 +318,7 @@ public class AzureConfigurationTests
         FakeBlobContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            services.AddSingleton(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
@@ -314,7 +341,7 @@ public class AzureConfigurationTests
         FakeBlobContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            services.AddSingleton(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
@@ -338,7 +365,7 @@ public class AzureConfigurationTests
         FakeTableAdapter table = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            services.AddSingleton(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
@@ -362,7 +389,7 @@ public class AzureConfigurationTests
         FakeTableAdapter table = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            services.AddSingleton(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
@@ -387,12 +414,11 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            services.AddSingleton(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
-                PartitionKeyPath = "/PartitionKey",
             }));
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
@@ -410,12 +436,11 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            services.AddSingleton(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
-                PartitionKeyPath = "/PartitionKey",
             }));
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
@@ -436,12 +461,11 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            services.AddSingleton(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
-                PartitionKeyPath = "/PartitionKey",
             }));
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
@@ -462,7 +486,7 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            services.AddSingleton(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://localhost:8081/;AccountKey=emulator;",
                 DatabaseName = "db",
@@ -488,7 +512,7 @@ public class AzureConfigurationTests
         };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            services.AddSingleton(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://localhost:8081/;AccountKey=emulator;",
                 DatabaseName = "db",
@@ -512,12 +536,11 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            services.AddSingleton(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
-                PartitionKeyPath = "/PartitionKey",
             }));
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
@@ -531,7 +554,7 @@ public class AzureConfigurationTests
 
         Assert.Equal("42", reference.GetId(runtime.VariableStore));
         Assert.Equal(new PartitionKey("tenant-1"), reference.GetPartitionKey(runtime.VariableStore));
-        Assert.False(container.EnsureContainerExistsCalled);
+        Assert.True(container.EnsureContainerExistsCalled);
         Assert.Equal("42", container.UpsertedItem!.id);
         Assert.Equal(new PartitionKey("tenant-1"), container.UpsertedPartitionKey);
         Assert.Equal("42", container.DeletedId);
@@ -547,7 +570,7 @@ public class AzureConfigurationTests
         };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            services.AddSingleton(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
@@ -575,7 +598,7 @@ public class AzureConfigurationTests
         container.QueryItems.Add(new TestItem("2", "p2", "Grace"));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            services.AddSingleton(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
@@ -593,12 +616,26 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public void CosmosModelSchemaResolver_UsesSameSerializedPartitionKeyForValueAndPath()
+    {
+        JsonNamedCosmosItem item = new("42", "tenant-json");
+
+        string id = CosmosModelSchemaResolver.ResolveId(item);
+        PartitionKey partitionKey = CosmosModelSchemaResolver.ResolvePartitionKey(item);
+        string partitionKeyPath = CosmosModelSchemaResolver.ResolvePartitionKeyPath<JsonNamedCosmosItem>();
+
+        Assert.Equal("42", id);
+        Assert.Equal(new PartitionKey("tenant-json"), partitionKey);
+        Assert.Equal("/partitionKey", partitionKeyPath);
+    }
+
+    [Fact]
     public async Task StorageAccountBlobArtifactDescriber_UsesUnifiedFactoryContainer()
     {
         FakeBlobContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            services.AddSingleton(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
@@ -631,7 +668,7 @@ public class AzureConfigurationTests
         };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            services.AddSingleton(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
@@ -658,7 +695,7 @@ public class AzureConfigurationTests
         FakeTableAdapter table = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            services.AddSingleton(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
@@ -691,7 +728,7 @@ public class AzureConfigurationTests
         };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            services.AddSingleton(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
@@ -719,7 +756,7 @@ public class AzureConfigurationTests
         table.QueryResults.Add(new TestTableEntity { PartitionKey = "p2", RowKey = "r2", Name = "Grace" });
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            services.AddSingleton(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
@@ -744,7 +781,7 @@ public class AzureConfigurationTests
         FakeServiceBusAdministrationAdapter administration = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("topic", new ServiceBusConfig
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = null,
@@ -772,7 +809,7 @@ public class AzureConfigurationTests
         FakeServiceBusAdministrationAdapter administration = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("topic", new ServiceBusConfig
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = null,
@@ -797,7 +834,7 @@ public class AzureConfigurationTests
         FakeServiceBusMessagePump pump = new() { MessageToReturn = receivedMessage };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("topic", new ServiceBusConfig
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = null,
@@ -834,7 +871,7 @@ public class AzureConfigurationTests
         FakeServiceBusComponentFactory serviceBusFactory = new(sender: sender, pump: pump);
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("queue", new ServiceBusConfig
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("queue", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders-queue",
@@ -866,7 +903,7 @@ public class AzureConfigurationTests
         FakeServiceBusSender sender = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("queue", new ServiceBusConfig
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("queue", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders-session-queue",
@@ -898,7 +935,7 @@ public class AzureConfigurationTests
         FakeServiceBusMessagePump pump = new() { MessageToReturn = receivedMessage };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("topic", new ServiceBusConfig
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = null,
@@ -927,7 +964,7 @@ public class AzureConfigurationTests
     {
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(CreateStore("topic", new ServiceBusConfig
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = null,
@@ -949,13 +986,6 @@ public class AzureConfigurationTests
     private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
     {
         return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
-    }
-
-    private static ConfigStore<TConfig> CreateStore<TConfig>(string key, TConfig config)
-    {
-        ConfigStore<TConfig> store = new();
-        store.AddConfig(key, config);
-        return store;
     }
 
     private static void AssertIdentifierRoundTrip<TIdentifier>(string value, Func<string, TIdentifier> create, Func<TIdentifier, string> toString)
@@ -1316,6 +1346,7 @@ public class AzureConfigurationTests
     }
 
     private sealed record TestItem(string id, string partitionKey, string name);
+    private sealed record JsonNamedCosmosItem([property: JsonProperty("id")] string Identifier, [property: JsonProperty("partitionKey")] string TenantKey);
 
     private sealed class TestTableEntity : ITableEntity
     {
@@ -1333,7 +1364,7 @@ public class AzureConfigurationTests
         public string[] LoadAllStorageAccountIdentifier(IConfiguration configuration) => new[] { "storage" };
         public StorageAccountConfig LoadStorageAccountConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "UseDevelopmentStorage=true", BlobContainerName = "blob", QueueContainerName = "queue", TableContainerName = "table" };
         public string[] LoadAllCosmosDbIdentifier(IConfiguration configuration) => new[] { "cosmos" };
-        public CosmosContainerDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "AccountEndpoint=https://cosmos.test/", DatabaseName = "db", ContainerName = "items", PartitionKeyPath = "/partitionKey" };
+        public CosmosContainerDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "AccountEndpoint=https://cosmos.test/", DatabaseName = "db", ContainerName = "items" };
         public string[] LoadAllServiceBusIdentifier(IConfiguration configuration) => new[] { "bus" };
         public ServiceBusConfig LoadServiceBusConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "Endpoint=sb://bus/", QueueName = "queue", TopicName = null, SubscriptionName = null, RequiredSession = false };
         public string[] LoadAllSqlDatabaseIdentifier(IConfiguration configuration) => new[] { "sql" };
