@@ -59,11 +59,11 @@ public class AzureSurfaceTests
     public void AzureTF_IsLive_ReturnsStepsForKnownTargets()
     {
         Step<object?> functionApp = AzureTF.Trigger.IsLive.FunctionApp("func");
-        Step<object?> serviceBus = AzureTF.Trigger.IsLive.ServiceBus("bus");
-        Step<object?> blob = AzureTF.Trigger.IsLive.Blob("storage");
-        Step<object?> table = AzureTF.Trigger.IsLive.Table("storage");
-        Step<object?> cosmos = AzureTF.Trigger.IsLive.Cosmos("cosmos");
-        Step<object?> sql = AzureTF.Trigger.IsLive.Sql("sql");
+        Step<object?> serviceBus = AzureTF.Trigger.IsLive.ServiceBus("bus", AlivenessLevel.Authenticated);
+        Step<object?> blob = AzureTF.Trigger.IsLive.Blob("storage", AlivenessLevel.Authenticated);
+        Step<object?> table = AzureTF.Trigger.IsLive.Table("storage", AlivenessLevel.Authenticated);
+        Step<object?> cosmos = AzureTF.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Authenticated);
+        Step<object?> sql = AzureTF.Trigger.IsLive.Sql("sql", AlivenessLevel.Authenticated);
 
         Assert.Equal("FunctionApp IsLive Trigger", functionApp.Name);
         Assert.Equal("ServiceBus IsLive Trigger", serviceBus.Name);

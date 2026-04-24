@@ -258,6 +258,31 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public async Task ServiceBusIsLiveTrigger_AuthenticatedLevel_UsesNamespaceValidation()
+    {
+        FakeServiceBusAdministrationAdapter administration = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("bus", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = "orders",
+                TopicName = null,
+                SubscriptionName = null,
+                RequiredSession = false,
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.ServiceBus("bus", AlivenessLevel.Authenticated);
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.True(administration.NamespaceValidateCalled);
+        Assert.False(administration.ValidateCalled);
+    }
+
+    [Fact]
     public async Task BlobStorageIsLiveTrigger_UsesContainerValidation()
     {
         FakeBlobContainerAdapter container = new();
@@ -278,6 +303,30 @@ public class AzureConfigurationTests
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
         Assert.True(container.ValidateCalled);
+    }
+
+    [Fact]
+    public async Task BlobStorageIsLiveTrigger_AuthenticatedLevel_UsesServiceValidation()
+    {
+        FakeBlobContainerAdapter container = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            {
+                ConnectionString = "UseDevelopmentStorage=true",
+                BlobContainerName = "blob",
+                QueueContainerName = null,
+                TableContainerName = "table",
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.Blob("storage", AlivenessLevel.Authenticated);
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.True(container.ValidateServiceCalled);
+        Assert.False(container.ValidateCalled);
     }
 
     [Fact]
@@ -305,6 +354,31 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public async Task TableStorageIsLiveTrigger_AuthenticatedLevel_UsesServiceValidation()
+    {
+        FakeTableAdapter table = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("storage", new StorageAccountConfig
+            {
+                ConnectionString = "UseDevelopmentStorage=true",
+                BlobContainerName = "blob",
+                QueueContainerName = null,
+                TableContainerName = "table",
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.Table("storage", AlivenessLevel.Authenticated);
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.True(table.ValidateServiceCalled);
+        Assert.False(table.ValidateCalled);
+        Assert.Equal("table", table.LastTableName);
+    }
+
+    [Fact]
     public async Task CosmosContainerIsLiveTrigger_UsesContainerValidation()
     {
         FakeCosmosContainerAdapter container = new();
@@ -324,6 +398,56 @@ public class AzureConfigurationTests
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
         Assert.True(container.ValidateCalled);
+    }
+
+    [Fact]
+    public async Task CosmosContainerIsLiveTrigger_AuthenticatedLevel_DoesNotRequireContainerValidation()
+    {
+        FakeCosmosContainerAdapter container = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            {
+                ConnectionString = "AccountEndpoint=https://cosmos.test/",
+                DatabaseName = "db",
+                ContainerName = "items",
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Authenticated);
+        trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.True(container.ValidateAccountCalled);
+        Assert.False(container.ValidateCalled);
+        Assert.False(container.ValidateReachabilityCalled);
+    }
+
+    [Fact]
+    public async Task CosmosContainerIsLiveTrigger_ReachableLevel_UsesEndpointReachabilityValidation()
+    {
+        FakeCosmosContainerAdapter container = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(CreateStore("cosmos", new CosmosContainerDbConfig
+            {
+                ConnectionString = "AccountEndpoint=https://cosmos.test/",
+                DatabaseName = "db",
+                ContainerName = "items",
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Reachable);
+        trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.True(container.ValidateReachabilityCalled);
+        Assert.False(container.ValidateAccountCalled);
+        Assert.False(container.ValidateCalled);
     }
 
     [Fact]
@@ -883,7 +1007,11 @@ public class AzureConfigurationTests
 
     private sealed class FakeCosmosContainerAdapter : ICosmosContainerAdapter
     {
+        public bool ValidateReachabilityCalled { get; private set; }
+        public bool ValidateAccountCalled { get; private set; }
         public bool ValidateCalled { get; private set; }
+        public Func<CancellationToken, Task>? ValidateReachabilityAsyncHandler { get; set; }
+        public Func<CancellationToken, Task>? ValidateAccountConnectionAsyncHandler { get; set; }
         public Func<CancellationToken, Task>? ValidateConnectionAsyncHandler { get; set; }
         public TestItem? UpsertedItem { get; private set; }
         public PartitionKey UpsertedPartitionKey { get; private set; } = PartitionKey.Null;
@@ -894,6 +1022,18 @@ public class AzureConfigurationTests
         public CosmosReadResponse ReadResponse { get; set; } = new(false, null);
         public QueryDefinition? LastQuery { get; private set; }
         public List<object> QueryItems { get; } = [];
+
+        public Task ValidateAccountReachabilityAsync(CancellationToken cancellationToken)
+        {
+            ValidateReachabilityCalled = true;
+            return ValidateReachabilityAsyncHandler?.Invoke(cancellationToken) ?? Task.CompletedTask;
+        }
+
+        public Task ValidateAccountConnectionAsync(CancellationToken cancellationToken)
+        {
+            ValidateAccountCalled = true;
+            return ValidateAccountConnectionAsyncHandler?.Invoke(cancellationToken) ?? Task.CompletedTask;
+        }
 
         public Task ValidateConnectionAsync(CancellationToken cancellationToken)
         {
@@ -941,6 +1081,7 @@ public class AzureConfigurationTests
     private sealed class FakeBlobContainerAdapter : IBlobContainerAdapter
     {
         public bool CreateCalled { get; private set; }
+        public bool ValidateServiceCalled { get; private set; }
         public bool ValidateCalled { get; private set; }
         public string? UploadedPath { get; private set; }
         public byte[]? UploadedData { get; private set; }
@@ -948,6 +1089,12 @@ public class AzureConfigurationTests
         public string? DeletedPath { get; private set; }
         public string? ReadPath { get; private set; }
         public BlobReadResponse ReadResponse { get; set; } = new(false, null, null);
+
+        public Task ValidateServiceConnectionAsync(CancellationToken cancellationToken)
+        {
+            ValidateServiceCalled = true;
+            return Task.CompletedTask;
+        }
 
         public Task ValidateConnectionAsync(CancellationToken cancellationToken)
         {
@@ -994,6 +1141,7 @@ public class AzureConfigurationTests
     private sealed class FakeTableAdapter : ITableAdapter
     {
         public bool CreateCalled { get; private set; }
+        public bool ValidateServiceCalled { get; private set; }
         public bool ValidateCalled { get; private set; }
         public string? LastTableName { get; set; }
         public object? UpsertedEntity { get; private set; }
@@ -1002,6 +1150,12 @@ public class AzureConfigurationTests
         public object? ReadEntity { get; set; }
         public string? LastFilter { get; private set; }
         public List<object> QueryResults { get; } = [];
+
+        public Task ValidateServiceConnectionAsync(CancellationToken cancellationToken)
+        {
+            ValidateServiceCalled = true;
+            return Task.CompletedTask;
+        }
 
         public Task ValidateConnectionAsync(CancellationToken cancellationToken)
         {
@@ -1098,10 +1252,17 @@ public class AzureConfigurationTests
 
     private sealed class FakeServiceBusAdministrationAdapter : IServiceBusAdministrationAdapter
     {
+        public bool NamespaceValidateCalled { get; private set; }
         public bool ValidateCalled { get; private set; }
         public CreateSubscriptionOptions? CreatedOptions { get; private set; }
         public CreateRuleOptions? CreatedRuleOptions { get; private set; }
         public (string TopicName, string SubscriptionName)? DeletedSubscription { get; private set; }
+
+        public Task ValidateNamespaceConnectionAsync(CancellationToken cancellationToken)
+        {
+            NamespaceValidateCalled = true;
+            return Task.CompletedTask;
+        }
 
         public Task ValidateConnectionAsync(CancellationToken cancellationToken)
         {
