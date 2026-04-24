@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TestFramework.Azure;
 using TestFramework.Azure.Runtime;
 using TestFramework.Azure.ServiceBus;
+using TestFramework.Core.Environment;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Variables;
 
@@ -53,6 +54,7 @@ public class AzureSurfaceTests
 
         Assert.IsType<ServiceBusCreateTempSubscriptionStep>(preStep);
         Assert.IsType<ServiceBusDeleteTempSubscriptionStep>(cleanupStep);
+        Assert.Equal("bus", Assert.Single(((IHasEnvironmentRequirements)step).GetEnvironmentRequirements(null!)).ResourceIdentifier);
     }
 
     [Fact]
@@ -71,6 +73,22 @@ public class AzureSurfaceTests
         Assert.Equal("Table Storage IsLive Trigger", table.Name);
         Assert.Equal("Cosmos Container IsLive Trigger", cosmos.Name);
         Assert.Equal("SqlDatabase IsLive Trigger", sql.Name);
+        Assert.Equal("bus", Assert.Single(((IHasEnvironmentRequirements)serviceBus).GetEnvironmentRequirements(null!)).ResourceIdentifier);
+        Assert.Equal("storage", Assert.Single(((IHasEnvironmentRequirements)blob).GetEnvironmentRequirements(null!)).ResourceIdentifier);
+        Assert.Equal("storage", Assert.Single(((IHasEnvironmentRequirements)table).GetEnvironmentRequirements(null!)).ResourceIdentifier);
+        Assert.Equal("cosmos", Assert.Single(((IHasEnvironmentRequirements)cosmos).GetEnvironmentRequirements(null!)).ResourceIdentifier);
+        Assert.Equal("sql", Assert.Single(((IHasEnvironmentRequirements)sql).GetEnvironmentRequirements(null!)).ResourceIdentifier);
+    }
+
+    [Fact]
+    public void AzureTF_ServiceBusSend_ProvidesEnvironmentRequirement()
+    {
+        ServiceBusSendTrigger trigger = AzureTF.Trigger.ServiceBus.Send("bus", Var.Const(new ServiceBusMessage("payload")));
+
+        EnvironmentRequirement requirement = Assert.Single(((IHasEnvironmentRequirements)trigger).GetEnvironmentRequirements(null!));
+
+        Assert.Equal(AzureEnvironmentResourceKinds.ServiceBus, requirement.ResourceKind);
+        Assert.Equal("bus", requirement.ResourceIdentifier);
     }
 
     private sealed class StubAzureComponentFactory : IAzureComponentFactory
