@@ -11,6 +11,7 @@ using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
+using TestFramework.Core.Environment;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Steps.Options;
@@ -18,7 +19,7 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.FunctionApp.Trigger;
 
-internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier, VariableReference<TriggerRouting> trigger) : Step<ManagedResult>
+internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier, VariableReference<TriggerRouting> trigger) : Step<ManagedResult>, IHasEnvironmentRequirements
 {
     private static readonly Uri AdminFunctionsUri = new Uri("admin/functions", UriKind.Relative);
 
@@ -66,4 +67,7 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
         if (trigger.HasIdentifier)
             contract.Inputs.Add(new StepIOEntry(trigger.Identifier!.Identifier, StepIOKind.Variable, true, typeof(TriggerRouting)));
     }
+
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.FunctionApp, appIdentifier)];
 }

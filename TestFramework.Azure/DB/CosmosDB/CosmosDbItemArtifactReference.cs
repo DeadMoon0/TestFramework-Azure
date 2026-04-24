@@ -33,7 +33,7 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
         CanDeconstruct = partitionKey is not null && id is not null;
     }
 
-    internal CosmosContainerIdentifier DbIdentifier { get; }
+    public CosmosContainerIdentifier DbIdentifier { get; }
 
     public override void OnPinReference(VariableStore variableStore, ScopedLogger logger)
     {
