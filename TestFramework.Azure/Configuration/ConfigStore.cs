@@ -7,6 +7,13 @@ public class ConfigStore<TConfig>
     private readonly Dictionary<string, TConfig> _config = [];
     private readonly object _syncRoot = new();
 
+    public static ConfigStore<TConfig> Create(string identifier, TConfig config)
+    {
+        ConfigStore<TConfig> store = new();
+        store.AddConfig(identifier, config);
+        return store;
+    }
+
     public void AddConfig(string identifier, TConfig config)
     {
         lock (_syncRoot)

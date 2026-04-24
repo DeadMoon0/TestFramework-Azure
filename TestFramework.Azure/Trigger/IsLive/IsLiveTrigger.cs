@@ -65,7 +65,7 @@ internal abstract class AzureIsLiveTriggerBase(VariableReference<AlivenessLevel>
         new StepInstance<Step<object?>, object?>(this);
 }
 
-internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel)
+internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel), IHasEnvironmentRequirements
 {
     private static readonly Uri HostStatusUri = new("admin/host/status", UriKind.Relative);
 
@@ -100,6 +100,9 @@ internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier,
         response.EnsureSuccessStatusCode();
         return null;
     }
+
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.FunctionApp, identifier)];
 }
 
 internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel), IHasEnvironmentRequirements

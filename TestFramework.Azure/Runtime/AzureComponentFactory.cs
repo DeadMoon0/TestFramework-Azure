@@ -14,6 +14,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration.SpecificConfigs;
+using TestFramework.Azure.DB.CosmosDB;
 
 namespace TestFramework.Azure.Runtime;
 
@@ -154,7 +155,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         {
             CosmosClientOptions options = CosmosClientOptionsResolver.Resolve(serviceProvider, config);
             CosmosClient client = new CosmosClient(config.ConnectionString, options);
-            return new DefaultCosmosContainerAdapter(client, config.DatabaseName, config.ContainerName);
+            return new DefaultCosmosContainerAdapter(client, config.ConnectionString, config.DatabaseName, config.ContainerName);
         }
     }
 
@@ -267,7 +268,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         }
     }
 
-    private sealed class DefaultCosmosContainerAdapter(CosmosClient client, string databaseName, string containerName) : ICosmosContainerAdapter
+    private sealed class DefaultCosmosContainerAdapter(CosmosClient client, string connectionString, string databaseName, string containerName) : ICosmosContainerAdapter
     {
         private Container GetContainer()
         {
@@ -294,9 +295,8 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
         public async Task EnsureContainerExistsAsync<TItem>(TItem item)
         {
-            Database database = await client.CreateDatabaseIfNotExistsAsync(databaseName, throughput: 400);
-            string partitionKeyPath = ResolvePartitionKeyPath<TItem>();
-            await database.CreateContainerIfNotExistsAsync(containerName, partitionKeyPath, throughput: 400);
+            string partitionKeyPath = CosmosModelSchemaResolver.ResolvePartitionKeyPath<TItem>();
+            await CosmosSchemaRestClient.EnsureDatabaseAndContainerExistAsync(connectionString, databaseName, containerName, partitionKeyPath, CancellationToken.None);
         }
 
         public async Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey)
@@ -335,17 +335,6 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
                     yield return item;
                 }
             }
-        }
-
-        private static string ResolvePartitionKeyPath<TItem>()
-        {
-            System.Reflection.PropertyInfo? property = typeof(TItem).GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
-                .FirstOrDefault(x => string.Equals(x.Name, "partitionKey", StringComparison.OrdinalIgnoreCase));
-
-            if (property is null)
-                throw new InvalidOperationException($"Cannot find a fitting PartitionKey Property in Type ({typeof(TItem).FullName}). A PartitionKey is required.");
-
-            return "/" + property.Name;
         }
     }
 

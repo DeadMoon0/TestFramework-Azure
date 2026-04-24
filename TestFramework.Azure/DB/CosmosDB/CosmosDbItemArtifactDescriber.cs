@@ -31,11 +31,8 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
         ICosmosDbIdentifierResolver resolver = serviceProvider.GetService<ICosmosDbIdentifierResolver>() ?? new DefaultCosmosDbIdentifierResolver();
         reference.SetIdentifier(resolver.ResolveId(data.Item), resolver.ResolvePartitionKey(data.Item));
 
-        if (string.IsNullOrWhiteSpace(config.PartitionKeyPath))
-        {
-            logger.LogInformation($"Ensuring Cosmos container exists: {config.DatabaseName}/{config.ContainerName}");
-            await container.EnsureContainerExistsAsync(data.Item);
-        }
+        logger.LogInformation($"Ensuring Cosmos container exists: {config.DatabaseName}/{config.ContainerName}");
+        await container.EnsureContainerExistsAsync(data.Item);
 
         logger.LogInformation($"Upserting Cosmos item: {reference.GetId(variableStore)} {reference.GetPartitionKey(variableStore)}");
         await container.UpsertItemAsync(data.Item, reference.GetPartitionKey(variableStore));
