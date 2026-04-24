@@ -99,7 +99,7 @@ Timeline timeline = Timeline.Create()
 
 Use `ConfigureCosmosClientOptions(...)` when you need to customize the underlying Cosmos SDK client.
 
-For `AzureTF.Trigger.IsLive.Cosmos(...)`, timeout control comes from the normal timeline step timeout, for example via `.WithTimeOut(...)` on the builder.
+For `AzureTF.Trigger.IsLive.Cosmos(...)`, timeout control comes from the normal timeline step timeout, for example via `.WithTimeOut(...)` on the builder. The optional `AlivenessLevel` lets you choose whether the check should stop at endpoint reachability, account authentication, or require the configured container to exist.
 
 ```csharp
 using Microsoft.Azure.Cosmos;
@@ -121,7 +121,7 @@ ConfigInstance config = ConfigInstance.FromJsonFile("local.testSettings.json")
     .Build();
 
 Timeline timeline = Timeline.Create()
-    .Trigger(AzureTF.Trigger.IsLive.Cosmos("MainDb"))
+    .Trigger(AzureTF.Trigger.IsLive.Cosmos("MainDb", AlivenessLevel.Authenticated))
         .WithTimeOut(TimeSpan.FromSeconds(5))
     .Build();
 ```
