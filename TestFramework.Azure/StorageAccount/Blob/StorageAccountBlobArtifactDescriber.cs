@@ -13,8 +13,14 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.StorageAccount.Blob;
 
+/// <summary>
+/// Sets up and tears down blob artifacts.
+/// </summary>
 public class StorageAccountBlobArtifactDescriber : ArtifactDescriber<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference>
 {
+    /// <summary>
+    /// Deletes the referenced blob during artifact cleanup.
+    /// </summary>
     public override async Task Deconstruct(IServiceProvider serviceProvider, StorageAccountBlobArtifactReference reference, VariableStore variableStore, ScopedLogger logger)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
@@ -24,6 +30,9 @@ public class StorageAccountBlobArtifactDescriber : ArtifactDescriber<StorageAcco
         logger.LogInformation($"Blob {reference.GetPath(variableStore)} deleted.");
     }
 
+    /// <summary>
+    /// Uploads the referenced blob during artifact setup.
+    /// </summary>
     public override async Task Setup(IServiceProvider serviceProvider, StorageAccountBlobArtifactData data, StorageAccountBlobArtifactReference reference, VariableStore variableStore, ScopedLogger logger)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
@@ -34,5 +43,9 @@ public class StorageAccountBlobArtifactDescriber : ArtifactDescriber<StorageAcco
         logger.LogInformation($"Blob {reference.GetPath(variableStore)} uploaded.");
     }
 
+    /// <summary>
+    /// Returns a readable string representation of the describer.
+    /// </summary>
+    /// <returns>A string representation of the describer.</returns>
     public override string ToString() => "Azure Storage Blob";
 }

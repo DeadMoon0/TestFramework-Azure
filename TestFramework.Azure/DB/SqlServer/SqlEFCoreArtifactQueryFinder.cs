@@ -12,12 +12,21 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.DB.SqlServer;
 
+/// <summary>
+/// Finds SQL row artifacts by executing an EF Core query.
+/// </summary>
+/// <typeparam name="TRow">The row entity type returned by the query.</typeparam>
+/// <param name="dbIdentifier">The SQL database identifier.</param>
+/// <param name="queryModifier">A delegate that shapes the query before execution.</param>
 public class SqlEFCoreArtifactQueryFinder<TRow>(
     SqlDatabaseIdentifier dbIdentifier,
     Func<IQueryable<TRow>, IQueryable<TRow>> queryModifier)
     : ArtifactFinder<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>>
     where TRow : class
 {
+    /// <summary>
+    /// Finds the first matching SQL row.
+    /// </summary>
     public override async Task<ArtifactFinderResult?> FindAsync(
         IServiceProvider serviceProvider, VariableStore variableStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
@@ -32,6 +41,9 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
         return new ArtifactFinderResult(reference);
     }
 
+    /// <summary>
+    /// Finds all matching SQL rows.
+    /// </summary>
     public override async Task<ArtifactFinderResultMulti> FindMultiAsync(
         IServiceProvider serviceProvider, VariableStore variableStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
