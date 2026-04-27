@@ -14,6 +14,14 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.StorageAccount.Table;
 
+/// <summary>
+/// Reference to an Azure Table entity addressed by table name, partition key, and row key.
+/// </summary>
+/// <typeparam name="T">The table entity type.</typeparam>
+/// <param name="identifier">The Storage Account identifier.</param>
+/// <param name="tableName">The table name variable.</param>
+/// <param name="partitionKey">The partition key variable.</param>
+/// <param name="rowKey">The row key variable.</param>
 public class TableStorageEntityArtifactReference<T>(StorageAccountIdentifier identifier, VariableReference<string> tableName, VariableReference<string> partitionKey, VariableReference<string> rowKey)
     : ArtifactReference<TableStorageEntityArtifactReference<T>, TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>>
     where T : class, ITableEntity
@@ -22,8 +30,14 @@ public class TableStorageEntityArtifactReference<T>(StorageAccountIdentifier ide
     private string _pinnedPartitionKey = "";
     private string _pinnedRowKey = "";
 
+    /// <summary>
+    /// The Storage Account identifier used to resolve the table.
+    /// </summary>
     public StorageAccountIdentifier Identifier { get; } = identifier;
 
+    /// <summary>
+    /// Pins the reference to concrete table coordinates.
+    /// </summary>
     public override void OnPinReference(VariableStore variableStore, ScopedLogger logger)
     {
         _pinnedTable = tableName.GetRequiredValue(variableStore);
@@ -32,6 +46,9 @@ public class TableStorageEntityArtifactReference<T>(StorageAccountIdentifier ide
         CanDeconstruct = true;
     }
 
+    /// <summary>
+    /// Resolves the reference into concrete table entity artifact data.
+    /// </summary>
     public override async Task<ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>> ResolveToDataAsync(
         IServiceProvider serviceProvider, ArtifactVersionIdentifier versionIdentifier, VariableStore variableStore, ScopedLogger logger)
     {
@@ -53,6 +70,9 @@ public class TableStorageEntityArtifactReference<T>(StorageAccountIdentifier ide
         };
     }
 
+    /// <summary>
+    /// Declares the variable inputs required by the reference.
+    /// </summary>
     public override void DeclareIO(StepIOContract contract)
     {
         if (tableName.HasIdentifier)
@@ -63,10 +83,31 @@ public class TableStorageEntityArtifactReference<T>(StorageAccountIdentifier ide
             contract.Inputs.Add(new StepIOEntry(rowKey.Identifier!.Identifier, StepIOKind.Variable, true, typeof(string)));
     }
 
+            /// <summary>
+            /// Gets the resolved table name.
+            /// </summary>
+            /// <param name="variableStore">The variable store used to resolve the value.</param>
+            /// <returns>The table name.</returns>
     public string GetTableName(VariableStore variableStore) => IsPinned ? _pinnedTable : tableName.GetRequiredValue(variableStore);
+
+            /// <summary>
+            /// Gets the resolved partition key.
+            /// </summary>
+            /// <param name="variableStore">The variable store used to resolve the value.</param>
+            /// <returns>The partition key.</returns>
     public string GetPartitionKey(VariableStore variableStore) => IsPinned ? _pinnedPartitionKey : partitionKey.GetRequiredValue(variableStore);
+
+            /// <summary>
+            /// Gets the resolved row key.
+            /// </summary>
+            /// <param name="variableStore">The variable store used to resolve the value.</param>
+            /// <returns>The row key.</returns>
     public string GetRowKey(VariableStore variableStore) => IsPinned ? _pinnedRowKey : rowKey.GetRequiredValue(variableStore);
 
+            /// <summary>
+            /// Returns a readable string representation of the reference.
+            /// </summary>
+            /// <returns>A string representation of the reference.</returns>
     public override string ToString() => IsPinned
         ? $"Azure Table<{typeof(T).Name}>: {_pinnedTable}/{_pinnedPartitionKey}/{_pinnedRowKey}"
         : $"Azure Table<{typeof(T).Name}> (unresolved)";

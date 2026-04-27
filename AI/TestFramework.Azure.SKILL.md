@@ -26,7 +26,18 @@
     Keep cloud-side waits and message flows visible in the timeline, not hidden in helpers.
     Prefer one visible end-to-end flow over several tiny wrappers that hide the Azure interaction sequence.
     Use correlation ids or equivalent scoping when message-driven tests would otherwise be ambiguous.
+    Prefer AzureTF entry points and identifier-driven config over ad-hoc nested helper layers.
 </best_practices>
+
+<surface_guidance>
+    The Azure package is intentionally broad, but the agent should still teach it through a consumer-first path:
+    - AzureTF as the main facade
+    - named identifiers as the configuration contract
+    - visible send, call, wait, and lookup steps in the timeline
+
+    Do not push users deeper into proxy layering unless they are actually extending the package.
+    If a scenario looks noisy, simplify the timeline around identifiers, explicit steps, and correlation rather than inventing more wrappers.
+</surface_guidance>
 
 <api_hints>
     Important APIs and shapes from the package docs:
@@ -72,6 +83,13 @@
     - A common pattern is a project extension name ending with Transform or similar, to signal that the project config is being transformed into TestFramework.Azure's expected model.
     - Keep the project-specific adapter names stable and descriptive so errors clearly point back to the owning project seam.
 </project_adaptation>
+
+<release_readiness_notes>
+    1.0 grounding the agent should preserve:
+    - public Azure docs and config guidance were expanded, so prefer the documented happy path instead of custom wrapper invention
+    - the remaining weaknesses are ergonomic backlog items such as proxy depth and overload cleanup, not reasons to redesign working flows during normal user requests
+    - duplicated Function App HTTP request-shaping logic was centralized; when modifying that area, keep remote and in-process request behavior aligned
+</release_readiness_notes>
 
 <style_guide>
     Prefer timelines where the Azure interaction order is obvious at a glance.

@@ -5,24 +5,52 @@ using TestFramework.Azure.Exceptions;
 
 namespace TestFramework.Azure.Configuration;
 
+/// <summary>
+/// Default <see cref="IConfigProvider"/> implementation that reads Azure settings from standard named sections.
+/// </summary>
 public class DefaultConfigProvider : IConfigProvider
 {
+    /// <summary>
+    /// Configuration section name for <see cref="FunctionAppConfig"/> records.
+    /// </summary>
     public const string FunctionAppBaseSelector = "FunctionApp";
+
+    /// <summary>
+    /// Configuration section name for <see cref="StorageAccountConfig"/> records.
+    /// </summary>
     public const string StorageAccountSelector = "StorageAccount";
+
+    /// <summary>
+    /// Configuration section name for <see cref="CosmosContainerDbConfig"/> records.
+    /// </summary>
     public const string CosmosDbSelector = "CosmosDb";
+
+    /// <summary>
+    /// Configuration section name for <see cref="ServiceBusConfig"/> records.
+    /// </summary>
     public const string ServiceBusSelector = "ServiceBus";
+
+    /// <summary>
+    /// Configuration section name for <see cref="SqlDatabaseConfig"/> records.
+    /// </summary>
     public const string SqlDatabaseSelector = "SqlDatabase";
 
+    /// <inheritdoc />
     public string[] LoadAllCosmosDbIdentifier(IConfiguration configuration) => [.. configuration.GetSection(CosmosDbSelector).GetChildren().Select(x => x.Key)];
 
+    /// <inheritdoc />
     public string[] LoadAllFunctionAppIdentifier(IConfiguration configuration) => [.. configuration.GetSection(FunctionAppBaseSelector).GetChildren().Select(x => x.Key)];
 
+    /// <inheritdoc />
     public string[] LoadAllStorageAccountIdentifier(IConfiguration configuration) => [.. configuration.GetSection(StorageAccountSelector).GetChildren().Select(x => x.Key)];
 
+    /// <inheritdoc />
     public string[] LoadAllSqlDatabaseIdentifier(IConfiguration configuration) => [.. configuration.GetSection(SqlDatabaseSelector).GetChildren().Select(x => x.Key)];
 
+    /// <inheritdoc />
     public string[] LoadAllServiceBusIdentifier(IConfiguration configuration) => [.. configuration.GetSection(ServiceBusSelector).GetChildren().Select(x => x.Key)];
 
+    /// <inheritdoc />
     public CosmosContainerDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier)
     {
         return new CosmosContainerDbConfig
@@ -33,6 +61,7 @@ public class DefaultConfigProvider : IConfigProvider
         };
     }
 
+    /// <inheritdoc />
     public ServiceBusConfig LoadServiceBusConfig(IConfiguration configuration, string identifier)
     {
         return new ServiceBusConfig
@@ -45,6 +74,7 @@ public class DefaultConfigProvider : IConfigProvider
         };
     }
 
+    /// <inheritdoc />
     public FunctionAppConfig LoadFunctionAppConfig(IConfiguration configuration, string identifier)
     {
         return new FunctionAppConfig
@@ -55,6 +85,7 @@ public class DefaultConfigProvider : IConfigProvider
         };
     }
 
+    /// <inheritdoc />
     public StorageAccountConfig LoadStorageAccountConfig(IConfiguration configuration, string identifier)
     {
         return new StorageAccountConfig
@@ -66,6 +97,7 @@ public class DefaultConfigProvider : IConfigProvider
         };
     }
 
+    /// <inheritdoc />
     public SqlDatabaseConfig LoadSqlDatabaseConfig(IConfiguration configuration, string identifier)
     {
         return new SqlDatabaseConfig

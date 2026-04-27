@@ -17,6 +17,10 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.DB.CosmosDB;
 
+/// <summary>
+/// Reference to a Cosmos DB item addressed by id and partition key.
+/// </summary>
+/// <typeparam name="TItem">The item type.</typeparam>
 public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbItemArtifactReference<TItem>, CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>>
 {
     private string pinnedId = "";
@@ -24,6 +28,12 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
     private VariableReference<PartitionKey>? _partitionKey;
     private VariableReference<string>? _id;
 
+    /// <summary>
+    /// Initializes a Cosmos DB artifact reference.
+    /// </summary>
+    /// <param name="dbIdentifier">The Cosmos container identifier.</param>
+    /// <param name="partitionKey">Optional partition key reference.</param>
+    /// <param name="id">Optional document id reference.</param>
     public CosmosDbItemArtifactReference(CosmosContainerIdentifier dbIdentifier, VariableReference<PartitionKey>? partitionKey = null, VariableReference<string>? id = null)
     {
         this._partitionKey = partitionKey;
@@ -33,14 +43,23 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
         CanDeconstruct = partitionKey is not null && id is not null;
     }
 
+    /// <summary>
+    /// The Cosmos container identifier used to resolve the container.
+    /// </summary>
     public CosmosContainerIdentifier DbIdentifier { get; }
 
+    /// <summary>
+    /// Pins the reference to concrete id and partition key values.
+    /// </summary>
     public override void OnPinReference(VariableStore variableStore, ScopedLogger logger)
     {
         pinnedId = this._id?.GetRequiredValue(variableStore) ?? "";
         pinnedPartitionKey = this._partitionKey?.GetRequiredValue(variableStore, "PartitionKey is required.") ?? PartitionKey.Null;
     }
 
+    /// <summary>
+    /// Resolves the reference into concrete artifact data.
+    /// </summary>
     public override async Task<ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>>> ResolveToDataAsync(IServiceProvider serviceProvider, ArtifactVersionIdentifier versionIdentifier, VariableStore variableStore, ScopedLogger logger)
     {
         CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(DbIdentifier);
@@ -64,6 +83,9 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
         throw new UnreachableException();
     }
 
+    /// <summary>
+    /// Declares the variable inputs required by the reference.
+    /// </summary>
     public override void DeclareIO(StepIOContract contract)
     {
         if (_partitionKey is not null && _partitionKey.HasIdentifier)
@@ -114,6 +136,10 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
         }
     }
 
+    /// <summary>
+    /// Returns a readable string representation of the reference.
+    /// </summary>
+    /// <returns>A string representation of the reference.</returns>
     public override string ToString() => IsPinned
         ? $"Cosmos DB<{typeof(TItem).Name}>: {DbIdentifier}/{pinnedId}"
         : $"Cosmos DB<{typeof(TItem).Name}> (unresolved)";

@@ -8,9 +8,16 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.DB.SqlServer;
 
+/// <summary>
+/// Sets up and tears down SQL row artifacts.
+/// </summary>
+/// <typeparam name="TRow">The row entity type.</typeparam>
 public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>>
     where TRow : class
 {
+    /// <summary>
+    /// Ensures the referenced row exists during artifact setup.
+    /// </summary>
     public override async Task Setup(IServiceProvider serviceProvider, SqlRowArtifactData<TRow> data, SqlRowArtifactReference<TRow> reference, VariableStore variableStore, ScopedLogger logger)
     {
         ISqlDbContextResolver resolver = serviceProvider.GetRequiredService<ISqlDbContextResolver>();
@@ -41,6 +48,9 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
         logger.LogInformation($"SQL row '{typeof(TRow).Name}' upserted. DB: {reference.DbIdentifier}, Key: ({FormatKeys(keyValues)}).");
     }
 
+    /// <summary>
+    /// Removes the referenced row during artifact cleanup.
+    /// </summary>
     public override async Task Deconstruct(IServiceProvider serviceProvider, SqlRowArtifactReference<TRow> reference, VariableStore variableStore, ScopedLogger logger)
     {
         ISqlDbContextResolver resolver = serviceProvider.GetRequiredService<ISqlDbContextResolver>();
@@ -62,6 +72,10 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
         logger.LogInformation($"SQL row '{typeof(TRow).Name}' deleted. DB: {reference.DbIdentifier}, Key: ({FormatKeys(keyValues)}).");
     }
 
+    /// <summary>
+    /// Returns a readable string representation of the describer.
+    /// </summary>
+    /// <returns>A string representation of the describer.</returns>
     public override string ToString() => $"SQL Row<{typeof(TRow).Name}>";
 
     private static string FormatKeys(object[] keyValues) => string.Join(", ", keyValues);
