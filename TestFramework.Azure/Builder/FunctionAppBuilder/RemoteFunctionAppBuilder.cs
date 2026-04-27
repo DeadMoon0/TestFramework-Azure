@@ -1,6 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net.Http;
+using TestFramework.Azure.Builder.FunctionAppBuilder.Http;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http.Stages;
 using TestFramework.Azure.FunctionApp;
 using TestFramework.Azure.FunctionApp.Trigger;
@@ -15,12 +15,7 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
     : IFunctionAppHttpConnectionStage, IFunctionAppHttpPayloadStage
 {
     private VariableReference<TriggerHttpRouting>? _routing;
-    private VariableReference<string>? _bodyText;
-    private VariableReference<byte[]>? _bodyBytes;
-    private readonly List<(VariableReference<string> key, VariableReference<string> value)> _singleHeaders = [];
-    private readonly List<(VariableReference<string> key, VariableReference<string[]> values)> _multiHeaders = [];
-    private readonly List<VariableReference<Dictionary<string, string>>> _headersDicts = [];
-    private readonly List<VariableReference<Dictionary<string, string[]>>> _headersDictMultis = [];
+    private readonly FunctionAppHttpRequestBuilderState _request = new();
 
     public IFunctionAppHttpPayloadStage SelectEndpointWithMethod<TFunctionType>(string methodName)
     {
@@ -39,43 +34,42 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
         if (_routing is null)
             throw new InvalidOperationException("No endpoint selected. Call SelectEndpoint or SelectEndpointWithMethod first.");
 
-        return new HttpRemoteFunctionAppTrigger(appIdentifier, _routing,
-            new ComposedHttpRequestVariable(_bodyText, _bodyBytes, _singleHeaders, _multiHeaders, _headersDicts, _headersDictMultis));
+        return new HttpRemoteFunctionAppTrigger(appIdentifier, _routing, _request.BuildVariable());
     }
 
     public IFunctionAppHttpPayloadStage WithBody(VariableReference<string> text)
     {
-        _bodyText = text;
+        _request.SetBody(text);
         return this;
     }
 
     public IFunctionAppHttpPayloadStage WithBody(VariableReference<byte[]> data)
     {
-        _bodyBytes = data;
+        _request.SetBody(data);
         return this;
     }
 
     public IFunctionAppHttpPayloadStage WithHeader(VariableReference<string> key, VariableReference<string> value)
     {
-        _singleHeaders.Add((key, value));
+        _request.AddHeader(key, value);
         return this;
     }
 
     public IFunctionAppHttpPayloadStage WithHeader(VariableReference<string> key, VariableReference<string[]> values)
     {
-        _multiHeaders.Add((key, values));
+        _request.AddHeader(key, values);
         return this;
     }
 
     public IFunctionAppHttpPayloadStage WithHeaders(VariableReference<Dictionary<string, string>> headers)
     {
-        _headersDicts.Add(headers);
+        _request.AddHeaders(headers);
         return this;
     }
 
     public IFunctionAppHttpPayloadStage WithHeaders(VariableReference<Dictionary<string, string[]>> headers)
     {
-        _headersDictMultis.Add(headers);
+        _request.AddHeaders(headers);
         return this;
     }
 

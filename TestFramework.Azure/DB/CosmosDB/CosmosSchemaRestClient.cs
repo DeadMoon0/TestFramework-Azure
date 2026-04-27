@@ -8,10 +8,22 @@ using System.Text.Json;
 
 namespace TestFramework.Azure.DB.CosmosDB;
 
+/// <summary>
+/// Minimal REST-based helper for creating Cosmos databases and containers when SDK metadata setup is insufficient.
+/// </summary>
 public static class CosmosSchemaRestClient
 {
     private const string ApiVersion = "2018-12-31";
 
+    /// <summary>
+    /// Ensures that the target Cosmos database and container exist.
+    /// </summary>
+    /// <param name="connectionString">The Cosmos account connection string.</param>
+    /// <param name="databaseName">The database name to create or validate.</param>
+    /// <param name="containerName">The container name to create or validate.</param>
+    /// <param name="partitionKeyPath">The container partition key path, including the leading slash.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task that completes when both resources are available.</returns>
     public static async Task EnsureDatabaseAndContainerExistAsync(
         string connectionString,
         string databaseName,

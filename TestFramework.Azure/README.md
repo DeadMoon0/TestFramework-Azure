@@ -32,6 +32,78 @@ ConfigInstance config = ConfigInstance.FromJsonFile("local.testSettings.json")
     .Build();
 ```
 
+## Configuration Records
+
+The Azure package reads named records from configuration sections through `LoadAzureConfig()` or `LoadAzureConfigs(...)`.
+Each DSL identifier such as `"MainDb"` or `"Default"` maps to one child object inside the matching section.
+
+Supported record types:
+
+| Section | Record type | Required fields | Optional fields | Used by |
+|---------|-------------|-----------------|-----------------|---------|
+| `FunctionApp:{identifier}` | `FunctionAppConfig` | `BaseUrl`, `Code` | `AdminCode` | Remote Function App HTTP triggers and Function App liveness checks |
+| `CosmosDb:{identifier}` | `CosmosContainerDbConfig` | `ConnectionString`, `DatabaseName`, `ContainerName` | None | Cosmos artifacts, query finders, and Cosmos liveness checks |
+| `ServiceBus:{identifier}` | `ServiceBusConfig` | `ConnectionString` plus either `QueueName` or `TopicName` | `SubscriptionName`, `RequiredSession` | Service Bus send triggers and message-received events |
+| `StorageAccount:{identifier}` | `StorageAccountConfig` | `ConnectionString` | `QueueContainerName`, `BlobContainerName`, `TableContainerName` | Blob artifacts, table artifacts, and storage liveness checks |
+| `SqlDatabase:{identifier}` | `SqlDatabaseConfig` | `ConnectionString`, `DatabaseName` | `ContextType` | SQL row artifacts, SQL query finders, and SQL liveness checks |
+
+Configuration expectations:
+
+- `FunctionAppConfig.BaseUrl` should be the host root, usually ending at the site root rather than a specific function route.
+- `FunctionAppConfig.Code` is the normal trigger key; `AdminCode` is only needed when host-status checks require a different admin-level key.
+- `CosmosContainerDbConfig` is container-specific. One identifier points to one database/container pair.
+- `ServiceBusConfig` should define either queue mode or topic mode. Queue mode uses `QueueName`. Topic mode uses `TopicName`, and fixed-subscription receives also require `SubscriptionName`.
+- `StorageAccountConfig` only requires container names for the features you use. Blob and table liveness checks rely on `BlobContainerName` and `TableContainerName` respectively.
+- `SqlDatabaseConfig.ContextType` is an assembly-qualified `DbContext` type name. Leave it unset when you register the context through the SQL registry instead.
+
+Example JSON:
+
+```json
+{
+    "FunctionApp": {
+        "Default": {
+            "BaseUrl": "https://my-functions.azurewebsites.net/",
+            "Code": "function-key",
+            "AdminCode": "admin-key"
+        }
+    },
+    "CosmosDb": {
+        "MainDb": {
+            "ConnectionString": "AccountEndpoint=...;AccountKey=...;",
+            "DatabaseName": "AppDb",
+            "ContainerName": "Orders"
+        }
+    },
+    "ServiceBus": {
+        "MainSBQueue": {
+            "ConnectionString": "Endpoint=sb://...",
+            "QueueName": "orders",
+            "RequiredSession": false
+        },
+        "MainSBTopic": {
+            "ConnectionString": "Endpoint=sb://...",
+            "TopicName": "events",
+            "SubscriptionName": "integration-tests",
+            "RequiredSession": false
+        }
+    },
+    "StorageAccount": {
+        "MainStorage": {
+            "ConnectionString": "DefaultEndpointsProtocol=https;...",
+            "BlobContainerName": "exports",
+            "TableContainerName": "OrderAudit"
+        }
+    },
+    "SqlDatabase": {
+        "MainSql": {
+            "ConnectionString": "Server=...;Database=AppDb;...",
+            "DatabaseName": "AppDb",
+            "ContextType": "MyProject.Data.AppDbContext, MyProject"
+        }
+    }
+}
+```
+
 ## Sample: Function App HTTP Call
 
 ```csharp

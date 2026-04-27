@@ -11,9 +11,16 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.StorageAccount.Table;
 
+/// <summary>
+/// Sets up and tears down Azure Table entity artifacts.
+/// </summary>
+/// <typeparam name="T">The table entity type.</typeparam>
 public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>
     where T : class, ITableEntity
 {
+    /// <summary>
+    /// Upserts the referenced entity during artifact setup.
+    /// </summary>
     public override async Task Setup(IServiceProvider serviceProvider, TableStorageEntityArtifactData<T> data, TableStorageEntityArtifactReference<T> reference, VariableStore variableStore, ScopedLogger logger)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
@@ -24,6 +31,9 @@ public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableSto
         logger.LogInformation($"Table entity {reference.GetPartitionKey(variableStore)}/{reference.GetRowKey(variableStore)} upserted.");
     }
 
+    /// <summary>
+    /// Deletes the referenced entity during artifact cleanup.
+    /// </summary>
     public override async Task Deconstruct(IServiceProvider serviceProvider, TableStorageEntityArtifactReference<T> reference, VariableStore variableStore, ScopedLogger logger)
     {
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
@@ -33,5 +43,9 @@ public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableSto
         logger.LogInformation($"Table entity {reference.GetPartitionKey(variableStore)}/{reference.GetRowKey(variableStore)} deleted.");
     }
 
+    /// <summary>
+    /// Returns a readable string representation of the describer.
+    /// </summary>
+    /// <returns>A string representation of the describer.</returns>
     public override string ToString() => $"Azure Table Entity<{typeof(T).Name}>";
 }

@@ -5,23 +5,48 @@ using System.Text.Json.Serialization;
 
 namespace TestFramework.Azure.DB.CosmosDB;
 
+/// <summary>
+/// Resolves Cosmos document identity metadata from CLR models and JSON serialization attributes.
+/// </summary>
 public static class CosmosModelSchemaResolver
 {
+    /// <summary>
+    /// Resolves the Cosmos document id value from an item instance.
+    /// </summary>
+    /// <typeparam name="TItem">The item type.</typeparam>
+    /// <param name="item">The item instance.</param>
+    /// <returns>The resolved id value.</returns>
     public static string ResolveId<TItem>(TItem item)
     {
         return ResolvePropertyValue(item, ResolveIdProperty(typeof(TItem)), "Id");
     }
 
+    /// <summary>
+    /// Resolves the Cosmos partition key value from an item instance.
+    /// </summary>
+    /// <typeparam name="TItem">The item type.</typeparam>
+    /// <param name="item">The item instance.</param>
+    /// <returns>The resolved partition key.</returns>
     public static PartitionKey ResolvePartitionKey<TItem>(TItem item)
     {
         return new PartitionKey(ResolvePropertyValue(item, ResolvePartitionKeyProperty(typeof(TItem)), "PartitionKey"));
     }
 
+    /// <summary>
+    /// Resolves the Cosmos partition key path for an item type.
+    /// </summary>
+    /// <typeparam name="TItem">The item type.</typeparam>
+    /// <returns>The serialized partition key path, including the leading slash.</returns>
     public static string ResolvePartitionKeyPath<TItem>()
     {
         return ResolvePartitionKeyPath(typeof(TItem));
     }
 
+    /// <summary>
+    /// Resolves the Cosmos partition key path for a CLR type.
+    /// </summary>
+    /// <param name="itemType">The CLR type to inspect.</param>
+    /// <returns>The serialized partition key path, including the leading slash.</returns>
     public static string ResolvePartitionKeyPath(Type itemType)
     {
         PropertyInfo property = ResolvePartitionKeyProperty(itemType);

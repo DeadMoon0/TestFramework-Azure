@@ -5,6 +5,9 @@ using TestFramework.Azure.Configuration.SpecificConfigs;
 
 namespace TestFramework.Azure.DB.SqlServer;
 
+/// <summary>
+/// Registers the SQL services required by SQL-backed Azure artifacts and query finders.
+/// </summary>
 public static class SqlArtifactContextExtensions
 {
     /// <summary>
@@ -18,6 +21,9 @@ public static class SqlArtifactContextExtensions
     ///     reg.AddForIdentifier&lt;AuditDbContext&gt;("AuditDb");
     /// });
     /// </example>
+    /// <param name="services">The service collection to register into.</param>
+    /// <param name="configure">Configures the SQL context registry.</param>
+    /// <returns>The service collection for fluent chaining.</returns>
     public static IServiceCollection AddSqlArtifactContexts(
         this IServiceCollection services,
         Action<SqlDbContextRegistry> configure)
