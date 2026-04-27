@@ -6,7 +6,7 @@
 		<Nullable>enable</Nullable>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<Title>TestFramework Azure</Title>
-		<Version>0.1.4</Version>
+		<Version>0.1.6</Version>
 		<Authors>DeadMoon0</Authors>
 		<Product>TestFramework</Product>
 		<Description>Interact with Azure infrastructure inside of a TestFramework Timeline.</Description>
@@ -18,7 +18,7 @@
 		<PackageTags>Test;UnitTest;IntegrationTest,Framework;Fluent;Timeline;Azure</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<Copyright>Copyright (c) DeadMoon0 2026</Copyright>
-		<PackageReleaseNotes>Added Support for custom envs</PackageReleaseNotes>
+		<PackageReleaseNotes>Added better docs</PackageReleaseNotes>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -48,8 +48,8 @@
 		<PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.1.0" />
 		<PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" Version="4.3.1" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-		<PackageReference Include="TestFramework.Core" Version="0.1.1" />
-		<PackageReference Include="TestFramework.Config" Version="0.1.0" />
+		<PackageReference Include="TestFramework.Core" Version="0.1.2" />
+		<PackageReference Include="TestFramework.Config" Version="0.1.1" />
 	</ItemGroup>
 
 	<ItemGroup>
