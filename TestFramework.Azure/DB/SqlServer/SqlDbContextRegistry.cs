@@ -6,16 +6,28 @@ using TestFramework.Azure.Identifier;
 
 namespace TestFramework.Azure.DB.SqlServer;
 
+/// <summary>
+/// Registers how SQL identifiers map to EF Core <c>DbContext</c> types.
+/// </summary>
 public class SqlDbContextRegistry
 {
     private readonly Dictionary<string, Func<IServiceProvider, DbContext>> _identifierMap = [];
     private Func<IServiceProvider, DbContext>? _default;
 
+    /// <summary>
+    /// Registers the default <c>DbContext</c> used when no identifier-specific registration matches.
+    /// </summary>
+    /// <typeparam name="TContext">The <c>DbContext</c> type to resolve from DI.</typeparam>
     public void AddDefault<TContext>() where TContext : DbContext
     {
         _default = sp => sp.GetRequiredService<TContext>();
     }
 
+    /// <summary>
+    /// Registers a specific <c>DbContext</c> for a SQL identifier.
+    /// </summary>
+    /// <typeparam name="TContext">The <c>DbContext</c> type to resolve from DI.</typeparam>
+    /// <param name="identifier">The SQL identifier that should resolve to the context.</param>
     public void AddForIdentifier<TContext>(SqlDatabaseIdentifier identifier) where TContext : DbContext
     {
         _identifierMap[identifier.Identifier] = sp => sp.GetRequiredService<TContext>();

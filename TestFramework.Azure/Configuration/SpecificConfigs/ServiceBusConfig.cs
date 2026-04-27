@@ -2,13 +2,34 @@
 
 namespace TestFramework.Azure.Configuration.SpecificConfigs;
 
+/// <summary>
+/// Describes which Service Bus receive flow a configuration supports.
+/// </summary>
 public enum ServiceBusConfigReceiveMode
 {
+    /// <summary>
+    /// Receive directly from a queue.
+    /// </summary>
     Queue,
+
+    /// <summary>
+    /// Receive from a topic using a fixed subscription.
+    /// </summary>
     TopicSubscription,
+
+    /// <summary>
+    /// Receive from a topic using a temporary subscription created by the framework.
+    /// </summary>
     TopicTemporarySubscription,
 }
 
+/// <summary>
+/// Configuration required to send to or receive from Azure Service Bus.
+/// </summary>
+/// <remarks>
+/// The identifier maps to a named entry under the <c>ServiceBus</c> section.
+/// Configure either <see cref="QueueName"/> for queue-backed usage or <see cref="TopicName"/> for topic-backed usage, but not both.
+/// </remarks>
 public record ServiceBusConfig
 {
     /// <summary>
@@ -39,6 +60,10 @@ public record ServiceBusConfig
     /// </summary>
     public required bool RequiredSession { get; init; }
 
+    /// <summary>
+    /// Gets the active queue or topic entity name.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when neither <see cref="QueueName"/> nor <see cref="TopicName"/> is configured.</exception>
     public string EntityName
     {
         get
@@ -49,10 +74,21 @@ public record ServiceBusConfig
         }
     }
 
+    /// <summary>
+    /// Gets a value indicating whether this configuration targets a topic.
+    /// </summary>
     public bool IsTopic => !string.IsNullOrEmpty(TopicName);
 
+    /// <summary>
+    /// Gets a value indicating whether this configuration targets a queue.
+    /// </summary>
     public bool IsQueue => !string.IsNullOrEmpty(QueueName);
 
+    /// <summary>
+    /// Resolves the receive mode for the current configuration.
+    /// </summary>
+    /// <param name="createTempSubscription">Whether the framework should create a temporary subscription for topic-backed receive flows.</param>
+    /// <returns>The receive mode implied by the configured entity fields.</returns>
     public ServiceBusConfigReceiveMode GetReceiveMode(bool createTempSubscription = false)
     {
         if (IsQueue) return ServiceBusConfigReceiveMode.Queue;
@@ -74,5 +110,8 @@ public record ServiceBusConfig
         throw new InvalidOperationException("SubscriptionName must be provided for topic-backed receive unless createTempSubscription is enabled.");
     }
 
+    /// <summary>
+    /// Gets the configured subscription name or throws when a topic-backed fixed subscription has not been configured.
+    /// </summary>
     public string SubscriptionNameRequired => SubscriptionName ?? throw new InvalidOperationException("SubscriptionName must be provided for topic-backed receive unless createTempSubscription is enabled.");
 }

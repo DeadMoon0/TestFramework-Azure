@@ -11,8 +11,15 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.DB.CosmosDB;
 
+/// <summary>
+/// Sets up and tears down Cosmos DB item artifacts.
+/// </summary>
+/// <typeparam name="TItem">The item type.</typeparam>
 public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>>
 {
+    /// <summary>
+    /// Removes the referenced item from Cosmos during artifact cleanup.
+    /// </summary>
     public override async Task Deconstruct(IServiceProvider serviceProvider, CosmosDbItemArtifactReference<TItem> reference, VariableStore variableStore, ScopedLogger logger)
     {
         CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(reference.DbIdentifier);
@@ -23,6 +30,9 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
         logger.LogInformation($"Deleted item from Cosmos DB: {reference.GetId(variableStore)} {reference.GetPartitionKey(variableStore)}");
     }
 
+    /// <summary>
+    /// Ensures the referenced Cosmos item exists during artifact setup.
+    /// </summary>
     public override async Task Setup(IServiceProvider serviceProvider, CosmosDbItemArtifactData<TItem> data, CosmosDbItemArtifactReference<TItem> reference, VariableStore variableStore, ScopedLogger logger)
     {
         CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(reference.DbIdentifier);
@@ -40,5 +50,9 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
         logger.LogInformation($"Upserted item to Cosmos DB: {reference.GetId(variableStore)} {reference.GetPartitionKey(variableStore)}");
     }
 
+    /// <summary>
+    /// Returns a readable string representation of the describer.
+    /// </summary>
+    /// <returns>A string representation of the describer.</returns>
     public override string ToString() => $"Cosmos DB Item<{typeof(TItem).Name}>";
 }

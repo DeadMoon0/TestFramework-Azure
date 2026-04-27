@@ -11,14 +11,26 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.DB.SqlServer;
 
+/// <summary>
+/// Reference to a SQL row addressed by its primary key values.
+/// </summary>
+/// <typeparam name="TRow">The row entity type.</typeparam>
 public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactReference<TRow>, SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>>
     where TRow : class
 {
     private readonly VariableReference<string>[] _primaryKeyValues;
     private string[] _pinnedPKValues = [];
 
+    /// <summary>
+    /// The SQL database identifier used to resolve the backing <c>DbContext</c>.
+    /// </summary>
     public SqlDatabaseIdentifier DbIdentifier { get; }
 
+    /// <summary>
+    /// Initializes a SQL row artifact reference.
+    /// </summary>
+    /// <param name="dbIdentifier">The SQL database identifier.</param>
+    /// <param name="primaryKeyValues">Primary key values in entity key order.</param>
     public SqlRowArtifactReference(SqlDatabaseIdentifier dbIdentifier, params VariableReference<string>[] primaryKeyValues)
     {
         if (primaryKeyValues.Length == 0)
@@ -29,6 +41,9 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
         CanDeconstruct = false;
     }
 
+    /// <summary>
+    /// Pins the reference to concrete primary key values.
+    /// </summary>
     public override void OnPinReference(VariableStore variableStore, ScopedLogger logger)
     {
         _pinnedPKValues = _primaryKeyValues
@@ -37,6 +52,9 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
         CanDeconstruct = true;
     }
 
+    /// <summary>
+    /// Declares the variable inputs required by the reference.
+    /// </summary>
     public override void DeclareIO(StepIOContract contract)
     {
         foreach (var pkRef in _primaryKeyValues)
@@ -61,6 +79,9 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
         CanDeconstruct = true;
     }
 
+    /// <summary>
+    /// Resolves the reference into concrete artifact data.
+    /// </summary>
     public override async Task<ArtifactResolveResult<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>>> ResolveToDataAsync(
         IServiceProvider serviceProvider, ArtifactVersionIdentifier versionIdentifier, VariableStore variableStore, ScopedLogger logger)
     {
@@ -110,6 +131,10 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
         return keyValues;
     }
 
+    /// <summary>
+    /// Returns a readable string representation of the reference.
+    /// </summary>
+    /// <returns>A string representation of the reference.</returns>
     public override string ToString() => (IsPinned || _pinnedPKValues.Length > 0)
         ? $"SQL Row<{typeof(TRow).Name}>: {DbIdentifier}/({string.Join(", ", _pinnedPKValues)})"
         : $"SQL Row<{typeof(TRow).Name}> (unresolved)";

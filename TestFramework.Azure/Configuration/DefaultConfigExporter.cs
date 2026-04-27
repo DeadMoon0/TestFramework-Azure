@@ -2,8 +2,12 @@ using TestFramework.Azure.Configuration.SpecificConfigs;
 
 namespace TestFramework.Azure.Configuration;
 
+/// <summary>
+/// Default <see cref="IConfigExporter"/> implementation that emits the keys expected by <see cref="DefaultConfigProvider"/>.
+/// </summary>
 public sealed class DefaultConfigExporter : IConfigExporter
 {
+    /// <inheritdoc />
     public IReadOnlyDictionary<string, string> ExportFunctionAppConfig(string identifier, FunctionAppConfig config) =>
         CreateSection(
             DefaultConfigProvider.FunctionAppBaseSelector,
@@ -12,6 +16,7 @@ public sealed class DefaultConfigExporter : IConfigExporter
             (nameof(FunctionAppConfig.Code), config.Code),
             (nameof(FunctionAppConfig.AdminCode), config.AdminCode));
 
+    /// <inheritdoc />
     public IReadOnlyDictionary<string, string> ExportStorageAccountConfig(string identifier, StorageAccountConfig config) =>
         CreateSection(
             DefaultConfigProvider.StorageAccountSelector,
@@ -21,6 +26,7 @@ public sealed class DefaultConfigExporter : IConfigExporter
             (nameof(StorageAccountConfig.BlobContainerName), config.BlobContainerName),
             (nameof(StorageAccountConfig.TableContainerName), config.TableContainerName));
 
+    /// <inheritdoc />
     public IReadOnlyDictionary<string, string> ExportCosmosDbConfig(string identifier, CosmosContainerDbConfig config) =>
         CreateSection(
             DefaultConfigProvider.CosmosDbSelector,
@@ -29,6 +35,7 @@ public sealed class DefaultConfigExporter : IConfigExporter
             (nameof(CosmosContainerDbConfig.DatabaseName), config.DatabaseName),
             (nameof(CosmosContainerDbConfig.ContainerName), config.ContainerName));
 
+    /// <inheritdoc />
     public IReadOnlyDictionary<string, string> ExportServiceBusConfig(string identifier, ServiceBusConfig config) =>
         CreateSection(
             DefaultConfigProvider.ServiceBusSelector,
@@ -39,6 +46,7 @@ public sealed class DefaultConfigExporter : IConfigExporter
             (nameof(ServiceBusConfig.SubscriptionName), config.SubscriptionName),
             (nameof(ServiceBusConfig.RequiredSession), config.RequiredSession.ToString()));
 
+    /// <inheritdoc />
     public IReadOnlyDictionary<string, string> ExportSqlDatabaseConfig(string identifier, SqlDatabaseConfig config) =>
         CreateSection(
             DefaultConfigProvider.SqlDatabaseSelector,

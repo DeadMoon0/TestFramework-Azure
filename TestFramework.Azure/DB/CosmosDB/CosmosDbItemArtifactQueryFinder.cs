@@ -14,8 +14,17 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.DB.CosmosDB;
 
+/// <summary>
+/// Finds Cosmos DB artifacts by executing a query against the configured container.
+/// </summary>
+/// <typeparam name="TItem">The item type returned by the query.</typeparam>
+/// <param name="dbIdentifier">The Cosmos container identifier.</param>
+/// <param name="query">The query definition variable.</param>
 public class CosmosDbItemArtifactQueryFinder<TItem>(CosmosContainerIdentifier dbIdentifier, VariableReference<QueryDefinition> query) : ArtifactFinder<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>>
 {
+    /// <summary>
+    /// Finds the first matching Cosmos item.
+    /// </summary>
     public override async Task<ArtifactFinderResult?> FindAsync(IServiceProvider serviceProvider, VariableStore variableStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(dbIdentifier);
@@ -35,6 +44,9 @@ public class CosmosDbItemArtifactQueryFinder<TItem>(CosmosContainerIdentifier db
         return new ArtifactFinderResult(new CosmosDbItemArtifactReference<TItem>(dbIdentifier, resolver.ResolvePartitionKey(data), resolver.ResolveId(data)));
     }
 
+    /// <summary>
+    /// Finds all matching Cosmos items.
+    /// </summary>
     public override async Task<ArtifactFinderResultMulti> FindMultiAsync(IServiceProvider serviceProvider, VariableStore variableStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(dbIdentifier);
