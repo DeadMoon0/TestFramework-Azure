@@ -1,15 +1,15 @@
-# TestFrameworkAzure
+# TestFramework.Azure
 
 ## Introduction
 
-TestFrameworkAzure is an extension package for TestFrameworkCore.
+TestFramework.Azure is an extension package for TestFramework.Core.
 
 If you are new: TestFrameworkCore runs your timeline, and this package adds Azure-specific triggers, events, and artifact helpers.
 You usually install and learn TestFrameworkCore first, then add TestFrameworkAzure when your tests need Azure resources.
 
-Azure-focused test helpers for TestFrameworkCore timelines.
+Azure-focused test helpers for TestFramework.Core timelines.
 
-TestFrameworkAzure adds fluent building blocks for:
+TestFramework.Azure adds fluent building blocks for:
 - Azure Function App calls (remote and in-process)
 - Service Bus send/receive flows
 - Azure artifacts (SQL, Cosmos DB, Table Storage, Blob Storage)
@@ -17,17 +17,16 @@ TestFrameworkAzure adds fluent building blocks for:
 ## Install
 
 ```bash
-dotnet add package TestFrameworkAzure
+dotnet add package TestFramework.Azure
 ```
 
 ## Minimal Setup
 
 ```csharp
-using TestFrameworkAzure.Extensions;
+using TestFramework.Azure.Extensions;
 using TestFramework.Config;
 
 ConfigInstance config = ConfigInstance.FromJsonFile("local.testSettings.json")
-    .SetupSubInstance()
     .LoadAzureConfig()
     .Build();
 ```
@@ -107,22 +106,19 @@ Example JSON:
 ## Sample: Function App HTTP Call
 
 ```csharp
-using FunctionApp;
-using TestFrameworkAzure;
+using TestFramework.Azure;
 using TestFramework.Core.Timelines;
 
 Timeline timeline = Timeline.Create()
-    .Trigger(AzureTF.Trigger.FunctionApp
-        .Http("Default")
-        .SelectEndpointWithMethod<HttpTests>(nameof(HttpTests.Run))
-        .Call())
+    .Trigger(AzureTF.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<HttpTests>(nameof(HttpTests.Run)).Call())
     .Build();
 
-TimelineRun run = await timeline.SetupRun(config.BuildServiceProvider())
-    .RunAsync();
+TimelineRun run = await timeline.SetupRun(config.BuildServiceProvider()).RunAsync();
 
 run.EnsureRanToCompletion();
 ```
+
+`SelectEndpointWithMethod<T>(...)` expects the target method to carry both a `[Function(...)]` attribute and a parameter marked with `[HttpTrigger(...)]`.
 
 ## Service Bus Support Matrix
 
@@ -138,17 +134,13 @@ run.EnsureRanToCompletion();
 
 ```csharp
 using Azure.Messaging.ServiceBus;
-using TestFrameworkAzure;
+using TestFramework.Azure;
 using TestFramework.Core.Timelines;
 
 Timeline timeline = Timeline.Create()
-    .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBQueue",
-        new ServiceBusMessage("Test message") { CorrelationId = "1234 :)" }))
-    .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived(
-        "MainSBQueue",
-        correlationId: "1234 :)",
-        completeMessage: true))
-    .WithTimeOut(TimeSpan.FromSeconds(10))
+    .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBQueue", new ServiceBusMessage("Test message") { CorrelationId = "order-42" }))
+    .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived("MainSBQueue", correlationId: "order-42", completeMessage: true))
+        .WithTimeOut(TimeSpan.FromSeconds(10))
     .Build();
 ```
 
@@ -156,14 +148,9 @@ Timeline timeline = Timeline.Create()
 
 ```csharp
 Timeline timeline = Timeline.Create()
-    .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived(
-        "MainSBTopic",
-        correlationId: "topic-1234",
-        createTempSubscription: true,
-        completeMessage: true))
-    .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBTopic",
-        new ServiceBusMessage("Test message") { CorrelationId = "topic-1234" }))
-    .WithTimeOut(TimeSpan.FromSeconds(10))
+    .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived("MainSBTopic", correlationId: "topic-1234", createTempSubscription: true, completeMessage: true))
+        .WithTimeOut(TimeSpan.FromSeconds(10))
+    .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBTopic", new ServiceBusMessage("Test message") { CorrelationId = "topic-1234" }))
     .Build();
 ```
 
@@ -202,7 +189,7 @@ Timeline timeline = Timeline.Create()
 
 ```csharp
 using Microsoft.Azure.Cosmos;
-using TestFrameworkAzure;
+using TestFramework.Azure;
 
 Timeline timeline = Timeline.Create()
     .FindArtifactMulti(

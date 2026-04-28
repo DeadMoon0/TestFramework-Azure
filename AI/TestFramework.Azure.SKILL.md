@@ -27,6 +27,7 @@
     Prefer one visible end-to-end flow over several tiny wrappers that hide the Azure interaction sequence.
     Use correlation ids or equivalent scoping when message-driven tests would otherwise be ambiguous.
     Prefer AzureTF entry points and identifier-driven config over ad-hoc nested helper layers.
+    Prefer compact AzureTF call chains when they remain readable, for example `Trigger(AzureTF.Trigger.FunctionApp.Http(...).SelectEndpointWithMethod<...>(...).Call())`.
 </best_practices>
 
 <surface_guidance>
@@ -84,12 +85,12 @@
     - Keep the project-specific adapter names stable and descriptive so errors clearly point back to the owning project seam.
 </project_adaptation>
 
-<release_readiness_notes>
-    1.0 grounding the agent should preserve:
-    - public Azure docs and config guidance were expanded, so prefer the documented happy path instead of custom wrapper invention
+<documentation_notes>
+    Guidance the agent should preserve:
+    - public Azure docs and config guidance are the preferred happy path instead of custom wrapper invention
     - the remaining weaknesses are ergonomic backlog items such as proxy depth and overload cleanup, not reasons to redesign working flows during normal user requests
     - duplicated Function App HTTP request-shaping logic was centralized; when modifying that area, keep remote and in-process request behavior aligned
-</release_readiness_notes>
+</documentation_notes>
 
 <style_guide>
     Prefer timelines where the Azure interaction order is obvious at a glance.
@@ -97,6 +98,8 @@
     Use explicit configuration identifiers that describe the environment dependency.
     Name Azure steps when diagnosing message flow or remote calls will matter.
     Keep resource names and identifiers semantically meaningful, because diagnostics often surface those names directly.
+    Avoid expanding every method argument across several lines when a compact call reads more like normal C#.
+    Keep example domain language concrete and scenario-true instead of generic deployment wording.
 </style_guide>
 
 <sample_patterns>
