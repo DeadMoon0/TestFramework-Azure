@@ -48,8 +48,11 @@
 		<PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.1.0" />
 		<PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" Version="4.3.1" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-		<PackageReference Include="TestFramework.Core" Version="0.1.2" />
-		<PackageReference Include="TestFramework.Config" Version="0.1.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\TestFramework-Core\TestFramework.Core\TestFramework.Core.csproj" />
+		<ProjectReference Include="..\..\TestFramework-Core\TestFramework.Config\TestFramework.Config.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
