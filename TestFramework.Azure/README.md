@@ -120,6 +120,43 @@ run.EnsureRanToCompletion();
 
 `SelectEndpointWithMethod<T>(...)` expects the target method to carry both a `[Function(...)]` attribute and a parameter marked with `[HttpTrigger(...)]`.
 
+## Function App Execution Modes
+
+`AzureTF.Trigger.FunctionApp` exposes three different execution styles:
+
+| Mode | Use when | Runtime dependency | Typical benefit |
+|------|----------|--------------------|-----------------|
+| `Http(...)` | you want to call a deployed or container-hosted Function App over HTTP | reachable HTTP host plus `FunctionAppConfig` | closest to production wiring |
+| `Managed<T>(identifier, method)` | you want framework-managed invocation of a known function entry point | the function type is available to the test process | avoids hand-written HTTP request setup |
+| `InProcessHttp<T>(...)` | you want to execute the function handler directly in-process | the function type and request delegate are available in the test process | fastest feedback and easiest offline unit-style validation |
+
+Choose `Http(...)` for end-to-end behavior, `Managed<T>(...)` when you still want a Function App abstraction without a remote hop, and `InProcessHttp<T>(...)` when the test should stay entirely local to the current process.
+
+## `InProcessHttp(...)` Overload Guide
+
+Use the smallest overload that matches what your function returns:
+
+- `InProcessHttp<T>((request, context) => { ... })` for synchronous handlers that return no result.
+- `InProcessHttp<T>((request, context) => Task.CompletedTask)` for asynchronous handlers that return no result.
+- `InProcessHttp<T>((request, context) => new OkResult())` for synchronous handlers that return `IActionResult`.
+- `InProcessHttp<T>((request, context) => Task.FromResult<IActionResult>(...))` for asynchronous handlers that return `IActionResult`.
+
+For remote calls, the equivalent decision point is different: start with `Http(...)`, then choose either `SelectEndpointWithMethod<T>(...)` when the route can be inferred from the function metadata, or `SelectEndpoint(path, method)` when the test should supply the path and HTTP verb explicitly.
+
+Example with explicit path, body, and headers:
+
+```csharp
+Timeline timeline = Timeline.Create()
+    .Trigger(
+        AzureTF.Trigger.FunctionApp.Http("Default")
+            .SelectEndpoint(Var.Const("orders/42"), Var.Const(HttpMethod.Post))
+            .WithHeader(Var.Const("x-correlation-id"), Var.Const("order-42"))
+            .WithHeaders(Var.Const(new Dictionary<string, string> { ["x-tenant"] = "lab" }))
+            .WithBody(Var.Const("{\"id\":42}"))
+            .Call())
+    .Build();
+```
+
 ## Service Bus Support Matrix
 
 `ServiceBusConfig` supports three receive modes:
