@@ -6,7 +6,7 @@
 		<Nullable>enable</Nullable>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<Title>TestFramework Azure</Title>
-		<Version>0.1.6</Version>
+		<Version>0.1.7</Version>
 		<Authors>DeadMoon0</Authors>
 		<Product>TestFramework</Product>
 		<Description>Interact with Azure infrastructure inside of a TestFramework Timeline.</Description>
