@@ -113,6 +113,43 @@ public class ReadmeSamplesTests
     }
 
     [Fact]
+    public async Task FunctionAppHttpCall_ExplicitEndpointBodyAndHeaders_ComposesExpectedRequest()
+    {
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
+            {
+                BaseUrl = "https://functions.test/api/",
+                Code = "function-key",
+            }));
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Timeline timeline = Timeline.Create()
+            .Trigger(
+                AzureTF.Trigger.FunctionApp.Http("Default")
+                    .SelectEndpoint(Var.Const("orders/42"), Var.Const(HttpMethod.Post))
+                    .WithHeader(Var.Const("x-correlation-id"), Var.Const("order-42"))
+                    .WithHeaders(Var.Const(new Dictionary<string, string> { ["x-tenant"] = "lab" }))
+                    .WithBody(Var.Const("{\"id\":42}"))
+                    .Call())
+            .Build();
+
+        TimelineRun run = await timeline.SetupRun(runtime.ServiceProvider).RunAsync();
+
+        run.EnsureRanToCompletion();
+        Assert.NotNull(sender.Request);
+        Assert.Equal(HttpMethod.Post, sender.Request!.Method);
+        Assert.Equal(new Uri("https://functions.test/api/orders/42"), sender.Request.RequestUri);
+        Assert.Equal("function-key", Assert.Single(sender.Request.Headers.GetValues("x-functions-key")));
+        Assert.Equal("order-42", Assert.Single(sender.Request.Headers.GetValues("x-correlation-id")));
+        Assert.Equal("lab", Assert.Single(sender.Request.Headers.GetValues("x-tenant")));
+        Assert.Equal("{\"id\":42}", await sender.Request.Content!.ReadAsStringAsync());
+    }
+
+    [Fact]
     public void ServiceBusQueueSendWait_BuildsQueueSendAndReceiveSteps()
     {
         Timeline timeline = Timeline.Create()
