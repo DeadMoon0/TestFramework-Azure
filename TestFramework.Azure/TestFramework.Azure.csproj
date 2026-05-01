@@ -18,7 +18,7 @@
 		<PackageTags>Test;UnitTest;IntegrationTest,Framework;Fluent;Timeline;Azure</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<Copyright>Copyright (c) DeadMoon0 2026</Copyright>
-		<PackageReleaseNotes>Added better docs</PackageReleaseNotes>
+		<PackageReleaseNotes>Expanded Function App guidance and strengthened Azure DSL test coverage.</PackageReleaseNotes>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
