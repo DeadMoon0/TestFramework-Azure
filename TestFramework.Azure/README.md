@@ -229,8 +229,8 @@ using Microsoft.Azure.Cosmos;
 using TestFramework.Azure;
 
 Timeline timeline = Timeline.Create()
-    .FindArtifactMulti(
-        ["cosmosItemQuery"],
+    .FindArtifacts(
+        "cosmosItemQuery",
         AzureTF.ArtifactFinder.DB.CosmosQuery<MyCosmosItem>(
             "MainDb",
             new QueryDefinition("SELECT * FROM c WHERE c.number = 1")))
