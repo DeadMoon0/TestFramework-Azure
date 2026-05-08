@@ -8,6 +8,7 @@ internal class ConfigLoader(IConfigProvider configProvider)
 {
     internal void LoadAllConfigs(IConfiguration configuration, IServiceCollection serviceCollection)
     {
+        LoadLogicAppConfigs(configuration, serviceCollection);
         LoadFunctionAppConfigs(configuration, serviceCollection);
         LoadCosmosDbConfigs(configuration, serviceCollection);
         LoadServiceBusConfigs(configuration, serviceCollection);
@@ -22,6 +23,15 @@ internal class ConfigLoader(IConfigProvider configProvider)
         ConfigStore<TConfig> store = new ConfigStore<TConfig>();
         serviceCollection.AddSingleton(store);
         return store;
+    }
+
+    internal void LoadLogicAppConfigs(IConfiguration configuration, IServiceCollection serviceCollection)
+    {
+        ConfigStore<LogicAppConfig> store = EnsureStoreRegistered<LogicAppConfig>(serviceCollection);
+        foreach (var key in configProvider.LoadAllLogicAppIdentifier(configuration))
+        {
+            store.AddConfig(key, configProvider.LoadLogicAppConfig(configuration, key));
+        }
     }
 
     internal void LoadFunctionAppConfigs(IConfiguration configuration, IServiceCollection serviceCollection)

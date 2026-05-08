@@ -43,6 +43,9 @@
 <api_hints>
     Important APIs and shapes from the package docs:
     - AzureTF.Trigger.FunctionApp.Http("name").SelectEndpointWithMethod<T>(...).Call()
+    - AzureTF.Trigger.LogicApp.Http("logic").Workflow("StatefulWorkflow").Manual().Call()
+    - AzureTF.Trigger.LogicApp.Http("logic").Workflow("StatelessWorkflow").Manual().CallAndCapture()
+    - AzureTF.Event.LogicApp.RunCompleted("logic", runId, workflowName) is for stateful workflows only
     - AzureTF.Trigger.ServiceBus.Send("configName", message)
     - AzureTF.Event.ServiceBus.MessageReceived("configName", ...)
     - AzureTF.Trigger.IsLive.Cosmos("configName")
@@ -56,6 +59,9 @@
 <runtime_behavior>
     Important runtime facts:
     - AzureTF is the main facade and groups Trigger, Event, Artifact, and ArtifactFinder entry points.
+    - Logic App workflow mode matters: stateful workflows expose run history, stateless workflows complete inline with the callback response.
+    - Use `Call()` when you need a run id and plan to wait with `RunCompleted(...)` or `RunReachedStatus(...)`.
+    - Use `CallAndCapture()` for stateless Logic Apps; do not model stateless completion through run polling or hidden fallback storage.
     - Service Bus receive flows may create temporary subscriptions for scoped topic tests.
     - Most Azure operations rely on configuration stores resolved from dependency injection and IConfiguration.
     - Live checks and remote interactions should be explicit in the timeline so waiting, retries, and timeouts remain visible.
@@ -107,6 +113,11 @@
     - prepare Azure config with ConfigInstance
     - trigger a function endpoint through AzureTF.Trigger.FunctionApp.Http(...)
     - run the timeline with the built service provider
+
+    Logic App pattern:
+    - stateful workflow: trigger with `Call()`, keep the returned `RunId`, then wait with `AzureTF.Event.LogicApp.RunCompleted(...)`
+    - stateless workflow: trigger with `CallAndCapture()` and assert against the returned `LogicAppCapturedResult`
+    - do not recommend `RunCompleted(...)` for stateless workflows
 
     Service Bus pattern:
     - trigger a send

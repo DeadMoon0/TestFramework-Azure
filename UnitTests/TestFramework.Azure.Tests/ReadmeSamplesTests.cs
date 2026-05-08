@@ -9,6 +9,7 @@ using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Extensions;
 using TestFramework.Azure.FunctionApp;
+using TestFramework.Azure.LogicApp;
 using TestFramework.Azure.Runtime;
 using TestFramework.Azure.ServiceBus;
 using TestFramework.Config;
@@ -177,6 +178,54 @@ public class ReadmeSamplesTests
     }
 
     [Fact]
+    public async Task LogicAppStatelessCallAndCapture_ComposesExpectedRequestAndResult()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"value\":\"https://logic.test/invoke/manual?sig=abc\"}")
+            },
+            new HttpResponseMessage(HttpStatusCode.Accepted)
+            {
+                Content = new StringContent("{\"message\":\"captured\"}")
+            });
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "StatelessOrders",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Timeline timeline = Timeline.Create()
+            .Trigger(
+                AzureTF.Trigger.LogicApp.Http("logic")
+                    .Workflow("StatelessOrders")
+                    .Manual()
+                    .WithBody(Var.Const("{\"id\":42}"))
+                    .CallAndCapture())
+            .Name("logic-call")
+            .Build();
+
+        TimelineRun run = await timeline.SetupRun(runtime.ServiceProvider).RunAsync();
+
+        run.EnsureRanToCompletion();
+        LogicAppCapturedResult result = Assert.IsType<LogicAppCapturedResult>(run.Step("logic-call").LastResult.Result);
+        Assert.Equal(LogicAppRunStatus.Succeeded, result.Status);
+        Assert.Equal("{\"message\":\"captured\"}", result.ResponseBody);
+        Assert.Equal(new Uri("https://logic.test/invoke/manual?sig=abc"), sender.Requests[1].RequestUri);
+        Assert.Equal("{\"id\":42}", sender.RequestBodies[1]);
+    }
+
+    [Fact]
     public void CosmosClientOptionsNote_RegistersConfiguredClientOptionsProvider()
     {
         IConfiguration configuration = new ConfigurationBuilder()
@@ -258,14 +307,21 @@ public class ReadmeSamplesTests
         public IHttpRequestSender CreateSender() => sender;
     }
 
-    private sealed class FakeHttpRequestSender(HttpResponseMessage response) : IHttpRequestSender
+    private sealed class FakeHttpRequestSender(params HttpResponseMessage[] responses) : IHttpRequestSender
     {
         public HttpRequestMessage? Request { get; private set; }
+        public List<HttpRequestMessage> Requests { get; } = [];
+        public List<string?> RequestBodies { get; } = [];
 
-        public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        private readonly Queue<HttpResponseMessage> _responses = new(responses);
+
+        public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Request = request;
-            return Task.FromResult(response);
+            Requests.Add(request);
+            RequestBodies.Add(request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken));
+            HttpResponseMessage response = _responses.Count > 0 ? _responses.Dequeue() : new HttpResponseMessage(HttpStatusCode.OK);
+            return response;
         }
     }
 

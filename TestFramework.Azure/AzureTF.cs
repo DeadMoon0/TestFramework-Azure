@@ -7,11 +7,14 @@ using System.Linq;
 using System.Threading.Tasks;
 using TestFramework.Azure.Builder.FunctionAppBuilder;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http.Stages;
+using TestFramework.Azure.Builder.LogicAppBuilder;
 using TestFramework.Azure.DB.CosmosDB;
 using TestFramework.Azure.DB.SqlServer;
 using TestFramework.Azure.FunctionApp.InProcessProxies;
 using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.LogicApp;
+using TestFramework.Azure.LogicApp.Events;
 using TestFramework.Azure.ServiceBus;
 using TestFramework.Azure.StorageAccount.Blob;
 using TestFramework.Azure.Trigger.IsLive;
@@ -52,6 +55,11 @@ public static class AzureTF
     public class TriggerProxy
     {
         /// <summary>
+        /// Access Logic App trigger builders.
+        /// </summary>
+        public LogicAppTrigger LogicApp { get; } = new LogicAppTrigger();
+
+        /// <summary>
         /// Access Function App trigger builders.
         /// </summary>
         public FunctionAppTrigger FunctionApp { get; } = new FunctionAppTrigger();
@@ -65,6 +73,22 @@ public static class AzureTF
         /// Access Azure liveness triggers.
         /// </summary>
         public IsLiveTrigger IsLive { get; } = new IsLiveTrigger();
+    }
+
+    /// <summary>
+    /// Creates Logic App triggers for remote Standard workflow execution.
+    /// </summary>
+    public class LogicAppTrigger
+    {
+        /// <summary>
+        /// Starts a remote HTTP Logic App trigger builder for a configured Logic App identifier.
+        /// </summary>
+        /// <param name="identifier">The Logic App identifier to resolve.</param>
+        /// <returns>The builder used to select a workflow and trigger.</returns>
+        public ILogicAppWorkflowStage Http(LogicAppIdentifier identifier)
+        {
+            return new RemoteLogicAppBuilder(identifier);
+        }
     }
 
     /// <summary>
@@ -307,9 +331,104 @@ public static class AzureTF
     public class EventProxy
     {
         /// <summary>
+        /// Access Logic App event factories.
+        /// </summary>
+        public LogicAppEvents LogicApp { get; } = new LogicAppEvents();
+
+        /// <summary>
         /// Access Service Bus event factories.
         /// </summary>
         public ServiceBusEvents ServiceBus { get; } = new ServiceBusEvents();
+    }
+
+    /// <summary>
+    /// Creates Logic App workflow run events.
+    /// </summary>
+    public class LogicAppEvents
+    {
+        /// <summary>
+        /// Waits until the Logic App run represented by an explicit run context reaches a specific status.
+        /// </summary>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<LogicAppRunContext> runContext, LogicAppRunStatus status)
+            => new(identifier,
+                runContext.Transform(context => context?.WorkflowName ?? string.Empty),
+                runContext.Transform(context => context?.RunId ?? string.Empty),
+                Var.Const(status),
+                runContext,
+                typeof(LogicAppRunContext));
+
+        /// <summary>
+        /// Waits until the Logic App run represented by an explicit run context reaches a specific status.
+        /// </summary>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<LogicAppRunContext> runContext, VariableReference<LogicAppRunStatus> status)
+            => new(identifier,
+                runContext.Transform(context => context?.WorkflowName ?? string.Empty),
+                runContext.Transform(context => context?.RunId ?? string.Empty),
+                status,
+                runContext,
+                typeof(LogicAppRunContext));
+
+        /// <summary>
+        /// Waits until the Logic App run represented by a trigger result reaches a specific status.
+        /// </summary>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<LogicAppTriggerResult> triggerResult, LogicAppRunStatus status)
+            => new(identifier,
+                triggerResult.Transform(result => result?.WorkflowName ?? string.Empty),
+                triggerResult.Transform(result => result?.RunId ?? string.Empty),
+                Var.Const(status),
+                triggerResult,
+                typeof(LogicAppTriggerResult));
+
+        /// <summary>
+        /// Waits until the Logic App run represented by a trigger result reaches a specific status.
+        /// </summary>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<LogicAppTriggerResult> triggerResult, VariableReference<LogicAppRunStatus> status)
+            => new(identifier,
+                triggerResult.Transform(result => result?.WorkflowName ?? string.Empty),
+                triggerResult.Transform(result => result?.RunId ?? string.Empty),
+                status,
+                triggerResult,
+                typeof(LogicAppTriggerResult));
+
+        /// <summary>
+        /// Waits until a Logic App run reaches a specific status.
+        /// </summary>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<string> runId, LogicAppRunStatus status, VariableReference<string>? workflowName = null)
+            => new(identifier, workflowName, runId, Var.Const(status));
+
+        /// <summary>
+        /// Waits until a Logic App run reaches a specific status.
+        /// </summary>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<string> runId, VariableReference<LogicAppRunStatus> status, VariableReference<string>? workflowName = null)
+            => new(identifier, workflowName, runId, status);
+
+        /// <summary>
+        /// Waits until a Logic App run represented by an explicit run context reaches any terminal state.
+        /// </summary>
+        public LogicAppRunEvent RunCompleted(LogicAppIdentifier identifier, VariableReference<LogicAppRunContext> runContext)
+            => new(identifier,
+                runContext.Transform(context => context?.WorkflowName ?? string.Empty),
+                runContext.Transform(context => context?.RunId ?? string.Empty),
+                null,
+                runContext,
+                typeof(LogicAppRunContext));
+
+        /// <summary>
+        /// Waits until a Logic App run reaches any terminal state.
+        /// </summary>
+        public LogicAppRunEvent RunCompleted(LogicAppIdentifier identifier, VariableReference<LogicAppTriggerResult> triggerResult)
+            => new(identifier,
+                triggerResult.Transform(result => result?.WorkflowName ?? string.Empty),
+                triggerResult.Transform(result => result?.RunId ?? string.Empty),
+                null,
+                triggerResult,
+                typeof(LogicAppTriggerResult));
+
+        /// <summary>
+        /// Waits until a Logic App run reaches any terminal state.
+        /// </summary>
+        public LogicAppRunEvent RunCompleted(LogicAppIdentifier identifier, VariableReference<string> runId, VariableReference<string>? workflowName = null)
+            => new(identifier, workflowName, runId, null);
     }
 
     /// <summary>

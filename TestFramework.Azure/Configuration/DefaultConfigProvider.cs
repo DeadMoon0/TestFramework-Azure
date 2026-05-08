@@ -2,6 +2,7 @@
 using System.Linq;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Exceptions;
+using TestFramework.Azure.LogicApp;
 
 namespace TestFramework.Azure.Configuration;
 
@@ -10,6 +11,11 @@ namespace TestFramework.Azure.Configuration;
 /// </summary>
 public class DefaultConfigProvider : IConfigProvider
 {
+    /// <summary>
+    /// Configuration section name for <see cref="LogicAppConfig"/> records.
+    /// </summary>
+    public const string LogicAppSelector = "LogicApp";
+
     /// <summary>
     /// Configuration section name for <see cref="FunctionAppConfig"/> records.
     /// </summary>
@@ -36,6 +42,9 @@ public class DefaultConfigProvider : IConfigProvider
     public const string SqlDatabaseSelector = "SqlDatabase";
 
     /// <inheritdoc />
+    public string[] LoadAllLogicAppIdentifier(IConfiguration configuration) => [.. configuration.GetSection(LogicAppSelector).GetChildren().Select(x => x.Key)];
+
+    /// <inheritdoc />
     public string[] LoadAllCosmosDbIdentifier(IConfiguration configuration) => [.. configuration.GetSection(CosmosDbSelector).GetChildren().Select(x => x.Key)];
 
     /// <inheritdoc />
@@ -49,6 +58,31 @@ public class DefaultConfigProvider : IConfigProvider
 
     /// <inheritdoc />
     public string[] LoadAllServiceBusIdentifier(IConfiguration configuration) => [.. configuration.GetSection(ServiceBusSelector).GetChildren().Select(x => x.Key)];
+
+    /// <inheritdoc />
+    public LogicAppConfig LoadLogicAppConfig(IConfiguration configuration, string identifier)
+    {
+        IConfigurationSection logicAppSection = configuration.GetSection(LogicAppSelector).GetSection(identifier);
+        IConfigurationSection standardSection = logicAppSection.GetSection(nameof(LogicAppConfig.Standard));
+        IConfigurationSection consumptionSection = logicAppSection.GetSection(nameof(LogicAppConfig.Consumption));
+
+        return new LogicAppConfig
+        {
+            HostingMode = Enum.TryParse<LogicAppHostingMode>(logicAppSection.GetSection(nameof(LogicAppConfig.HostingMode)).Value, ignoreCase: true, out LogicAppHostingMode mode) ? mode : LogicAppHostingMode.Standard,
+            WorkflowName = logicAppSection.GetSection(nameof(LogicAppConfig.WorkflowName)).Value,
+            Standard = new LogicAppStandardConfig
+            {
+                BaseUrl = standardSection.GetSection(nameof(LogicAppStandardConfig.BaseUrl)).Value,
+                Code = standardSection.GetSection(nameof(LogicAppStandardConfig.Code)).Value,
+                AdminCode = standardSection.GetSection(nameof(LogicAppStandardConfig.AdminCode)).Value,
+            },
+            Consumption = new LogicAppConsumptionConfig
+            {
+                InvokeUrl = consumptionSection.GetSection(nameof(LogicAppConsumptionConfig.InvokeUrl)).Value,
+                WorkflowResourceId = consumptionSection.GetSection(nameof(LogicAppConsumptionConfig.WorkflowResourceId)).Value,
+            },
+        };
+    }
 
     /// <inheritdoc />
     public CosmosContainerDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier)

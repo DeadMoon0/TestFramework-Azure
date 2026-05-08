@@ -8,6 +8,14 @@ namespace TestFramework.Azure.Configuration;
 public interface IConfigExporter
 {
     /// <summary>
+    /// Exports a Logic App configuration record.
+    /// </summary>
+    /// <param name="identifier">The logical identifier to export under.</param>
+    /// <param name="config">The configuration record to flatten.</param>
+    /// <returns>A key/value map suitable for configuration providers such as in-memory collections.</returns>
+    IReadOnlyDictionary<string, string> ExportLogicAppConfig(string identifier, LogicAppConfig config);
+
+    /// <summary>
     /// Exports a Function App configuration record.
     /// </summary>
     /// <param name="identifier">The logical identifier to export under.</param>

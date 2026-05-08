@@ -20,9 +20,15 @@ It is the solution you add when your timelines need to interact with Microsoft A
 With this solution you can:
 
 - call Azure Function App endpoints from a timeline
+- invoke Azure Logic Apps in both stateful and stateless modes
 - send messages and wait for messages with Service Bus flows
 - work with Azure-backed artifacts such as blobs, tables, Cosmos items, and SQL data
 - combine Azure interactions with the core timeline engine and assertions from TestFramework-Core
+
+Logic App mode matters:
+- stateful workflows use `Call()` and can be followed by `RunCompleted(...)` or `RunReachedStatus(...)`
+- stateless workflows use `CallAndCapture()` and return the callback result directly
+- Consumption workflows are supported through nested `Consumption` settings, and users only need to provide the URLs required by the features they use
 
 ## Related Repositories
 
@@ -35,6 +41,8 @@ With this solution you can:
 - Read the package-level overview in [TestFramework.Azure/README.md](./TestFramework.Azure/README.md)
 - Use the Showroom repository for example-driven learning and begin with `TestFramework.Showroom.Azure/A1_BlobStorage.cs`, `A4_ServiceBus.cs`, and `A6_IntegratedAzure.cs`
 - Keep TestFramework-Core nearby because most Azure timelines build directly on its timeline and configuration model
+- For Logic Apps, prefer the package README first because it now documents the stateful vs stateless API split explicitly
+- For remote Function Apps, prefer `SelectFunction(name, method)` when you want the default `api/{name}` route instead of spelling it out by hand
 
 ## CI Pull Requests
 

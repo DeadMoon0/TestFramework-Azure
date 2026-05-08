@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.DependencyInjection;
 using TestFramework.Azure;
+using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
 using TestFramework.Azure.ServiceBus;
 using TestFramework.Core.Environment;
@@ -60,6 +61,7 @@ public class AzureSurfaceTests
     [Fact]
     public void AzureTF_IsLive_ReturnsStepsForKnownTargets()
     {
+        Step<object?> logicApp = AzureTF.Trigger.IsLive.LogicApp("logic", AlivenessLevel.Authenticated);
         Step<object?> functionApp = AzureTF.Trigger.IsLive.FunctionApp("func");
         Step<object?> serviceBus = AzureTF.Trigger.IsLive.ServiceBus("bus", AlivenessLevel.Authenticated);
         Step<object?> blob = AzureTF.Trigger.IsLive.Blob("storage", AlivenessLevel.Authenticated);
@@ -67,12 +69,14 @@ public class AzureSurfaceTests
         Step<object?> cosmos = AzureTF.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Authenticated);
         Step<object?> sql = AzureTF.Trigger.IsLive.Sql("sql", AlivenessLevel.Authenticated);
 
+        Assert.Equal("LogicApp IsLive Trigger", logicApp.Name);
         Assert.Equal("FunctionApp IsLive Trigger", functionApp.Name);
         Assert.Equal("ServiceBus IsLive Trigger", serviceBus.Name);
         Assert.Equal("Blob Storage IsLive Trigger", blob.Name);
         Assert.Equal("Table Storage IsLive Trigger", table.Name);
         Assert.Equal("Cosmos Container IsLive Trigger", cosmos.Name);
         Assert.Equal("SqlDatabase IsLive Trigger", sql.Name);
+        Assert.Equal("logic", Assert.Single(((IHasEnvironmentRequirements)logicApp).GetEnvironmentRequirements(null!)).ResourceIdentifier);
         Assert.Equal("bus", Assert.Single(((IHasEnvironmentRequirements)serviceBus).GetEnvironmentRequirements(null!)).ResourceIdentifier);
         Assert.Equal("storage", Assert.Single(((IHasEnvironmentRequirements)blob).GetEnvironmentRequirements(null!)).ResourceIdentifier);
         Assert.Equal("storage", Assert.Single(((IHasEnvironmentRequirements)table).GetEnvironmentRequirements(null!)).ResourceIdentifier);
@@ -89,6 +93,15 @@ public class AzureSurfaceTests
 
         Assert.Equal(AzureEnvironmentResourceKinds.ServiceBus, requirement.ResourceKind);
         Assert.Equal("bus", requirement.ResourceIdentifier);
+    }
+
+    [Fact]
+    public void AzureEnvironmentResourceKinds_ExposesLogicAppKind()
+    {
+        LogicAppIdentifier identifier = "logic";
+
+        Assert.Equal("logic", identifier.ToString());
+        Assert.Equal("azure.logicapp", AzureEnvironmentResourceKinds.LogicApp);
     }
 
     private sealed class StubAzureComponentFactory : IAzureComponentFactory

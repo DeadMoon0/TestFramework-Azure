@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Cosmos;
 using TestFramework.Azure;
+using TestFramework.Azure.LogicApp;
 using TestFramework.Azure.FunctionApp.InProcessProxies;
 using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.StorageAccount.Table;
@@ -17,8 +18,10 @@ public class AzureDslCoverageTests
     public void FunctionApp_HttpBuilder_IsCreated()
     {
         object builder = AzureTF.Trigger.FunctionApp.Http("func");
+        object functionBuilder = AzureTF.Trigger.FunctionApp.Http("func").SelectFunction("HttpEchoTest", HttpMethod.Post);
 
         Assert.NotNull(builder);
+        Assert.NotNull(functionBuilder);
     }
 
     [Fact]
@@ -41,6 +44,26 @@ public class AzureDslCoverageTests
         Assert.NotNull(taskBuilder);
         Assert.NotNull(resultBuilder);
         Assert.NotNull(taskResultBuilder);
+    }
+
+    [Fact]
+    public void LogicApp_HttpBuilder_AndEvents_AreCreated()
+    {
+        object triggerBuilder = AzureTF.Trigger.LogicApp.Http("logic");
+        object runCompleted = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-1"));
+        object runSucceeded = AzureTF.Event.LogicApp.RunReachedStatus("logic", Var.Const("run-1"), LogicAppRunStatus.Succeeded);
+        object runCompletedWithContext = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const(new LogicAppRunContext("OrderProcessor", "run-1")));
+        object capture = AzureTF.Trigger.LogicApp.Http("logic").Workflow("OrderProcessor").Manual().CallAndCapture();
+        object timer = AzureTF.Trigger.LogicApp.Http("logic").Workflow("NightlyJob").Timer().Call();
+        object timerContext = AzureTF.Trigger.LogicApp.Http("logic").Workflow("NightlyJob").Timer().CallForRunContext();
+
+        Assert.NotNull(triggerBuilder);
+        Assert.NotNull(runCompleted);
+        Assert.NotNull(runSucceeded);
+        Assert.NotNull(runCompletedWithContext);
+        Assert.NotNull(capture);
+        Assert.NotNull(timer);
+        Assert.NotNull(timerContext);
     }
 
     [Fact]

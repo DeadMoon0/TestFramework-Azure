@@ -8,6 +8,19 @@ namespace TestFramework.Azure.Configuration;
 public sealed class DefaultConfigExporter : IConfigExporter
 {
     /// <inheritdoc />
+    public IReadOnlyDictionary<string, string> ExportLogicAppConfig(string identifier, LogicAppConfig config) =>
+        CreateSection(
+            DefaultConfigProvider.LogicAppSelector,
+            identifier,
+            (nameof(LogicAppConfig.HostingMode), config.HostingMode.ToString()),
+            (nameof(LogicAppConfig.WorkflowName), config.WorkflowName),
+            ($"{nameof(LogicAppConfig.Standard)}:{nameof(LogicAppStandardConfig.BaseUrl)}", config.Standard.BaseUrl),
+            ($"{nameof(LogicAppConfig.Standard)}:{nameof(LogicAppStandardConfig.Code)}", config.Standard.Code),
+            ($"{nameof(LogicAppConfig.Standard)}:{nameof(LogicAppStandardConfig.AdminCode)}", config.Standard.AdminCode),
+            ($"{nameof(LogicAppConfig.Consumption)}:{nameof(LogicAppConsumptionConfig.InvokeUrl)}", config.Consumption.InvokeUrl),
+            ($"{nameof(LogicAppConfig.Consumption)}:{nameof(LogicAppConsumptionConfig.WorkflowResourceId)}", config.Consumption.WorkflowResourceId));
+
+    /// <inheritdoc />
     public IReadOnlyDictionary<string, string> ExportFunctionAppConfig(string identifier, FunctionAppConfig config) =>
         CreateSection(
             DefaultConfigProvider.FunctionAppBaseSelector,

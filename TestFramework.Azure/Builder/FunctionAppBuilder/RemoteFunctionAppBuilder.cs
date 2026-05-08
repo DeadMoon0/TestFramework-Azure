@@ -29,6 +29,15 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
         return this;
     }
 
+    public IFunctionAppHttpPayloadStage SelectFunction(string functionName, HttpMethod method)
+        => SelectFunction(Var.Const(functionName), Var.Const(method));
+
+    public IFunctionAppHttpPayloadStage SelectFunction(VariableReference<string> functionName, VariableReference<HttpMethod> method)
+    {
+        _routing = new DefaultFunctionRoutingVariable(functionName, method);
+        return this;
+    }
+
     public Step<HttpResponseMessage> Call()
     {
         if (_routing is null)
@@ -82,6 +91,29 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
 
         public override TriggerHttpRouting? GetValue(VariableStore store) =>
             new TriggerHttpRouting(path.GetRequiredValue(store), method.GetRequiredValue(store), null!);
+
+        public override VariableReference<TNew> Transform<TNew>(Func<TriggerHttpRouting?, TNew?> transform) where TNew : default =>
+            throw new NotSupportedException();
+
+        public override VariableReference<TNew> Transform<TNew>(Func<TriggerHttpRouting?, object?[], TNew?> transform, params VariableReferenceGeneric[] variables) where TNew : default =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class DefaultFunctionRoutingVariable(VariableReference<string> functionName, VariableReference<HttpMethod> method)
+        : VariableReference<TriggerHttpRouting>
+    {
+        public override bool RequireImmutability => false;
+        public override bool HasIdentifier => false;
+        public override VariableIdentifier? Identifier => null;
+
+        public override TriggerHttpRouting? GetValue(VariableStore store)
+        {
+            string resolvedFunctionName = functionName.GetRequiredValue(store);
+            string normalized = resolvedFunctionName.StartsWith("api/", StringComparison.OrdinalIgnoreCase)
+                ? resolvedFunctionName
+                : $"api/{resolvedFunctionName.TrimStart('/')}";
+            return new TriggerHttpRouting(normalized, method.GetRequiredValue(store), null!);
+        }
 
         public override VariableReference<TNew> Transform<TNew>(Func<TriggerHttpRouting?, TNew?> transform) where TNew : default =>
             throw new NotSupportedException();

@@ -10,6 +10,7 @@ using TestFramework.Azure.DB.SqlServer;
 using TestFramework.Azure.FunctionApp;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.LogicApp;
 using TestFramework.Azure.Runtime;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Environment;
@@ -25,6 +26,16 @@ namespace TestFramework.Azure.Trigger.IsLive;
 /// </summary>
 public class IsLiveTrigger
 {
+    /// <summary>
+    /// Creates a Logic App liveness trigger using a constant aliveness level.
+    /// </summary>
+    public Step<object?> LogicApp(LogicAppIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => LogicApp(identifier, Var.Const(alivenessLevel));
+
+    /// <summary>
+    /// Creates a Logic App liveness trigger using a variable aliveness level.
+    /// </summary>
+    public Step<object?> LogicApp(LogicAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new LogicAppIsLiveTrigger(identifier, alivenessLevel);
+
     /// <summary>
     /// Creates a Function App liveness trigger using a constant aliveness level.
     /// </summary>
@@ -142,6 +153,67 @@ internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier,
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
         => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.FunctionApp, identifier)];
+}
+
+internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel), IHasEnvironmentRequirements
+{
+    private static readonly Uri HostStatusUri = new("admin/host/status", UriKind.Relative);
+
+    public override string Name => "LogicApp IsLive Trigger";
+
+    public override string Description => "Checks whether the Logic App host is reachable and accepts the configured key.";
+
+    public override Step<object?> Clone() => new LogicAppIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
+
+    public override async Task<object?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    {
+        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
+        LogicAppConfig logicAppConfig = serviceProvider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
+        Uri probeBaseUri = logicAppConfig.HostingMode == LogicAppHostingMode.Standard
+            ? new Uri(LogicAppRoutes.RequireStandardBaseUrl(logicAppConfig))
+            : LogicAppRoutes.BuildIsLiveProbeUri(logicAppConfig, logicAppConfig.WorkflowName);
+        RemoteConnection remoteConnection = new(probeBaseUri);
+        if (currentAlivenessLevel == AlivenessLevel.Reachable)
+        {
+            await remoteConnection.EnsurePingAsync();
+            return null;
+        }
+
+        using HttpRequestMessage request = logicAppConfig.HostingMode == LogicAppHostingMode.Standard
+            ? new HttpRequestMessage(HttpMethod.Get, new Uri(remoteConnection.BasePath, HostStatusUri))
+            : new HttpRequestMessage(HttpMethod.Get, LogicAppRoutes.BuildIsLiveProbeUri(logicAppConfig, logicAppConfig.WorkflowName));
+
+        if (logicAppConfig.HostingMode == LogicAppHostingMode.Standard)
+        {
+            string hostKey = logicAppConfig.Standard.AdminCode ?? logicAppConfig.Standard.Code ?? throw new InvalidOperationException($"Logic App '{identifier}' requires Standard:AdminCode or Standard:Code for authenticated liveness checks.");
+            request.Headers.Add("x-functions-key", hostKey);
+        }
+        else if (LogicAppRoutes.HasConsumptionManagementResourceId(logicAppConfig))
+        {
+            await LogicAppRoutes.AuthorizeManagementRequestAsync(serviceProvider, identifier, logicAppConfig, request, cancellationToken);
+        }
+
+        IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
+        using HttpResponseMessage response = await sender.SendAsync(request, cancellationToken);
+        if (logicAppConfig.HostingMode == LogicAppHostingMode.Consumption)
+        {
+            if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+                throw new InvalidOperationException(
+                    $"Logic App '{identifier}' rejected the configured Consumption liveness probe. "
+                    + "If this host only has invoke access, use reachable-level checks or configure management capability with WorkflowResourceId plus ILogicAppConsumptionManagementRequestAuthorizer.");
+
+            if ((int)response.StatusCode >= 500)
+                response.EnsureSuccessStatusCode();
+
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return null;
+    }
+
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.LogicApp, identifier)];
 }
 
 internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel), IHasEnvironmentRequirements

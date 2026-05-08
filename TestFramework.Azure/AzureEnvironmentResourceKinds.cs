@@ -11,6 +11,11 @@ public static class AzureEnvironmentResourceKinds
     public const string FunctionApp = "azure.functionapp";
 
     /// <summary>
+    /// Logic App environment requirement kind.
+    /// </summary>
+    public const string LogicApp = "azure.logicapp";
+
+    /// <summary>
     /// Service Bus environment requirement kind.
     /// </summary>
     public const string ServiceBus = "azure.servicebus";
