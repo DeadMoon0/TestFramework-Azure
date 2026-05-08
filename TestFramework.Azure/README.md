@@ -41,6 +41,7 @@ Supported record types:
 | Section | Record type | Required fields | Optional fields | Used by |
 |---------|-------------|-----------------|-----------------|---------|
 | `FunctionApp:{identifier}` | `FunctionAppConfig` | `BaseUrl`, `Code` | `AdminCode` | Remote Function App HTTP triggers and Function App liveness checks |
+| `LogicApp:{identifier}` | `LogicAppConfig` | no single global required field | `HostingMode`, `WorkflowName`, nested `Standard` and `Consumption` settings | Logic App request triggers, timer triggers, run events, and Logic App liveness checks |
 | `CosmosDb:{identifier}` | `CosmosContainerDbConfig` | `ConnectionString`, `DatabaseName`, `ContainerName` | None | Cosmos artifacts, query finders, and Cosmos liveness checks |
 | `ServiceBus:{identifier}` | `ServiceBusConfig` | `ConnectionString` plus either `QueueName` or `TopicName` | `SubscriptionName`, `RequiredSession` | Service Bus send triggers and message-received events |
 | `StorageAccount:{identifier}` | `StorageAccountConfig` | `ConnectionString` | `QueueContainerName`, `BlobContainerName`, `TableContainerName` | Blob artifacts, table artifacts, and storage liveness checks |
@@ -50,10 +51,26 @@ Configuration expectations:
 
 - `FunctionAppConfig.BaseUrl` should be the host root, usually ending at the site root rather than a specific function route.
 - `FunctionAppConfig.Code` is the normal trigger key; `AdminCode` is only needed when host-status checks require a different admin-level key.
+- `LogicAppConfig.HostingMode` defaults to `Standard`.
+- `LogicAppConfig.Standard` contains the Standard-only values: `BaseUrl`, `Code`, and `AdminCode`.
+- `LogicAppConfig.Consumption` contains the Consumption-only values: `InvokeUrl` and `WorkflowResourceId`.
+- For Consumption request-trigger calls, `Consumption.InvokeUrl` is enough. Think of that as invoke-only Consumption.
+- For Consumption run polling, timer triggers, recurrence triggers, and management-backed liveness checks, set `Consumption.WorkflowResourceId` and register `ILogicAppConsumptionManagementRequestAuthorizer` in DI. Think of that as managed Consumption.
+- The framework still does not discover Consumption URLs, resource IDs, or tokens from Azure on the user's behalf.
 - `CosmosContainerDbConfig` is container-specific. One identifier points to one database/container pair.
 - `ServiceBusConfig` should define either queue mode or topic mode. Queue mode uses `QueueName`. Topic mode uses `TopicName`, and fixed-subscription receives also require `SubscriptionName`.
 - `StorageAccountConfig` only requires container names for the features you use. Blob and table liveness checks rely on `BlobContainerName` and `TableContainerName` respectively.
 - `SqlDatabaseConfig.ContextType` is an assembly-qualified `DbContext` type name. Leave it unset when you register the context through the SQL registry instead.
+
+## Logic App Support Matrix
+
+Treat Logic App support as three capability levels instead of one large feature bucket:
+
+| Mode | Required config | Works without ARM access | Supported features |
+|------|-----------------|--------------------------|--------------------|
+| Standard | `Standard.BaseUrl`, optional `Standard.Code` / `Standard.AdminCode` | yes | invoke, run polling, timer/recurrence triggers, authenticated liveness |
+| Consumption invoke-only | `Consumption.InvokeUrl` | yes | manual request-trigger `Call()` and `CallAndCapture()`, basic reachability |
+| Consumption managed | `Consumption.InvokeUrl`, `Consumption.WorkflowResourceId`, `ILogicAppConsumptionManagementRequestAuthorizer` | no | everything from invoke-only plus `RunCompleted(...)`, `RunReachedStatus(...)`, timer/recurrence triggers, management-backed liveness |
 
 Example JSON:
 
@@ -64,6 +81,24 @@ Example JSON:
             "BaseUrl": "https://my-functions.azurewebsites.net/",
             "Code": "function-key",
             "AdminCode": "admin-key"
+        }
+    },
+    "LogicApp": {
+        "StandardOrders": {
+            "WorkflowName": "OrderProcessor",
+            "Standard": {
+                "BaseUrl": "https://my-logic.azurewebsites.net/",
+                "Code": "workflow-key",
+                "AdminCode": "host-admin-key"
+            }
+        },
+        "ConsumptionOrders": {
+            "HostingMode": "Consumption",
+            "WorkflowName": "OrderProcessor",
+            "Consumption": {
+                "InvokeUrl": "https://prod-04.germanywestcentral.logic.azure.com/workflows/.../triggers/manual/paths/invoke?api-version=...&sp=...&sv=1.0&sig=...",
+                "WorkflowResourceId": "/subscriptions/.../resourceGroups/.../providers/Microsoft.Logic/workflows/OrderProcessor"
+            }
         }
     },
     "CosmosDb": {
@@ -141,7 +176,7 @@ Use the smallest overload that matches what your function returns:
 - `InProcessHttp<T>((request, context) => new OkResult())` for synchronous handlers that return `IActionResult`.
 - `InProcessHttp<T>((request, context) => Task.FromResult<IActionResult>(...))` for asynchronous handlers that return `IActionResult`.
 
-For remote calls, the equivalent decision point is different: start with `Http(...)`, then choose either `SelectEndpointWithMethod<T>(...)` when the route can be inferred from the function metadata, or `SelectEndpoint(path, method)` when the test should supply the path and HTTP verb explicitly.
+For remote calls, the equivalent decision point is different: start with `Http(...)`, then choose either `SelectEndpointWithMethod<T>(...)` when the route can be inferred from the function metadata, `SelectFunction(name, method)` when you want the normal `api/{functionName}` route without spelling out the prefix yourself, or `SelectEndpoint(path, method)` when the test should supply the path and HTTP verb explicitly.
 
 Example with explicit path, body, and headers:
 
@@ -156,6 +191,78 @@ Timeline timeline = Timeline.Create()
             .Call())
     .Build();
 ```
+
+Example with the default Function App route prefix:
+
+```csharp
+Timeline timeline = Timeline.Create()
+    .Trigger(
+        AzureTF.Trigger.FunctionApp.Http("Default")
+            .SelectFunction("HttpEchoTest", HttpMethod.Post)
+            .WithBody(Var.Const("payload"))
+            .Call())
+    .Build();
+```
+
+## Sample: Stateless Logic App Call And Capture
+
+Use `CallAndCapture()` when the target workflow is stateless and completes inline with the callback response instead of exposing durable run history.
+
+```csharp
+using TestFramework.Azure;
+using TestFramework.Core.Timelines;
+using TestFramework.Core.Variables;
+
+Timeline timeline = Timeline.Create()
+    .Trigger(
+        AzureTF.Trigger.LogicApp.Http("logic")
+            .Workflow("StatelessOrders")
+            .Manual()
+            .WithBody(Var.Const("{\"id\":42}"))
+            .CallAndCapture())
+    .Name("logic-call")
+    .Build();
+
+TimelineRun run = await timeline.SetupRun(config.BuildServiceProvider()).RunAsync();
+
+run.EnsureRanToCompletion();
+LogicAppCapturedResult result = Assert.IsType<LogicAppCapturedResult>(run.Step("logic-call").LastResult.Result);
+Assert.Equal(LogicAppRunStatus.Succeeded, result.Status);
+Assert.Equal(HttpStatusCode.Accepted, result.StatusCode);
+```
+
+Use `RunCompleted(...)` and `RunReachedStatus(...)` only for stateful workflows. When Docker-hosted Logic App definitions are known to be stateless, the framework now fails fast with a message that points you to `CallAndCapture()`.
+
+## Sample: Consumption Logic App Run Tracking
+
+Consumption workflows now use a smaller config surface: provide the invoke URL for request triggers and add the workflow resource ID only when the test host should perform durable management operations.
+
+```csharp
+using TestFramework.Azure.LogicApp;
+
+Timeline timeline = Timeline.Create()
+    .Trigger(
+        AzureTF.Trigger.LogicApp.Http("ConsumptionOrders")
+            .Workflow("OrderProcessor")
+            .Manual()
+            .WithBody(Var.Const("{\"id\":42}"))
+            .CallForRunContext())
+    .CaptureResultAs<LogicAppRunContext>("logicRun")
+    .WaitForEvent(
+        AzureTF.Event.LogicApp.RunCompleted(
+            "ConsumptionOrders",
+            Var.Ref<LogicAppRunContext>("logicRun")))
+    .Build();
+```
+
+This run-tracking flow is managed Consumption. It needs `Consumption.InvokeUrl` plus `Consumption.WorkflowResourceId`, and the host must register `ILogicAppConsumptionManagementRequestAuthorizer` so the framework can authenticate ARM management requests for `RunCompleted(...)` and timer/recurrence trigger operations.
+
+Use `CallAndCapture()` when the Consumption workflow is effectively stateless and returns the meaningful result directly in the callback response. That is the invoke-only path and does not require ARM access.
+
+## Live Validation Notes
+
+- The live validation solution inside the repository now mirrors the same Consumption model: callback invoke URL plus workflow resource ID and an injected management-request authorizer.
+- SQL remains the heaviest live-validation surface because it needs both a connection string and a registered `DbContext` shape, which is a larger setup burden than the other Azure resources.
 
 ## Service Bus Support Matrix
 

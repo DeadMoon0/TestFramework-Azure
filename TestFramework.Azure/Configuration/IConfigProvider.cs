@@ -13,6 +13,21 @@ namespace TestFramework.Azure.Configuration;
 public interface IConfigProvider
 {
     /// <summary>
+    /// Returns every configured Logic App identifier.
+    /// </summary>
+    /// <param name="configuration">The configuration source to inspect.</param>
+    /// <returns>All configured Logic App identifiers.</returns>
+    public string[] LoadAllLogicAppIdentifier(IConfiguration configuration);
+
+    /// <summary>
+    /// Loads the Logic App configuration for a specific identifier.
+    /// </summary>
+    /// <param name="configuration">The configuration source to inspect.</param>
+    /// <param name="identifier">The logical Logic App identifier used by the Azure DSL.</param>
+    /// <returns>The resolved Logic App configuration.</returns>
+    public LogicAppConfig LoadLogicAppConfig(IConfiguration configuration, string identifier);
+
+    /// <summary>
     /// Returns every configured Function App identifier.
     /// </summary>
     /// <param name="configuration">The configuration source to inspect.</param>

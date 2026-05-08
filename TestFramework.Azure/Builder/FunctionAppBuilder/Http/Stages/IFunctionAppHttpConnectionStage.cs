@@ -7,4 +7,5 @@ namespace TestFramework.Azure.Builder.FunctionAppBuilder.Http.Stages;
 /// </summary>
 public interface IFunctionAppHttpConnectionStage :
     ISelectEndpointWithMethodAction,
-    ISelectEndpointAction;
+    ISelectEndpointAction,
+    ISelectFunctionAction;

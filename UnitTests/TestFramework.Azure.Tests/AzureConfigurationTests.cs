@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -21,6 +22,7 @@ using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.FunctionApp.Trigger;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Azure.LogicApp;
 using TestFramework.Azure.Runtime;
 using TestFramework.Azure.ServiceBus;
 using TestFramework.Azure.StorageAccount.Blob;
@@ -28,6 +30,7 @@ using TestFramework.Azure.StorageAccount.Table;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
+using TestFramework.Core.Timelines;
 using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.Tests;
@@ -37,6 +40,7 @@ public class AzureConfigurationTests
     [Fact]
     public void IdentifierRecords_RoundTripAsStrings()
     {
+        AssertIdentifierRoundTrip("logic", value => (LogicAppIdentifier)value, id => (string)id);
         AssertIdentifierRoundTrip("func", value => (FunctionAppIdentifier)value, id => (string)id);
         AssertIdentifierRoundTrip("storage", value => (StorageAccountIdentifier)value, id => (string)id);
         AssertIdentifierRoundTrip("cosmos", value => (CosmosContainerIdentifier)value, id => (string)id);
@@ -60,6 +64,12 @@ public class AzureConfigurationTests
     {
         IConfiguration configuration = BuildConfiguration(new Dictionary<string, string?>
         {
+            ["LogicApp:workflow:HostingMode"] = "Consumption",
+            ["LogicApp:workflow:WorkflowName"] = "OrderProcessor",
+            ["LogicApp:workflow:Standard:BaseUrl"] = "https://logic.test",
+            ["LogicApp:workflow:Standard:Code"] = "logic-secret",
+            ["LogicApp:workflow:Consumption:InvokeUrl"] = "https://logic-consumption.test/invoke?sig=abc",
+            ["LogicApp:workflow:Consumption:WorkflowResourceId"] = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
             ["ServiceBus:orders:ConnectionString"] = "Endpoint=sb://orders/",
             ["ServiceBus:orders:QueueName"] = "orders",
             ["ServiceBus:orders:RequiredSession"] = "true",
@@ -68,6 +78,7 @@ public class AzureConfigurationTests
         });
 
         DefaultConfigProvider provider = new();
+    LogicAppConfig logicAppConfig = provider.LoadLogicAppConfig(configuration, "workflow");
         ServiceBusConfig busConfig = provider.LoadServiceBusConfig(configuration, "orders");
         FunctionAppConfig functionAppConfig = provider.LoadFunctionAppConfig(configuration, "notify");
         CosmosContainerDbConfig cosmosConfig = provider.LoadCosmosDbConfig(BuildConfiguration(new Dictionary<string, string?>
@@ -77,8 +88,15 @@ public class AzureConfigurationTests
             ["CosmosDb:cosmos:ContainerName"] = "items",
         }), "cosmos");
 
+        Assert.Equal(new[] { "workflow" }, provider.LoadAllLogicAppIdentifier(configuration));
         Assert.Equal(new[] { "orders" }, provider.LoadAllServiceBusIdentifier(configuration));
         Assert.Equal(new[] { "notify" }, provider.LoadAllFunctionAppIdentifier(configuration));
+        Assert.Equal("https://logic.test", logicAppConfig.Standard.BaseUrl);
+        Assert.Equal(LogicAppHostingMode.Consumption, logicAppConfig.HostingMode);
+        Assert.Equal("OrderProcessor", logicAppConfig.WorkflowName);
+        Assert.Equal("logic-secret", logicAppConfig.Standard.Code);
+        Assert.Equal("https://logic-consumption.test/invoke?sig=abc", logicAppConfig.Consumption.InvokeUrl);
+        Assert.Equal("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor", logicAppConfig.Consumption.WorkflowResourceId);
         Assert.Equal("Endpoint=sb://orders/", busConfig.ConnectionString);
         Assert.Equal("orders", busConfig.EntityName);
         Assert.True(busConfig.RequiredSession);
@@ -111,6 +129,8 @@ public class AzureConfigurationTests
         loader.LoadAllConfigs(BuildConfiguration(new Dictionary<string, string?>()), services);
 
         using ServiceProvider provider = services.BuildServiceProvider();
+        Assert.Equal("https://logic.test", provider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig("logic-app").Standard.BaseUrl);
+        Assert.Equal("OrderProcessor", provider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig("logic-app").WorkflowName);
         Assert.Equal("https://functions.test", provider.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig("func").BaseUrl);
         Assert.Equal("db", provider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig("cosmos").DatabaseName);
         Assert.Equal("queue", provider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig("bus").EntityName);
@@ -122,6 +142,23 @@ public class AzureConfigurationTests
     public void DefaultConfigExporter_ExportsSectionShapedKeys()
     {
         DefaultConfigExporter exporter = new();
+
+        IReadOnlyDictionary<string, string> logicApp = exporter.ExportLogicAppConfig("logic", new LogicAppConfig
+        {
+            HostingMode = LogicAppHostingMode.Consumption,
+            WorkflowName = "OrderProcessor",
+            Standard = new LogicAppStandardConfig
+            {
+                BaseUrl = "https://logic.test",
+                Code = "runtime-code",
+                AdminCode = "admin-code",
+            },
+            Consumption = new LogicAppConsumptionConfig
+            {
+                InvokeUrl = "https://logic-consumption.test/invoke?sig=abc",
+                WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
+            },
+        });
 
         IReadOnlyDictionary<string, string> cosmos = exporter.ExportCosmosDbConfig("cosmos", new CosmosContainerDbConfig
         {
@@ -138,6 +175,13 @@ public class AzureConfigurationTests
             RequiredSession = false,
         });
 
+        Assert.Equal("https://logic.test", logicApp["LogicApp:logic:Standard:BaseUrl"]);
+        Assert.Equal("Consumption", logicApp["LogicApp:logic:HostingMode"]);
+        Assert.Equal("OrderProcessor", logicApp["LogicApp:logic:WorkflowName"]);
+        Assert.Equal("runtime-code", logicApp["LogicApp:logic:Standard:Code"]);
+        Assert.Equal("admin-code", logicApp["LogicApp:logic:Standard:AdminCode"]);
+        Assert.Equal("https://logic-consumption.test/invoke?sig=abc", logicApp["LogicApp:logic:Consumption:InvokeUrl"]);
+        Assert.Equal("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor", logicApp["LogicApp:logic:Consumption:WorkflowResourceId"]);
         Assert.Equal("AccountEndpoint=https://cosmos.test/", cosmos["CosmosDb:cosmos:ConnectionString"]);
         Assert.Equal("db", cosmos["CosmosDb:cosmos:DatabaseName"]);
         Assert.Equal("items", cosmos["CosmosDb:cosmos:ContainerName"]);
@@ -207,6 +251,712 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public async Task FunctionAppHttpBuilder_ComposesBodyAndHeadersThroughExecution()
+    {
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            {
+                BaseUrl = "https://example.test/api/",
+                Code = "secret",
+                AdminCode = null,
+            }));
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Step<HttpResponseMessage> trigger = AzureTF.Trigger.FunctionApp
+            .Http("func")
+            .SelectEndpoint(Var.Const("orders"), Var.Const(HttpMethod.Post))
+            .WithBody(Var.Const("payload"))
+            .WithHeader(Var.Const("Content-Type"), Var.Const("application/json"))
+            .WithHeader(Var.Const("x-test"), Var.Const("1"))
+            .Call();
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.Equal("https://example.test/api/orders", sender.Requests.Single().RequestUri!.ToString());
+        Assert.Equal("1", sender.Requests.Single().Headers.GetValues("x-test").Single());
+        Assert.Equal("application/json", sender.Requests.Single().Content!.Headers.ContentType!.MediaType);
+        Assert.Equal("payload", await sender.Requests.Single().Content!.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task FunctionAppSelectFunction_PrefixesDefaultApiRoute()
+    {
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            {
+                BaseUrl = "https://example.test/",
+                Code = "secret",
+                AdminCode = null,
+            }));
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Step<HttpResponseMessage> trigger = AzureTF.Trigger.FunctionApp
+            .Http("func")
+            .SelectFunction("HttpEchoTest", HttpMethod.Post)
+            .Call();
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.Equal("https://example.test/api/HttpEchoTest", sender.Requests.Single().RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task LogicAppHttpTrigger_ResolvesCallbackUrlAndInvokesWorkflow()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"value\":\"https://logic.test/invoke/manual?sig=abc\"}")
+            },
+            new HttpResponseMessage(HttpStatusCode.Accepted)
+            {
+                Content = new StringContent("accepted")
+            });
+        sender.Responses[1].Headers.Add("x-ms-workflow-run-id", "run-123");
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+            .Http("logic")
+            .Workflow("OrderProcessor")
+            .Manual()
+            .WithBody(Var.Const("payload"))
+            .WithHeader(Var.Const("x-test"), Var.Const("1"))
+            .Call();
+
+        LogicAppTriggerResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("OrderProcessor", result!.WorkflowName);
+        Assert.Equal("manual", result.TriggerName);
+        Assert.Equal("run-123", result.RunId);
+        Assert.Equal(HttpStatusCode.Accepted, result.StatusCode);
+        Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/triggers/manual/listCallbackUrl?api-version=2022-03-01", sender.Requests[0].RequestUri!.ToString());
+        Assert.Equal("logic-admin", sender.Requests[0].Headers.GetValues("x-functions-key").Single());
+        Assert.Equal("https://logic.test/invoke/manual?sig=abc", sender.Requests[1].RequestUri!.ToString());
+        Assert.Equal("1", sender.Requests[1].Headers.GetValues("x-test").Single());
+        Assert.Equal("payload", await sender.Requests[1].Content!.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task LogicAppHttpTrigger_RebasesLocalCallbackUrl_ToConfiguredBaseUrl()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"value\":\"https://localhost:443/api/OrderProcessor/triggers/manual/invoke?api-version=2022-05-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=abc\"}")
+            },
+            new HttpResponseMessage(HttpStatusCode.Accepted)
+            {
+                Content = new StringContent("accepted")
+            });
+        sender.Responses[1].Headers.Add("x-ms-workflow-run-id", "run-local-123");
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "http://127.0.0.1:59911/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+            .Http("logic")
+            .Workflow("OrderProcessor")
+            .Manual()
+            .WithBody(Var.Const("payload"))
+            .Call();
+
+        LogicAppTriggerResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("http://127.0.0.1:59911/api/OrderProcessor/triggers/manual/invoke?api-version=2022-05-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=abc", sender.Requests[1].RequestUri!.ToString());
+        Assert.Equal("http://127.0.0.1:59911/api/OrderProcessor/triggers/manual/invoke?api-version=2022-05-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=abc", result!.CallbackUrl);
+        Assert.Equal("run-local-123", result.RunId);
+    }
+
+    [Fact]
+    public async Task LogicAppHttpCaptureTrigger_ReturnsCapturedCallbackResponse()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"value\":\"https://localhost:443/api/OrderProcessor/triggers/manual/invoke?api-version=2022-05-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=abc\"}")
+            },
+            new HttpResponseMessage(HttpStatusCode.Accepted)
+            {
+                Content = new StringContent("{\"message\":\"captured\"}")
+            });
+        sender.Responses[1].Headers.Add("x-ms-workflow-run-id", "run-capture-123");
+        sender.Responses[1].Content!.Headers.Add("x-capture", "true");
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "http://127.0.0.1:59911/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Step<LogicAppCapturedResult> trigger = AzureTF.Trigger.LogicApp
+            .Http("logic")
+            .Workflow("OrderProcessor")
+            .Manual()
+            .WithBody(Var.Const("payload"))
+            .CallAndCapture();
+
+        LogicAppCapturedResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("OrderProcessor", result!.WorkflowName);
+        Assert.Equal("manual", result.TriggerName);
+        Assert.Equal("run-capture-123", result.RunId);
+        Assert.Equal(HttpStatusCode.Accepted, result.StatusCode);
+        Assert.Equal(LogicAppRunStatus.Succeeded, result.Status);
+        Assert.Equal("{\"message\":\"captured\"}", result.ResponseBody);
+        Assert.Equal("true", Assert.Single(result.ResponseHeaders["x-capture"]));
+        Assert.Equal("http://127.0.0.1:59911/api/OrderProcessor/triggers/manual/invoke?api-version=2022-05-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=abc", result.CallbackUrl);
+    }
+
+    [Fact]
+    public async Task LogicAppHttpCaptureTrigger_MapsFailedHttpResponse_ToFailedStatus()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"value\":\"https://logic.test/invoke/manual?sig=abc\"}")
+            },
+            new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent("bad request")
+            });
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Step<LogicAppCapturedResult> trigger = AzureTF.Trigger.LogicApp
+            .Http("logic")
+            .Workflow("OrderProcessor")
+            .Manual()
+            .CallAndCapture();
+
+        LogicAppCapturedResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(HttpStatusCode.BadRequest, result!.StatusCode);
+        Assert.Equal(LogicAppRunStatus.Failed, result.Status);
+        Assert.Equal("bad request", result.ResponseBody);
+    }
+
+    [Fact]
+    public async Task LogicAppHttpTrigger_UsesConsumptionCallbackUrl_WhenConfigured()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.Accepted)
+            {
+                Content = new StringContent("accepted")
+            });
+        sender.Responses[0].Headers.Add("x-ms-workflow-run-id", "run-consumption-123");
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                HostingMode = LogicAppHostingMode.Consumption,
+                Consumption = new LogicAppConsumptionConfig
+                {
+                    InvokeUrl = "https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+            .Http("logic")
+            .Workflow("OrderProcessor")
+            .Manual()
+            .WithBody(Var.Const("payload"))
+            .Call();
+
+        LogicAppTriggerResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc", sender.Requests[0].RequestUri!.ToString());
+        Assert.Equal("run-consumption-123", result!.RunId);
+        Assert.Equal("https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc", result.CallbackUrl);
+    }
+
+    [Fact]
+    public async Task LogicAppTimerTrigger_UsesConsumptionWorkflowResourceId()
+    {
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.Accepted));
+        sender.Responses[0].Headers.Add("x-ms-workflow-run-id", "run-consumption-timer-123");
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "NightlyJob",
+                HostingMode = LogicAppHostingMode.Consumption,
+                Consumption = new LogicAppConsumptionConfig
+                {
+                    WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/NightlyJob",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+            services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
+        });
+
+        Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+            .Http("logic")
+            .Workflow("NightlyJob")
+            .Timer()
+            .Call();
+
+        LogicAppTriggerResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("https://management.azure.com/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/NightlyJob/triggers/Recurrence/run?api-version=2019-05-01", sender.Requests[0].RequestUri!.ToString());
+        Assert.Equal("Bearer", sender.Requests[0].Headers.Authorization!.Scheme);
+        Assert.Equal("test-token", sender.Requests[0].Headers.Authorization!.Parameter);
+        Assert.Equal("run-consumption-timer-123", result!.RunId);
+    }
+
+    [Fact]
+    public async Task LogicAppTimerTrigger_RunsManagementTriggerEndpoint()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.Accepted));
+        sender.Responses[0].Headers.Add("x-ms-workflow-run-id", "run-timer-123");
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "NightlyJob",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+            .Http("logic")
+            .Workflow("NightlyJob")
+            .Timer()
+            .Call();
+
+        LogicAppTriggerResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("NightlyJob", result!.WorkflowName);
+        Assert.Equal("Recurrence", result.TriggerName);
+        Assert.Equal("run-timer-123", result.RunId);
+        Assert.Equal(HttpStatusCode.Accepted, result.StatusCode);
+        Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/NightlyJob/triggers/Recurrence/run?api-version=2022-03-01", sender.Requests[0].RequestUri!.ToString());
+        Assert.Equal("logic-admin", sender.Requests[0].Headers.GetValues("x-functions-key").Single());
+        Assert.Null(sender.Requests[0].Content);
+    }
+
+        [Fact]
+        public async Task LogicAppTimerTrigger_FallsBackToObservedScheduledRun_WhenTriggerRunIsUnavailable()
+        {
+                FakeHttpRequestSender sender = new(
+                        new HttpResponseMessage(HttpStatusCode.NotFound),
+                        new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                                Content = new StringContent("""
+                                {
+                                    "value": [
+                                        {
+                                            "name": "run-observed-123",
+                                            "properties": {
+                                                "startTime": "2099-01-01T00:00:01Z",
+                                                "trigger": {
+                                                    "name": "Recurrence"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                                """)
+                        });
+
+                RuntimeContext runtime = RuntimeContext.Create(services =>
+                {
+                        services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+                        {
+                                WorkflowName = "NightlyJob",
+                        Standard = new LogicAppStandardConfig
+                        {
+                            BaseUrl = "https://logic.test/",
+                            Code = "logic-code",
+                            AdminCode = "logic-admin",
+                        },
+                        }));
+                        services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+                });
+
+                Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+                        .Http("logic")
+                        .Workflow("NightlyJob")
+                        .Timer()
+                        .Call();
+
+                LogicAppTriggerResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+                Assert.NotNull(result);
+                Assert.Equal("run-observed-123", result!.RunId);
+                Assert.Equal(HttpStatusCode.Accepted, result.StatusCode);
+                Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/NightlyJob/triggers/Recurrence/run?api-version=2022-03-01", sender.Requests[0].RequestUri!.ToString());
+                Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/NightlyJob/runs?api-version=2022-03-01", sender.Requests[1].RequestUri!.ToString());
+        }
+
+    [Fact]
+    public async Task LogicAppRunEvent_ReturnsWhenExpectedStatusIsReached()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"properties\":{\"status\":\"Running\"}}")
+            },
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"properties\":{\"status\":\"Succeeded\",\"code\":\"OK\",\"outputs\":{\"result\":\"done\"}}}")
+            });
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        var evt = AzureTF.Event.LogicApp.RunReachedStatus("logic", Var.Const("run-123"), LogicAppRunStatus.Succeeded, Var.Const("OrderProcessor"));
+
+        LogicAppRunDetails? result = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(LogicAppRunStatus.Succeeded, result!.Status);
+        Assert.Equal("OK", result.Code);
+        Assert.Equal("{\"result\":\"done\"}", result.OutputsJson);
+        Assert.Equal(2, sender.Requests.Count);
+        Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/runs/run-123?api-version=2022-03-01", sender.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task LogicAppRunEvent_RetriesUntilRunBecomesAvailable()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.NotFound),
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"value\":[]}")
+            },
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"properties\":{\"status\":\"Succeeded\",\"code\":\"OK\"}}")
+            });
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
+
+        LogicAppRunDetails? result = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(LogicAppRunStatus.Succeeded, result!.Status);
+        Assert.Equal(3, sender.Requests.Count);
+        Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/runs?api-version=2022-03-01", sender.Requests[1].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task LogicAppRunEvent_AllowsCapturedRunContextVariableInTimeline()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"properties\":{\"status\":\"Succeeded\",\"code\":\"OK\"}}")
+            });
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        TimelineRun run = await Timeline.Create()
+            .SetVariable("logicRun", Var.Const(new LogicAppRunContext("OrderProcessor", "run-ctx")))
+            .WaitForEvent(AzureTF.Event.LogicApp.RunCompleted("logic", Var.Ref<LogicAppRunContext>("logicRun")))
+            .Build()
+            .SetupRun(runtime.ServiceProvider)
+            .RunAsync();
+
+        run.EnsureRanToCompletion();
+        Assert.Single(sender.Requests);
+        Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/runs/run-ctx?api-version=2022-03-01", sender.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task LogicAppRunCompleted_ReturnsTerminalDetails_WhenWorkflowFails()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"properties\":{\"status\":\"Failed\",\"code\":\"ActionFailed\"}}")
+            });
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-500"), Var.Const("OrderProcessor"));
+
+        LogicAppRunDetails? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(completed);
+        Assert.Equal(LogicAppRunStatus.Failed, completed!.Status);
+        Assert.Equal("ActionFailed", completed.Code);
+        Assert.Equal("run-500", completed.RunId);
+    }
+
+    [Fact]
+        public async Task LogicAppRunCompleted_UsesRunsListFallback_WhenSingleRunEndpointIsMissing()
+    {
+        FakeHttpRequestSender sender = new(
+                        new HttpResponseMessage(HttpStatusCode.NotFound),
+                        new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                                Content = new StringContent("""
+                                {
+                                    "value": [
+                                        {
+                                            "name": "run-123",
+                                            "properties": {
+                                                "status": "Succeeded",
+                                                "code": "OK"
+                                            }
+                                        }
+                                    ]
+                                }
+                                """)
+                        });
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
+
+        LogicAppRunDetails? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(completed);
+        Assert.Equal(LogicAppRunStatus.Succeeded, completed!.Status);
+        Assert.Equal(2, sender.Requests.Count);
+        Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/runs/run-123?api-version=2022-03-01", sender.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task LogicAppRunCompleted_UsesCancellation_WhenRunEndpointDoesNotRespond()
+    {
+        HangingHttpRequestSender sender = new();
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new HangingHttpComponentFactory(sender) });
+        });
+
+        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-nonresponsive"), Var.Const("OrderProcessor"));
+        using CancellationTokenSource cancellation = new(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, cancellation.Token));
+
+        Assert.Single(sender.RequestUris);
+        Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/runs/run-nonresponsive?api-version=2022-03-01", sender.RequestUris[0]!.ToString());
+    }
+
+
+    [Fact]
+    public async Task LogicAppRunCompleted_ThrowsHelpfulMessage_ForKnownStatelessWorkflow()
+    {
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "StatelessOrders",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+            services.AddSingleton<ILogicAppWorkflowMetadataProvider>(new StubLogicAppWorkflowMetadataProvider(("logic", "StatelessOrders"), LogicAppWorkflowMode.Stateless));
+        });
+
+        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-stateless"), Var.Const("StatelessOrders"));
+
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+
+        Assert.Contains("stateless", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CallAndCapture", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(sender.Requests);
+    }
+
+    [Fact]
+    public async Task LogicAppRunEvent_UsesConsumptionWorkflowResourceId()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"properties\":{\"status\":\"Succeeded\",\"code\":\"OK\"}}")
+            });
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                HostingMode = LogicAppHostingMode.Consumption,
+                Consumption = new LogicAppConsumptionConfig
+                {
+                    WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+            services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
+        });
+
+        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
+
+        LogicAppRunDetails? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(completed);
+        Assert.Equal("https://management.azure.com/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor/runs/run-123?api-version=2019-05-01", sender.Requests[0].RequestUri!.ToString());
+        Assert.Equal("Bearer", sender.Requests[0].Headers.Authorization!.Scheme);
+        Assert.Equal(LogicAppRunStatus.Succeeded, completed!.Status);
+    }
+
+    [Fact]
     public async Task ManagedRemoteFunctionAppTrigger_UsesUnifiedFactorySender()
     {
         HttpResponseMessage response = new(HttpStatusCode.OK)
@@ -261,6 +1011,127 @@ public class AzureConfigurationTests
 
         Assert.Equal("https://example.test/api/admin/host/status", sender.Request!.RequestUri!.ToString());
         Assert.Equal("admin-code", sender.Request.Headers.GetValues("x-functions-key").Single());
+    }
+
+    [Fact]
+    public async Task LogicAppIsLiveTrigger_UsesHostStatusEndpointAndConfiguredKey()
+    {
+        HttpResponseMessage response = new(HttpStatusCode.OK);
+        FakeHttpRequestSender sender = new(response);
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/api/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.LogicApp("logic");
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.Equal("https://logic.test/api/admin/host/status", sender.Request!.RequestUri!.ToString());
+        Assert.Equal("logic-admin", sender.Request.Headers.GetValues("x-functions-key").Single());
+    }
+
+    [Fact]
+    public async Task LogicAppIsLiveTrigger_UsesConsumptionWorkflowResourceId_WhenConfigured()
+    {
+        HttpResponseMessage response = new(HttpStatusCode.OK);
+        FakeHttpRequestSender sender = new(response);
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                HostingMode = LogicAppHostingMode.Consumption,
+                Consumption = new LogicAppConsumptionConfig
+                {
+                    WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+            services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.LogicApp("logic");
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.Equal("https://management.azure.com/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor/runs?api-version=2019-05-01", sender.Request!.RequestUri!.ToString());
+        Assert.Equal("Bearer", sender.Request.Headers.Authorization!.Scheme);
+    }
+
+    [Fact]
+    public async Task LogicAppIsLiveTrigger_ThrowsHelpfulMessage_WhenConsumptionManagementCapabilityIsMissing()
+    {
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                HostingMode = LogicAppHostingMode.Consumption,
+                Consumption = new LogicAppConsumptionConfig
+                {
+                    WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        Step<object?> trigger = AzureTF.Trigger.IsLive.LogicApp("logic");
+
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+
+        Assert.Contains("management capability", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(nameof(ILogicAppConsumptionManagementRequestAuthorizer), exception.Message, StringComparison.Ordinal);
+        Assert.Null(sender.Request);
+    }
+
+    [Fact]
+    public async Task LogicAppRunEvent_UsesConsumptionRunsListFallback_WhenRunEndpointReturnsNotFound()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.NotFound),
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"value\":[{\"name\":\"run-123\",\"properties\":{\"status\":\"Succeeded\",\"code\":\"OK\"}}]}")
+            });
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                HostingMode = LogicAppHostingMode.Consumption,
+                Consumption = new LogicAppConsumptionConfig
+                {
+                    WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+            services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
+        });
+
+        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
+
+        LogicAppRunDetails? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(completed);
+        Assert.Equal(2, sender.Requests.Count);
+        Assert.Equal("https://management.azure.com/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor/runs/run-123?api-version=2019-05-01", sender.Requests[0].RequestUri!.ToString());
+        Assert.Equal("https://management.azure.com/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor/runs?api-version=2019-05-01", sender.Requests[1].RequestUri!.ToString());
+        Assert.Equal(LogicAppRunStatus.Succeeded, completed!.Status);
     }
 
     [Fact]
@@ -1016,8 +1887,28 @@ public class AzureConfigurationTests
                 args: new object?[] { null },
                 culture: null)!;
 
-            VariableStore = null!;
-            ArtifactStore = null!;
+            Type coreAssemblyType = typeof(VariableStore);
+            Type debuggingRunSessionType = coreAssemblyType.Assembly.GetType("TestFramework.Core.Debugger.DebuggingRunSession", throwOnError: true)!;
+            Type emptyRunDebuggerType = coreAssemblyType.Assembly.GetType("TestFramework.Core.Debugger.EmptyRunDebugger", throwOnError: true)!;
+            object emptyRunDebugger = emptyRunDebuggerType.GetMethod("CreateNew", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!.Invoke(null, null)!;
+            object debuggingSession = debuggingRunSessionType
+                .GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
+                .Single()
+                .Invoke([emptyRunDebugger]);
+
+            VariableStore = (VariableStore)Activator.CreateInstance(
+                typeof(VariableStore),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                binder: null,
+                args: new object?[] { Logger, debuggingSession },
+                culture: null)!;
+
+            ArtifactStore = (ArtifactStore)Activator.CreateInstance(
+                typeof(ArtifactStore),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                binder: null,
+                args: new object?[] { Logger, debuggingSession },
+                culture: null)!;
         }
 
         public static RuntimeContext Create(Action<IServiceCollection>? configureServices = null) => new(configureServices);
@@ -1334,14 +2225,84 @@ public class AzureConfigurationTests
         public IHttpRequestSender CreateSender() => sender;
     }
 
-    private sealed class FakeHttpRequestSender(HttpResponseMessage response) : IHttpRequestSender
+    private sealed class StubLogicAppWorkflowMetadataProvider((string Identifier, string WorkflowName) match, LogicAppWorkflowMode mode) : ILogicAppWorkflowMetadataProvider
     {
-        public HttpRequestMessage? Request { get; private set; }
-
-        public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public bool TryGetWorkflowMode(LogicAppIdentifier identifier, string workflowName, out LogicAppWorkflowMode resolvedMode)
         {
-            Request = request;
-            return Task.FromResult(response);
+            if (string.Equals(identifier.Identifier, match.Identifier, StringComparison.Ordinal)
+                && string.Equals(workflowName, match.WorkflowName, StringComparison.Ordinal))
+            {
+                resolvedMode = mode;
+                return true;
+            }
+
+            resolvedMode = LogicAppWorkflowMode.Unknown;
+            return false;
+        }
+    }
+
+    private sealed class StubLogicAppConsumptionManagementRequestAuthorizer(string token) : ILogicAppConsumptionManagementRequestAuthorizer
+    {
+        public Task AuthorizeAsync(LogicAppIdentifier identifier, LogicAppConfig config, HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class HangingHttpComponentFactory(HangingHttpRequestSender sender) : IHttpComponentFactory
+    {
+        public IHttpRequestSender CreateSender() => sender;
+    }
+
+    private sealed class FakeHttpRequestSender(params HttpResponseMessage[] responses) : IHttpRequestSender
+    {
+        private int _nextResponseIndex;
+
+        public List<HttpRequestMessage> Requests { get; } = [];
+        public IReadOnlyList<HttpResponseMessage> Responses => responses;
+
+        public HttpRequestMessage? Request => Requests.LastOrDefault();
+
+        public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(await CloneRequestAsync(request, cancellationToken));
+            HttpResponseMessage response = _nextResponseIndex < responses.Length
+                ? responses[_nextResponseIndex++]
+                : responses.Last();
+            return response;
+        }
+
+        private static async Task<HttpRequestMessage> CloneRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            HttpRequestMessage clone = new(request.Method, request.RequestUri);
+
+            foreach (var header in request.Headers)
+                clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+
+            if (request.Content is not null)
+            {
+                byte[] contentBytes = await request.Content.ReadAsByteArrayAsync(cancellationToken);
+                ByteArrayContent contentClone = new(contentBytes);
+                foreach (var header in request.Content.Headers)
+                    contentClone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+
+                clone.Content = contentClone;
+            }
+
+            return clone;
+        }
+    }
+
+    private sealed class HangingHttpRequestSender : IHttpRequestSender
+    {
+        public List<Uri?> RequestUris { get; } = [];
+
+        public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestUris.Add(request.RequestUri);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("The hanging sender should be canceled before completing.");
         }
     }
 
@@ -1359,6 +2320,8 @@ public class AzureConfigurationTests
 
     private sealed class StubConfigProvider : IConfigProvider
     {
+        public string[] LoadAllLogicAppIdentifier(IConfiguration configuration) => new[] { "logic-app" };
+        public LogicAppConfig LoadLogicAppConfig(IConfiguration configuration, string identifier) => new() { WorkflowName = "OrderProcessor", HostingMode = LogicAppHostingMode.Standard, Standard = new LogicAppStandardConfig { BaseUrl = "https://logic.test", Code = "logic-code", AdminCode = "logic-admin" } };
         public string[] LoadAllFunctionAppIdentifier(IConfiguration configuration) => new[] { "func" };
         public FunctionAppConfig LoadFunctionAppConfig(IConfiguration configuration, string identifier) => new() { BaseUrl = "https://functions.test", Code = "function-code", AdminCode = "admin" };
         public string[] LoadAllStorageAccountIdentifier(IConfiguration configuration) => new[] { "storage" };
