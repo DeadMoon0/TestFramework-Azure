@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,12 +41,54 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         RemoteConnection remoteConnection = new RemoteConnection(new Uri(functionConfig.BaseUrl));
         if (config.DoPing) await remoteConnection.EnsurePingAsync();
         Uri fullTriggerUri = new Uri(remoteConnection.BasePath, _trigger.Path);
-        HttpRequestMessage message = new HttpRequestMessage(_trigger.Method, fullTriggerUri);
-        _request.ApplyToHttpRequestMessage(message);
-        message.Headers.Add("x-functions-key", functionConfig.Code);
         IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
-        return await sender.SendAsync(message, cancellationToken);
+
+        return await SendWithLocalWarmupRetryAsync(
+            sender,
+            fullTriggerUri,
+            _trigger.Method,
+            _request,
+            functionConfig,
+            config,
+            cancellationToken).ConfigureAwait(false);
     }
+
+    private static async Task<HttpResponseMessage> SendWithLocalWarmupRetryAsync(
+        IHttpRequestSender sender,
+        Uri fullTriggerUri,
+        HttpMethod method,
+        CommonHttpRequest request,
+        FunctionAppConfig functionConfig,
+        FunctionAppTriggerConfig triggerConfig,
+        CancellationToken cancellationToken)
+    {
+        bool shouldRetryNotFound = IsLocalDevelopmentHost(fullTriggerUri) && triggerConfig.LocalNotFoundRetryDuration > TimeSpan.Zero;
+        DateTime retryDeadline = DateTime.UtcNow.Add(triggerConfig.LocalNotFoundRetryDuration);
+
+        while (true)
+        {
+            using HttpRequestMessage message = CreateRequestMessage(fullTriggerUri, method, request, functionConfig);
+            HttpResponseMessage response = await sender.SendAsync(message, cancellationToken).ConfigureAwait(false);
+            if (!shouldRetryNotFound || response.StatusCode != HttpStatusCode.NotFound || DateTime.UtcNow >= retryDeadline)
+                return response;
+
+            response.Dispose();
+            await Task.Delay(triggerConfig.LocalNotFoundRetryDelay, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static HttpRequestMessage CreateRequestMessage(Uri fullTriggerUri, HttpMethod method, CommonHttpRequest request, FunctionAppConfig functionConfig)
+    {
+        HttpRequestMessage message = new(method, fullTriggerUri);
+        request.ApplyToHttpRequestMessage(message);
+        message.Headers.Add("x-functions-key", functionConfig.Code);
+        return message;
+    }
+
+    private static bool IsLocalDevelopmentHost(Uri uri)
+        => uri.IsLoopback
+        || string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(uri.Host, "host.docker.internal", StringComparison.OrdinalIgnoreCase);
 
     public override StepInstance<Step<HttpResponseMessage>, HttpResponseMessage> GetInstance() =>
         new StepInstance<Step<HttpResponseMessage>, HttpResponseMessage>(this);
