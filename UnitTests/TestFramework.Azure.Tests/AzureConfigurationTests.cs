@@ -309,6 +309,43 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public async Task HttpRemoteFunctionAppTrigger_RetriesLocalhostNotFoundDuringWarmup()
+    {
+        FakeHttpRequestSender sender = new(
+            new HttpResponseMessage(HttpStatusCode.NotFound),
+            new HttpResponseMessage(HttpStatusCode.InternalServerError));
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            {
+                BaseUrl = "http://localhost:7071/",
+                Code = "secret",
+                AdminCode = null,
+            }));
+            services.AddSingleton(new FunctionAppTriggerConfig
+            {
+                DoPing = false,
+                LocalNotFoundRetryDuration = TimeSpan.FromSeconds(1),
+                LocalNotFoundRetryDelay = TimeSpan.Zero,
+            });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        TriggerHttpRouting routing = new("api/orders", HttpMethod.Post, Var.Const(new Dictionary<string, string>()));
+        CommonHttpRequest request = new();
+
+        HttpRemoteFunctionAppTrigger trigger = new("func", Var.Const(routing), Var.Const(request));
+
+        HttpResponseMessage? actual = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.NotNull(actual);
+        Assert.Equal(HttpStatusCode.InternalServerError, actual.StatusCode);
+        Assert.Equal(2, sender.Requests.Count);
+        Assert.All(sender.Requests, loggedRequest => Assert.Equal("http://localhost:7071/api/orders", loggedRequest.RequestUri!.ToString()));
+    }
+
+    [Fact]
     public async Task LogicAppHttpTrigger_ResolvesCallbackUrlAndInvokesWorkflow()
     {
         FakeHttpRequestSender sender = new(
