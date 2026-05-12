@@ -1,6 +1,10 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;

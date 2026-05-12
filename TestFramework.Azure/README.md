@@ -4,8 +4,8 @@
 
 TestFramework.Azure is an extension package for TestFramework.Core.
 
-If you are new: TestFrameworkCore runs your timeline, and this package adds Azure-specific triggers, events, and artifact helpers.
-You usually install and learn TestFrameworkCore first, then add TestFrameworkAzure when your tests need Azure resources.
+If you are new: TestFramework.Core runs your timeline, and this package adds Azure-specific triggers, events, and artifact helpers.
+You usually install and learn TestFramework.Core first, then add TestFramework.Azure when your tests need Azure resources.
 
 Azure-focused test helpers for TestFramework.Core timelines.
 
@@ -19,6 +19,23 @@ TestFramework.Azure adds fluent building blocks for:
 ```bash
 dotnet add package TestFramework.Azure
 ```
+
+## Start Here
+
+If you are new to the Azure package, learn it in this order:
+
+1. Pick stable identifier names such as `Default`, `MainDb`, or `MainSBQueue` and keep those names consistent between timeline code and config.
+2. Register the smallest config shape that matches the resource you need.
+3. Start with one canonical flow per resource family before mixing features.
+
+Recommended first flows:
+
+- Function App: `AzureTF.Trigger.FunctionApp.Http("Default") ... .Call()`
+- Service Bus: send with `AzureTF.Trigger.ServiceBus.Send(...)`, then wait with `AzureTF.Event.ServiceBus.MessageReceived(...)`
+- Logic App: use `CallAndCapture()` for stateless workflows, `Call()` plus `RunCompleted(...)` for stateful workflows
+- Data systems: start with one artifact or one finder against a single named identifier before composing larger end-to-end scenarios
+
+Once those three ideas are clear, the broader support matrix below becomes much easier to navigate.
 
 ## Minimal Setup
 

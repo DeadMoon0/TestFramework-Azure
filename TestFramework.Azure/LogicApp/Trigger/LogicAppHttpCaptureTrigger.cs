@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Core.Artifacts;

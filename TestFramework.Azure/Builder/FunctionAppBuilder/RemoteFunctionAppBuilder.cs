@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http.Stages;

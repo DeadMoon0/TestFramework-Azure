@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using System;
+using Microsoft.Extensions.Configuration;
 using System.Linq;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Exceptions;
