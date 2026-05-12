@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TestFramework.Azure.Builder.FunctionAppBuilder;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http;

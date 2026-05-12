@@ -2,10 +2,10 @@
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
+		<ImplicitUsings>disable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
-		<Title>TestFramework Azure</Title>
+		<Title>TestFramework.Azure</Title>
 		<Version>0.1.8</Version>
 		<Authors>DeadMoon0</Authors>
 		<Product>TestFramework</Product>

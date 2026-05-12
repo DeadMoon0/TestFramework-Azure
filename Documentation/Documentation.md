@@ -1,6 +1,6 @@
-# TestFrameworkAzure
+# TestFramework.Azure
 
-A CommonExtension for the TestFramework for Microsoft Azure.
+An Azure extension package for TestFramework.
 
 ## Azure Component
 Every azure component is Identified by an Identifier. The Identifier is used to select a Config from the Store.
