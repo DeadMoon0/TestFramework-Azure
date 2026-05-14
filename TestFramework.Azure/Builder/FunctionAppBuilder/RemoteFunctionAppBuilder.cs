@@ -4,6 +4,7 @@ using System.Net.Http;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http.Stages;
 using TestFramework.Azure.FunctionApp;
+using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.FunctionApp.Trigger;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
@@ -39,7 +40,7 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
         return this;
     }
 
-    public Step<HttpResponseMessage> Call()
+    public Step<HttpResponseResultContext> Call()
     {
         if (_routing is null)
             throw new InvalidOperationException("No endpoint selected. Call SelectEndpoint or SelectEndpointWithMethod first.");

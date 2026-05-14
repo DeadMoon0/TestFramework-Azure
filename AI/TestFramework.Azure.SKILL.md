@@ -15,7 +15,7 @@
     Azure extends the Core timeline engine with cloud-facing triggers, waits, artifacts, and identifiers.
     Most Azure tests still follow the same build, run, and assert pattern from Core.
     Azure scenarios often need configuration and environment identifiers before the timeline can run.
-    The package exposes a fluent entry surface through AzureTF for triggers, events, artifact lookup, and environment-specific helpers.
+    The package exposes a fluent entry surface through AzureExt for triggers, events, artifact lookup, and environment-specific helpers.
     Configuration is identifier-driven. Timelines refer to names like Default or MainSBQueue, and the package resolves those names to concrete Azure resources through configuration providers.
 </key_concepts>
 
@@ -26,13 +26,13 @@
     Keep cloud-side waits and message flows visible in the timeline, not hidden in helpers.
     Prefer one visible end-to-end flow over several tiny wrappers that hide the Azure interaction sequence.
     Use correlation ids or equivalent scoping when message-driven tests would otherwise be ambiguous.
-    Prefer AzureTF entry points and identifier-driven config over ad-hoc nested helper layers.
-    Prefer compact AzureTF call chains when they remain readable, for example `Trigger(AzureTF.Trigger.FunctionApp.Http(...).SelectEndpointWithMethod<...>(...).Call())`.
+    Prefer AzureExt entry points and identifier-driven config over ad-hoc nested helper layers.
+    Prefer compact AzureExt call chains when they remain readable, for example `Trigger(AzureExt.Trigger.FunctionApp.Http(...).SelectEndpointWithMethod<...>(...).Call())`.
 </best_practices>
 
 <surface_guidance>
     The Azure package is intentionally broad, but the agent should still teach it through a consumer-first path:
-    - AzureTF as the main facade
+    - AzureExt as the main facade
     - named identifiers as the configuration contract
     - visible send, call, wait, and lookup steps in the timeline
 
@@ -42,14 +42,14 @@
 
 <api_hints>
     Important APIs and shapes from the package docs:
-    - AzureTF.Trigger.FunctionApp.Http("name").SelectEndpointWithMethod<T>(...).Call()
-    - AzureTF.Trigger.LogicApp.Http("logic").Workflow("StatefulWorkflow").Manual().Call()
-    - AzureTF.Trigger.LogicApp.Http("logic").Workflow("StatelessWorkflow").Manual().CallAndCapture()
-    - AzureTF.Event.LogicApp.RunCompleted("logic", runId, workflowName) is for stateful workflows only
-    - AzureTF.Trigger.ServiceBus.Send("configName", message)
-    - AzureTF.Event.ServiceBus.MessageReceived("configName", ...)
-    - AzureTF.Trigger.IsLive.Cosmos("configName")
-    - AzureTF.ArtifactFinder.DB.CosmosQuery<T>("configName", queryDefinition)
+    - AzureExt.Trigger.FunctionApp.Http("name").SelectEndpointWithMethod<T>(...).Call()
+    - AzureExt.Trigger.LogicApp.Http("logic").Workflow("StatefulWorkflow").Manual().Call()
+    - AzureExt.Trigger.LogicApp.Http("logic").Workflow("StatelessWorkflow").Manual().CallAndCapture()
+    - AzureExt.Event.LogicApp.RunCompleted("logic", runId, workflowName) is for stateful workflows only
+    - AzureExt.Trigger.ServiceBus.Send("configName", message)
+    - AzureExt.Event.ServiceBus.MessageReceived("configName", ...)
+    - AzureExt.Trigger.IsLive.Cosmos("configName")
+    - AzureExt.ArtifactFinder.DB.CosmosQuery<T>("configName", queryDefinition)
     - Config extensions such as LoadAzureConfig() prepare Azure-specific configuration.
 
     Operational hint:
@@ -58,7 +58,7 @@
 
 <runtime_behavior>
     Important runtime facts:
-    - AzureTF is the main facade and groups Trigger, Event, Artifact, and ArtifactFinder entry points.
+    - AzureExt is the main facade and groups Trigger, Event, Artifact, and ArtifactFinder entry points.
     - Logic App workflow mode matters: stateful workflows expose run history, stateless workflows complete inline with the callback response.
     - Use `Call()` when you need a run id and plan to wait with `RunCompleted(...)` or `RunReachedStatus(...)`.
     - Use `CallAndCapture()` for stateless Logic Apps; do not model stateless completion through run polling or hidden fallback storage.
@@ -111,11 +111,11 @@
 <sample_patterns>
     Function App pattern:
     - prepare Azure config with ConfigInstance
-    - trigger a function endpoint through AzureTF.Trigger.FunctionApp.Http(...)
+    - trigger a function endpoint through AzureExt.Trigger.FunctionApp.Http(...)
     - run the timeline with the built service provider
 
     Logic App pattern:
-    - stateful workflow: trigger with `Call()`, keep the returned `RunId`, then wait with `AzureTF.Event.LogicApp.RunCompleted(...)`
+    - stateful workflow: trigger with `Call()`, keep the returned `RunId`, then wait with `AzureExt.Event.LogicApp.RunCompleted(...)`
     - stateless workflow: trigger with `CallAndCapture()` and assert against the returned `LogicAppCapturedResult`
     - do not recommend `RunCompleted(...)` for stateless workflows
 
@@ -149,7 +149,7 @@
 
 <important_type_map>
     Common type map for discovery and error interpretation:
-    - AzureTF: main facade for Azure triggers, events, artifact registration, and artifact finding
+    - AzureExt: main facade for Azure triggers, events, artifact registration, and artifact finding
     - IConfigProvider: project-to-TestFramework.Azure config adapter seam
     - DefaultConfigProvider: default reader for the package's standard section names
     - ConfigLoader: component that loads all Azure configs into DI stores
@@ -171,7 +171,7 @@
 
 <grounding_files>
     Most important files for expert grounding:
-    - TestFramework-Azure/TestFramework.Azure/AzureTF.cs
+    - TestFramework-Azure/TestFramework.Azure/AzureExt.cs
     - TestFramework-Azure/TestFramework.Azure/Extensions/ConfigExtension.cs
     - TestFramework-Azure/TestFramework.Azure/Configuration/ConfigLoader.cs
     - TestFramework-Azure/TestFramework.Azure/Configuration/DefaultConfigProvider.cs

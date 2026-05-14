@@ -1,4 +1,5 @@
 ﻿using System.Net.Http;
+using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Core.Steps;
 
 namespace TestFramework.Azure.Builder.FunctionAppBuilder.Http.Actions;
@@ -13,6 +14,6 @@ public interface ICallRemoteHttpAction
     /// Builds the current request into an executable timeline step.
     /// </summary>
     /// <returns>A step that performs the HTTP call.</returns>
-    public Step<HttpResponseMessage> Call();
+    public Step<HttpResponseResultContext> Call();
 }
 #pragma warning restore CA1716

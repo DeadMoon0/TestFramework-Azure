@@ -46,7 +46,7 @@ public record ServiceBusConfig
     /// <summary>
     /// Topic-backed mode. Required for topic send and receive flows.
     /// Pair with <see cref="SubscriptionName"/> for a fixed subscription, or use
-    /// AzureTF.Event.ServiceBus.MessageReceived(..., createTempSubscription: true) for a temp subscription.
+    /// AzureExt.Event.ServiceBus.MessageReceived(..., createTempSubscription: true) for a temp subscription.
     /// </summary>
     public required string? TopicName { get; init; }
 

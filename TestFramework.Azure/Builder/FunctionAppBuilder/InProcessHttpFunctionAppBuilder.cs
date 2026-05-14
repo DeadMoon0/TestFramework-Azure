@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
-using System.Net.Http;
 using System.Threading.Tasks;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http.Stages;
 using TestFramework.Azure.FunctionApp.InProcessProxies;
+using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.FunctionApp.Trigger;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Variables;
@@ -37,7 +37,7 @@ internal class InProcessHttpFunctionAppBuilder<TFunction> : IFunctionAppHttpPayl
         _action = async (f, p) => await func(f, p);
     }
 
-    public Step<HttpResponseMessage> Call() =>
+    public Step<HttpResponseResultContext> Call() =>
         new InProcessHttpFunctionAppTrigger<TFunction>(_action, _request.BuildVariable());
 
     public IFunctionAppHttpPayloadStage WithBody(VariableReference<string> text) { _request.SetBody(text); return this; }

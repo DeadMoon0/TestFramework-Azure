@@ -1,5 +1,6 @@
 using System;
 using System.Net;
+using TestFramework.Core.Steps;
 
 namespace TestFramework.Azure.LogicApp;
 
@@ -16,7 +17,7 @@ public sealed record LogicAppTriggerResult(
     string TriggerName,
     string CallbackUrl,
     string? RunId,
-    HttpStatusCode StatusCode)
+    HttpStatusCode StatusCode) : StepResultContext
 {
     /// <summary>
     /// Creates an explicit run-tracking context for stateful Logic App polling.

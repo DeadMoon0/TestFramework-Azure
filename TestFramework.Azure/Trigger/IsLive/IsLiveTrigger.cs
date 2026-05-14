@@ -30,75 +30,75 @@ public class IsLiveTrigger
     /// <summary>
     /// Creates a Logic App liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<object?> LogicApp(LogicAppIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => LogicApp(identifier, Var.Const(alivenessLevel));
+    public Step<EmptyStepResultContext> LogicApp(LogicAppIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => LogicApp(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Logic App liveness trigger using a variable aliveness level.
     /// </summary>
-    public Step<object?> LogicApp(LogicAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new LogicAppIsLiveTrigger(identifier, alivenessLevel);
+    public Step<EmptyStepResultContext> LogicApp(LogicAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new LogicAppIsLiveTrigger(identifier, alivenessLevel);
 
     /// <summary>
     /// Creates a Function App liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<object?> FunctionApp(FunctionAppIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => FunctionApp(identifier, Var.Const(alivenessLevel));
+    public Step<EmptyStepResultContext> FunctionApp(FunctionAppIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => FunctionApp(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Function App liveness trigger using a variable aliveness level.
     /// </summary>
-    public Step<object?> FunctionApp(FunctionAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new FunctionAppIsLiveTrigger(identifier, alivenessLevel);
+    public Step<EmptyStepResultContext> FunctionApp(FunctionAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new FunctionAppIsLiveTrigger(identifier, alivenessLevel);
 
     /// <summary>
     /// Creates a Service Bus liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<object?> ServiceBus(ServiceBusIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => ServiceBus(identifier, Var.Const(alivenessLevel));
+    public Step<EmptyStepResultContext> ServiceBus(ServiceBusIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => ServiceBus(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Service Bus liveness trigger using a variable aliveness level.
     /// </summary>
-    public Step<object?> ServiceBus(ServiceBusIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new ServiceBusIsLiveTrigger(identifier, alivenessLevel);
+    public Step<EmptyStepResultContext> ServiceBus(ServiceBusIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new ServiceBusIsLiveTrigger(identifier, alivenessLevel);
 
     /// <summary>
     /// Creates a Blob Storage liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<object?> Blob(StorageAccountIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Blob(identifier, Var.Const(alivenessLevel));
+    public Step<EmptyStepResultContext> Blob(StorageAccountIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Blob(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Blob Storage liveness trigger using a variable aliveness level.
     /// </summary>
-    public Step<object?> Blob(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new BlobStorageIsLiveTrigger(identifier, alivenessLevel);
+    public Step<EmptyStepResultContext> Blob(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new BlobStorageIsLiveTrigger(identifier, alivenessLevel);
 
     /// <summary>
     /// Creates a Table Storage liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<object?> Table(StorageAccountIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Table(identifier, Var.Const(alivenessLevel));
+    public Step<EmptyStepResultContext> Table(StorageAccountIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Table(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Table Storage liveness trigger using a variable aliveness level.
     /// </summary>
-    public Step<object?> Table(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new TableStorageIsLiveTrigger(identifier, alivenessLevel);
+    public Step<EmptyStepResultContext> Table(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new TableStorageIsLiveTrigger(identifier, alivenessLevel);
 
     /// <summary>
     /// Creates a Cosmos DB liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<object?> Cosmos(CosmosContainerIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Cosmos(identifier, Var.Const(alivenessLevel));
+    public Step<EmptyStepResultContext> Cosmos(CosmosContainerIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Cosmos(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Cosmos DB liveness trigger using a variable aliveness level.
     /// </summary>
-    public Step<object?> Cosmos(CosmosContainerIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new CosmosContainerIsLiveTrigger(identifier, alivenessLevel);
+    public Step<EmptyStepResultContext> Cosmos(CosmosContainerIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new CosmosContainerIsLiveTrigger(identifier, alivenessLevel);
 
     /// <summary>
     /// Creates a SQL database liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<object?> Sql(SqlDatabaseIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Sql(identifier, Var.Const(alivenessLevel));
+    public Step<EmptyStepResultContext> Sql(SqlDatabaseIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Sql(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a SQL database liveness trigger using a variable aliveness level.
     /// </summary>
-    public Step<object?> Sql(SqlDatabaseIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new SqlDatabaseIsLiveTrigger(identifier, alivenessLevel);
+    public Step<EmptyStepResultContext> Sql(SqlDatabaseIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new SqlDatabaseIsLiveTrigger(identifier, alivenessLevel);
 }
 
-internal abstract class AzureIsLiveTriggerBase(VariableReference<AlivenessLevel> alivenessLevel) : Step<object?>
+internal abstract class AzureIsLiveTriggerBase(VariableReference<AlivenessLevel> alivenessLevel) : Step<EmptyStepResultContext>
 {
     public override bool DoesReturn => false;
 
@@ -112,8 +112,8 @@ internal abstract class AzureIsLiveTriggerBase(VariableReference<AlivenessLevel>
             contract.Inputs.Add(new StepIOEntry(AlivenessLevelReference.Identifier!.Identifier, StepIOKind.Variable, false, typeof(AlivenessLevel)));
     }
 
-    public override StepInstance<Step<object?>, object?> GetInstance() =>
-        new StepInstance<Step<object?>, object?>(this);
+    public override StepInstance<Step<EmptyStepResultContext>, EmptyStepResultContext> GetInstance() =>
+        new StepInstance<Step<EmptyStepResultContext>, EmptyStepResultContext>(this);
 }
 
 internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(alivenessLevel), IHasEnvironmentRequirements
@@ -124,9 +124,9 @@ internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier,
 
     public override string Description => "Checks whether the Function App is reachable and accepts the configured key.";
 
-    public override Step<object?> Clone() => new FunctionAppIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
+    public override Step<EmptyStepResultContext> Clone() => new FunctionAppIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<object?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<EmptyStepResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
         FunctionAppTriggerConfig triggerConfig = serviceProvider.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
@@ -164,9 +164,9 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
 
     public override string Description => "Checks whether the Logic App host is reachable and accepts the configured key.";
 
-    public override Step<object?> Clone() => new LogicAppIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
+    public override Step<EmptyStepResultContext> Clone() => new LogicAppIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<object?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<EmptyStepResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
         LogicAppConfig logicAppConfig = serviceProvider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
@@ -223,9 +223,9 @@ internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, V
 
     public override string Description => "Checks whether the configured Service Bus entity is reachable with the configured credentials.";
 
-    public override Step<object?> Clone() => new ServiceBusIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
+    public override Step<EmptyStepResultContext> Clone() => new ServiceBusIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<object?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<EmptyStepResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
         ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
@@ -250,9 +250,9 @@ internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifi
 
     public override string Description => "Checks whether the configured Blob container is reachable with the configured credentials.";
 
-    public override Step<object?> Clone() => new BlobStorageIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
+    public override Step<EmptyStepResultContext> Clone() => new BlobStorageIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<object?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<EmptyStepResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(identifier);
@@ -277,9 +277,9 @@ internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identif
 
     public override string Description => "Checks whether the configured Table storage table is reachable with the configured credentials.";
 
-    public override Step<object?> Clone() => new TableStorageIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
+    public override Step<EmptyStepResultContext> Clone() => new TableStorageIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<object?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<EmptyStepResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
         StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(identifier);
@@ -304,9 +304,9 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
 
     public override string Description => "Checks whether the configured Cosmos container is reachable with the configured credentials.";
 
-    public override Step<object?> Clone() => new CosmosContainerIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
+    public override Step<EmptyStepResultContext> Clone() => new CosmosContainerIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<object?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<EmptyStepResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
         CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(identifier);
@@ -341,7 +341,7 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
         => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.Cosmos, identifier)];
 
-    private static async Task<object?> ExecuteWithTimeoutAsync(TimeSpan timeout, CancellationToken cancellationToken, Func<CancellationToken, Task> action, string timeoutMessage)
+    private static async Task<EmptyStepResultContext?> ExecuteWithTimeoutAsync(TimeSpan timeout, CancellationToken cancellationToken, Func<CancellationToken, Task> action, string timeoutMessage)
     {
         using CancellationTokenSource timeoutTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutTokenSource.CancelAfter(timeout);
@@ -369,9 +369,9 @@ internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier,
 
     public override string Description => "Checks whether the configured SQL database is reachable with the configured credentials.";
 
-    public override Step<object?> Clone() => new SqlDatabaseIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
+    public override Step<EmptyStepResultContext> Clone() => new SqlDatabaseIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<object?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<EmptyStepResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         ISqlDbContextResolver resolver = serviceProvider.GetRequiredService<ISqlDbContextResolver>();
         DbContext context = resolver.Resolve(identifier);

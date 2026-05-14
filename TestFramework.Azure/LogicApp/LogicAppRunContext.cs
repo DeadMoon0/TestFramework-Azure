@@ -1,3 +1,5 @@
+using TestFramework.Core.Steps;
+
 namespace TestFramework.Azure.LogicApp;
 
 /// <summary>
@@ -7,4 +9,10 @@ namespace TestFramework.Azure.LogicApp;
 /// <param name="RunId">The resolved workflow run identifier.</param>
 public sealed record LogicAppRunContext(
     string WorkflowName,
-    string RunId);
+    string RunId) : StepResultContext
+{
+    /// <summary>
+    /// Returns the current run context for typed result binding.
+    /// </summary>
+    internal LogicAppRunContext Context => this;
+}

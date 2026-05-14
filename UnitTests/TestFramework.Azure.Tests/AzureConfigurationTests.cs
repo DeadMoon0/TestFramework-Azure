@@ -241,10 +241,11 @@ public class AzureConfigurationTests
 
         HttpRemoteFunctionAppTrigger trigger = new("func", Var.Const(routing), Var.Const(request));
 
-        HttpResponseMessage? actual = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        var actual = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
         Assert.NotNull(actual);
-        Assert.Same(response, actual);
+        Assert.Equal(HttpStatusCode.Accepted, actual!.StatusCode);
+        Assert.Equal(string.Empty, actual.Body);
         Assert.Equal("https://example.test/api/orders", sender.Request!.RequestUri!.ToString());
         Assert.Equal("secret", sender.Request.Headers.GetValues("x-functions-key").Single());
         Assert.Equal("1", sender.Request.Headers.GetValues("x-test").Single());
@@ -266,7 +267,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        Step<HttpResponseMessage> trigger = AzureTF.Trigger.FunctionApp
+        var trigger = AzureExt.Trigger.FunctionApp
             .Http("func")
             .SelectEndpoint(Var.Const("orders"), Var.Const(HttpMethod.Post))
             .WithBody(Var.Const("payload"))
@@ -298,7 +299,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        Step<HttpResponseMessage> trigger = AzureTF.Trigger.FunctionApp
+        var trigger = AzureExt.Trigger.FunctionApp
             .Http("func")
             .SelectFunction("HttpEchoTest", HttpMethod.Post)
             .Call();
@@ -337,7 +338,7 @@ public class AzureConfigurationTests
 
         HttpRemoteFunctionAppTrigger trigger = new("func", Var.Const(routing), Var.Const(request));
 
-        HttpResponseMessage? actual = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        var actual = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
         Assert.NotNull(actual);
         Assert.Equal(HttpStatusCode.InternalServerError, actual.StatusCode);
@@ -374,7 +375,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+        Step<LogicAppTriggerResult> trigger = AzureExt.Trigger.LogicApp
             .Http("logic")
             .Workflow("OrderProcessor")
             .Manual()
@@ -425,7 +426,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+        Step<LogicAppTriggerResult> trigger = AzureExt.Trigger.LogicApp
             .Http("logic")
             .Workflow("OrderProcessor")
             .Manual()
@@ -470,7 +471,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        Step<LogicAppCapturedResult> trigger = AzureTF.Trigger.LogicApp
+        Step<LogicAppCapturedResult> trigger = AzureExt.Trigger.LogicApp
             .Http("logic")
             .Workflow("OrderProcessor")
             .Manual()
@@ -518,7 +519,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        Step<LogicAppCapturedResult> trigger = AzureTF.Trigger.LogicApp
+        Step<LogicAppCapturedResult> trigger = AzureExt.Trigger.LogicApp
             .Http("logic")
             .Workflow("OrderProcessor")
             .Manual()
@@ -556,7 +557,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+        Step<LogicAppTriggerResult> trigger = AzureExt.Trigger.LogicApp
             .Http("logic")
             .Workflow("OrderProcessor")
             .Manual()
@@ -592,7 +593,7 @@ public class AzureConfigurationTests
             services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
         });
 
-        Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+        Step<LogicAppTriggerResult> trigger = AzureExt.Trigger.LogicApp
             .Http("logic")
             .Workflow("NightlyJob")
             .Timer()
@@ -629,7 +630,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+        Step<LogicAppTriggerResult> trigger = AzureExt.Trigger.LogicApp
             .Http("logic")
             .Workflow("NightlyJob")
             .Timer()
@@ -686,7 +687,7 @@ public class AzureConfigurationTests
                         services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
                 });
 
-                Step<LogicAppTriggerResult> trigger = AzureTF.Trigger.LogicApp
+                Step<LogicAppTriggerResult> trigger = AzureExt.Trigger.LogicApp
                         .Http("logic")
                         .Workflow("NightlyJob")
                         .Timer()
@@ -729,7 +730,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        var evt = AzureTF.Event.LogicApp.RunReachedStatus("logic", Var.Const("run-123"), LogicAppRunStatus.Succeeded, Var.Const("OrderProcessor"));
+        var evt = AzureExt.Event.LogicApp.RunReachedStatus("logic", Var.Const("run-123"), LogicAppRunStatus.Succeeded, Var.Const("OrderProcessor"));
 
         LogicAppRunDetails? result = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -770,7 +771,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
+        var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
 
         LogicAppRunDetails? result = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -806,7 +807,7 @@ public class AzureConfigurationTests
 
         TimelineRun run = await Timeline.Create()
             .SetVariable("logicRun", Var.Const(new LogicAppRunContext("OrderProcessor", "run-ctx")))
-            .WaitForEvent(AzureTF.Event.LogicApp.RunCompleted("logic", Var.Ref<LogicAppRunContext>("logicRun")))
+            .WaitForEvent(AzureExt.Event.LogicApp.RunCompleted("logic", Var.Ref<LogicAppRunContext>("logicRun")))
             .Build()
             .SetupRun(runtime.ServiceProvider)
             .RunAsync();
@@ -840,7 +841,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-500"), Var.Const("OrderProcessor"));
+        var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-500"), Var.Const("OrderProcessor"));
 
         LogicAppRunDetails? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -887,7 +888,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
+        var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
 
         LogicAppRunDetails? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -917,7 +918,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new HangingHttpComponentFactory(sender) });
         });
 
-        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-nonresponsive"), Var.Const("OrderProcessor"));
+        var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-nonresponsive"), Var.Const("OrderProcessor"));
         using CancellationTokenSource cancellation = new(TimeSpan.FromMilliseconds(100));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -949,7 +950,7 @@ public class AzureConfigurationTests
             services.AddSingleton<ILogicAppWorkflowMetadataProvider>(new StubLogicAppWorkflowMetadataProvider(("logic", "StatelessOrders"), LogicAppWorkflowMode.Stateless));
         });
 
-        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-stateless"), Var.Const("StatelessOrders"));
+        var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-stateless"), Var.Const("StatelessOrders"));
 
         InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
@@ -983,7 +984,7 @@ public class AzureConfigurationTests
             services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
         });
 
-        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
+        var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
 
         LogicAppRunDetails? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1042,7 +1043,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.FunctionApp("func");
+        var trigger = AzureExt.Trigger.IsLive.FunctionApp("func");
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1070,7 +1071,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.LogicApp("logic");
+        var trigger = AzureExt.Trigger.IsLive.LogicApp("logic");
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1098,7 +1099,7 @@ public class AzureConfigurationTests
             services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.LogicApp("logic");
+        var trigger = AzureExt.Trigger.IsLive.LogicApp("logic");
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1125,7 +1126,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.LogicApp("logic");
+        var trigger = AzureExt.Trigger.IsLive.LogicApp("logic");
 
         InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
@@ -1160,7 +1161,7 @@ public class AzureConfigurationTests
             services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
         });
 
-        var evt = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
+        var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
 
         LogicAppRunDetails? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1188,7 +1189,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.ServiceBus("bus");
+        var trigger = AzureExt.Trigger.IsLive.ServiceBus("bus");
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1212,7 +1213,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.ServiceBus("bus", AlivenessLevel.Authenticated);
+        var trigger = AzureExt.Trigger.IsLive.ServiceBus("bus", AlivenessLevel.Authenticated);
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1236,7 +1237,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.Blob("storage");
+        var trigger = AzureExt.Trigger.IsLive.Blob("storage");
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1259,7 +1260,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.Blob("storage", AlivenessLevel.Authenticated);
+        var trigger = AzureExt.Trigger.IsLive.Blob("storage", AlivenessLevel.Authenticated);
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1283,7 +1284,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.Table("storage");
+        var trigger = AzureExt.Trigger.IsLive.Table("storage");
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1307,7 +1308,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.Table("storage", AlivenessLevel.Authenticated);
+        var trigger = AzureExt.Trigger.IsLive.Table("storage", AlivenessLevel.Authenticated);
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1331,7 +1332,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.Cosmos("cosmos");
+        var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos");
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1353,7 +1354,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Authenticated);
+        var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Authenticated);
         trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
@@ -1378,7 +1379,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Reachable);
+        var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Reachable);
         trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
@@ -1403,7 +1404,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.Cosmos("cosmos");
+        var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos");
         trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
@@ -1429,7 +1430,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
-        Step<object?> trigger = AzureTF.Trigger.IsLive.Cosmos("cosmos");
+        var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos");
         trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(50));
 
         TimeoutException exception = await Assert.ThrowsAsync<TimeoutException>(() =>
@@ -1753,16 +1754,17 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
-        ServiceBusProcessEvent step = AzureTF.Event.ServiceBus.MessageReceived(
+        ServiceBusProcessEvent step = AzureExt.Event.ServiceBus.MessageReceived(
             "topic",
             messageId: Var.Const("m1"),
             correlationId: Var.Const("c1"),
             predicate: Var.Const<Func<ServiceBusReceivedMessage, bool>>(message => message.MessageId == "m1"),
             completeMessage: Var.Const(true));
 
-        ServiceBusReceivedMessage? result = await step.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        var result = await step.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
-        Assert.Same(receivedMessage, result);
+        Assert.NotNull(result);
+        Assert.Same(receivedMessage, result!.Message);
         Assert.Equal("m1", pump.LastRequest!.Value.MessageId);
         Assert.Equal("c1", pump.LastRequest.Value.CorrelationId);
         Assert.True(pump.LastRequest.Value.CompleteMessage);
@@ -1791,14 +1793,15 @@ public class AzureConfigurationTests
         });
 
         ServiceBusMessage sendMessage = new("payload") { MessageId = "q1" };
-        ServiceBusSendTrigger sendTrigger = AzureTF.Trigger.ServiceBus.Send("queue", Var.Const(sendMessage));
-        ServiceBusProcessEvent receiveEvent = AzureTF.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q1"));
+        ServiceBusSendTrigger sendTrigger = AzureExt.Trigger.ServiceBus.Send("queue", Var.Const(sendMessage));
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q1"));
 
         await sendTrigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
-        ServiceBusReceivedMessage? result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        var result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
         Assert.Same(sendMessage, sender.MessageSent);
-        Assert.Same(receivedMessage, result);
+        Assert.NotNull(result);
+        Assert.Same(receivedMessage, result!.Message);
         Assert.Null(pump.SubscriptionName);
         Assert.Equal("q1", pump.LastRequest!.Value.MessageId);
     }
@@ -1823,15 +1826,16 @@ public class AzureConfigurationTests
         });
 
         ServiceBusMessage sendMessage = new("payload") { MessageId = "q2" };
-        ServiceBusSendTrigger sendTrigger = AzureTF.Trigger.ServiceBus.Send("queue", Var.Const(sendMessage));
-        ServiceBusProcessEvent receiveEvent = AzureTF.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q2"));
+        ServiceBusSendTrigger sendTrigger = AzureExt.Trigger.ServiceBus.Send("queue", Var.Const(sendMessage));
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q2"));
 
         await sendTrigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
-        ServiceBusReceivedMessage? result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        var result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
         Assert.Same(sendMessage, sender.MessageSent);
         Assert.False(string.IsNullOrWhiteSpace(sendMessage.SessionId));
-        Assert.Same(receivedMessage, result);
+        Assert.NotNull(result);
+        Assert.Same(receivedMessage, result!.Message);
         Assert.Null(pump.SubscriptionName);
         Assert.Equal("q2", pump.LastRequest!.Value.MessageId);
     }
@@ -1854,15 +1858,16 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
-        ServiceBusProcessEvent receiveEvent = AzureTF.Event.ServiceBus.MessageReceived("topic", messageId: Var.Const("t1"), createTempSubscription: true);
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic", messageId: Var.Const("t1"), createTempSubscription: true);
 
         StepGeneric? preStep = ((IHasPreStep)receiveEvent).CreatePreStep(runtime.VariableStore);
         StepGeneric? cleanupStep = ((IHasCleanupStep)receiveEvent).CreateCleanupStep(runtime.VariableStore);
-        ServiceBusReceivedMessage? result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        var result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
         Assert.IsType<ServiceBusCreateTempSubscriptionStep>(preStep);
         Assert.IsType<ServiceBusDeleteTempSubscriptionStep>(cleanupStep);
-        Assert.Same(receivedMessage, result);
+        Assert.NotNull(result);
+        Assert.Same(receivedMessage, result!.Message);
         Assert.NotNull(pump.SubscriptionName);
         Assert.StartsWith("tmp-", pump.SubscriptionName, StringComparison.Ordinal);
     }
@@ -1883,7 +1888,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory());
         });
 
-        ServiceBusProcessEvent receiveEvent = AzureTF.Event.ServiceBus.MessageReceived("topic", messageId: Var.Const("missing-sub"));
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic", messageId: Var.Const("missing-sub"));
 
         InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));

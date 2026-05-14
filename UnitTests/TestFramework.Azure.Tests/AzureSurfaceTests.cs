@@ -38,17 +38,17 @@ public class AzureSurfaceTests
     }
 
     [Fact]
-    public void AzureTF_ServiceBusSend_ReturnsConcreteTrigger()
+    public void AzureEnv_ServiceBusSend_ReturnsConcreteTrigger()
     {
-        ServiceBusSendTrigger trigger = AzureTF.Trigger.ServiceBus.Send("bus", Var.Const(new ServiceBusMessage("payload")));
+        ServiceBusSendTrigger trigger = AzureExt.Trigger.ServiceBus.Send("bus", Var.Const(new ServiceBusMessage("payload")));
 
         Assert.Equal("ServiceBus Send Trigger", trigger.Name);
     }
 
     [Fact]
-    public void AzureTF_MessageReceived_WithTempSubscriptionFlag_ProvidesPreAndCleanupSteps()
+    public void AzureEnv_MessageReceived_WithTempSubscriptionFlag_ProvidesPreAndCleanupSteps()
     {
-        ServiceBusProcessEvent step = AzureTF.Event.ServiceBus.MessageReceived("bus", createTempSubscription: true);
+        ServiceBusProcessEvent step = AzureExt.Event.ServiceBus.MessageReceived("bus", createTempSubscription: true);
 
         StepGeneric? preStep = ((IHasPreStep)step).CreatePreStep(null!);
         StepGeneric? cleanupStep = ((IHasCleanupStep)step).CreateCleanupStep(null!);
@@ -59,15 +59,15 @@ public class AzureSurfaceTests
     }
 
     [Fact]
-    public void AzureTF_IsLive_ReturnsStepsForKnownTargets()
+    public void AzureEnv_IsLive_ReturnsStepsForKnownTargets()
     {
-        Step<object?> logicApp = AzureTF.Trigger.IsLive.LogicApp("logic", AlivenessLevel.Authenticated);
-        Step<object?> functionApp = AzureTF.Trigger.IsLive.FunctionApp("func");
-        Step<object?> serviceBus = AzureTF.Trigger.IsLive.ServiceBus("bus", AlivenessLevel.Authenticated);
-        Step<object?> blob = AzureTF.Trigger.IsLive.Blob("storage", AlivenessLevel.Authenticated);
-        Step<object?> table = AzureTF.Trigger.IsLive.Table("storage", AlivenessLevel.Authenticated);
-        Step<object?> cosmos = AzureTF.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Authenticated);
-        Step<object?> sql = AzureTF.Trigger.IsLive.Sql("sql", AlivenessLevel.Authenticated);
+        var logicApp = AzureExt.Trigger.IsLive.LogicApp("logic", AlivenessLevel.Authenticated);
+        var functionApp = AzureExt.Trigger.IsLive.FunctionApp("func");
+        var serviceBus = AzureExt.Trigger.IsLive.ServiceBus("bus", AlivenessLevel.Authenticated);
+        var blob = AzureExt.Trigger.IsLive.Blob("storage", AlivenessLevel.Authenticated);
+        var table = AzureExt.Trigger.IsLive.Table("storage", AlivenessLevel.Authenticated);
+        var cosmos = AzureExt.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Authenticated);
+        var sql = AzureExt.Trigger.IsLive.Sql("sql", AlivenessLevel.Authenticated);
 
         Assert.Equal("LogicApp IsLive Trigger", logicApp.Name);
         Assert.Equal("FunctionApp IsLive Trigger", functionApp.Name);
@@ -85,9 +85,9 @@ public class AzureSurfaceTests
     }
 
     [Fact]
-    public void AzureTF_ServiceBusSend_ProvidesEnvironmentRequirement()
+    public void AzureEnv_ServiceBusSend_ProvidesEnvironmentRequirement()
     {
-        ServiceBusSendTrigger trigger = AzureTF.Trigger.ServiceBus.Send("bus", Var.Const(new ServiceBusMessage("payload")));
+        ServiceBusSendTrigger trigger = AzureExt.Trigger.ServiceBus.Send("bus", Var.Const(new ServiceBusMessage("payload")));
 
         EnvironmentRequirement requirement = Assert.Single(((IHasEnvironmentRequirements)trigger).GetEnvironmentRequirements(null!));
 

@@ -34,7 +34,7 @@ public class ServiceBusProcessEvent(
     VariableReference<Func<ServiceBusReceivedMessage, bool>>? predicate = null,
     VariableReference<bool>? completeMessage = null,
     VariableReference<bool>? createTempSubscription = null)
-    : AsyncEvent<ServiceBusProcessEvent, ServiceBusReceivedMessage>, IHasPreStep, IHasCleanupStep, IHasEnvironmentRequirements
+    : AsyncEvent<ServiceBusProcessEvent, ServiceBusReceivedMessageContext>, IHasPreStep, IHasCleanupStep, IHasEnvironmentRequirements
 {
     /// <summary>
     /// Gets the display name used for this event.
@@ -69,7 +69,7 @@ public class ServiceBusProcessEvent(
     /// Creates a copy of this event and its options.
     /// </summary>
     /// <returns>The cloned event.</returns>
-    public override Step<ServiceBusReceivedMessage> Clone()
+    public override Step<ServiceBusReceivedMessageContext> Clone()
         => new ServiceBusProcessEvent(identifier, messageId, correlationId, predicate, completeMessage, createTempSubscription)
             .WithClonedOptions(this);
 
@@ -120,7 +120,7 @@ public class ServiceBusProcessEvent(
     /// <param name="logger">The event logger.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The matching Service Bus message, or <see langword="null"/> when none is found.</returns>
-    public override async Task<ServiceBusReceivedMessage?> DoEventPolling(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore,
+    public override async Task<ServiceBusReceivedMessageContext?> DoEventPolling(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore,
         ScopedLogger logger, CancellationToken cancellationToken)
     {
         ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
@@ -135,12 +135,14 @@ public class ServiceBusProcessEvent(
         };
 
         await using IServiceBusMessagePump pump = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateMessagePump(config, subscriptionName);
-        return await pump.ReceiveMessageAsync(
+        ServiceBusReceivedMessage? message = await pump.ReceiveMessageAsync(
             new ServiceBusReceiveRequest(
                 messageId?.GetValue(variableStore),
                 correlationId?.GetValue(variableStore),
                 predicate?.GetValue(variableStore),
                 completeMessage?.GetValue(variableStore) == true),
             cancellationToken);
+
+        return message is null ? null : new ServiceBusReceivedMessageContext(message);
     }
 }

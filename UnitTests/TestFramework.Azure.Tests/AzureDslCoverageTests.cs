@@ -17,8 +17,8 @@ public class AzureDslCoverageTests
     [Fact]
     public void FunctionApp_HttpBuilder_IsCreated()
     {
-        object builder = AzureTF.Trigger.FunctionApp.Http("func");
-        object functionBuilder = AzureTF.Trigger.FunctionApp.Http("func").SelectFunction("HttpEchoTest", HttpMethod.Post);
+        object builder = AzureExt.Trigger.FunctionApp.Http("func");
+        object functionBuilder = AzureExt.Trigger.FunctionApp.Http("func").SelectFunction("HttpEchoTest", HttpMethod.Post);
 
         Assert.NotNull(builder);
         Assert.NotNull(functionBuilder);
@@ -27,7 +27,7 @@ public class AzureDslCoverageTests
     [Fact]
     public void FunctionApp_ManagedBuilder_ReturnsStep()
     {
-        Step<ManagedResult> step = AzureTF.Trigger.FunctionApp.Managed<DummyFunction>("func", "Run");
+        Step<ManagedResult> step = AzureExt.Trigger.FunctionApp.Managed<DummyFunction>("func", "Run");
 
         Assert.NotNull(step);
     }
@@ -35,10 +35,10 @@ public class AzureDslCoverageTests
     [Fact]
     public void FunctionApp_InProcessHttpOverloads_ReturnBuilderInstances()
     {
-        object actionBuilder = AzureTF.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => { });
-        object taskBuilder = AzureTF.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => Task.CompletedTask);
-        object resultBuilder = AzureTF.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => new OkResult());
-        object taskResultBuilder = AzureTF.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => Task.FromResult<IActionResult>(new OkResult()));
+        object actionBuilder = AzureExt.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => { });
+        object taskBuilder = AzureExt.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => Task.CompletedTask);
+        object resultBuilder = AzureExt.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => new OkResult());
+        object taskResultBuilder = AzureExt.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => Task.FromResult<IActionResult>(new OkResult()));
 
         Assert.NotNull(actionBuilder);
         Assert.NotNull(taskBuilder);
@@ -49,13 +49,13 @@ public class AzureDslCoverageTests
     [Fact]
     public void LogicApp_HttpBuilder_AndEvents_AreCreated()
     {
-        object triggerBuilder = AzureTF.Trigger.LogicApp.Http("logic");
-        object runCompleted = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const("run-1"));
-        object runSucceeded = AzureTF.Event.LogicApp.RunReachedStatus("logic", Var.Const("run-1"), LogicAppRunStatus.Succeeded);
-        object runCompletedWithContext = AzureTF.Event.LogicApp.RunCompleted("logic", Var.Const(new LogicAppRunContext("OrderProcessor", "run-1")));
-        object capture = AzureTF.Trigger.LogicApp.Http("logic").Workflow("OrderProcessor").Manual().CallAndCapture();
-        object timer = AzureTF.Trigger.LogicApp.Http("logic").Workflow("NightlyJob").Timer().Call();
-        object timerContext = AzureTF.Trigger.LogicApp.Http("logic").Workflow("NightlyJob").Timer().CallForRunContext();
+        object triggerBuilder = AzureExt.Trigger.LogicApp.Http("logic");
+        object runCompleted = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-1"));
+        object runSucceeded = AzureExt.Event.LogicApp.RunReachedStatus("logic", Var.Const("run-1"), LogicAppRunStatus.Succeeded);
+        object runCompletedWithContext = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const(new LogicAppRunContext("OrderProcessor", "run-1")));
+        object capture = AzureExt.Trigger.LogicApp.Http("logic").Workflow("OrderProcessor").Manual().CallAndCapture();
+        object timer = AzureExt.Trigger.LogicApp.Http("logic").Workflow("NightlyJob").Timer().Call();
+        object timerContext = AzureExt.Trigger.LogicApp.Http("logic").Workflow("NightlyJob").Timer().CallForRunContext();
 
         Assert.NotNull(triggerBuilder);
         Assert.NotNull(runCompleted);
@@ -69,10 +69,10 @@ public class AzureDslCoverageTests
     [Fact]
     public void ArtifactProxies_CreateExpectedReferenceTypes()
     {
-        object cosmosRef = AzureTF.Artifact.DB.CosmosRef<object>("cosmos", "id-1", new PartitionKey("tenant"));
-        object sqlRef = AzureTF.Artifact.DB.SqlRef<DummyRow>("sql", Var.Const("pk"));
-        object tableRef = AzureTF.Artifact.StorageAccount.TableRef<DummyTableEntity>("storage", Var.Const("orders"), Var.Const("tenant"), Var.Const("row"));
-        object blobRef = AzureTF.Artifact.StorageAccount.BlobRef("storage", Var.Const("samples/a.txt"));
+        object cosmosRef = AzureExt.Artifact.DB.CosmosRef<object>("cosmos", "id-1", new PartitionKey("tenant"));
+        object sqlRef = AzureExt.Artifact.DB.SqlRef<DummyRow>("sql", Var.Const("pk"));
+        object tableRef = AzureExt.Artifact.StorageAccount.TableRef<DummyTableEntity>("storage", Var.Const("orders"), Var.Const("tenant"), Var.Const("row"));
+        object blobRef = AzureExt.Artifact.StorageAccount.BlobRef("storage", Var.Const("samples/a.txt"));
 
         Assert.NotNull(cosmosRef);
         Assert.NotNull(sqlRef);
@@ -83,9 +83,9 @@ public class AzureDslCoverageTests
     [Fact]
     public void ArtifactFinderProxies_CreateExpectedFinderTypes()
     {
-        object cosmosQuery = AzureTF.ArtifactFinder.DB.CosmosQuery<object>("cosmos", Var.Const(new QueryDefinition("SELECT * FROM c")));
-        object sqlQuery = AzureTF.ArtifactFinder.DB.SqlQuery<DummyRow>("sql", query => query);
-        TableStorageEntityArtifactQueryFinder<DummyTableEntity> tableQuery = AzureTF.ArtifactFinder.StorageAccount.TableQuery<DummyTableEntity>("storage", Var.Const("orders"), "PartitionKey ne ''");
+        object cosmosQuery = AzureExt.ArtifactFinder.DB.CosmosQuery<object>("cosmos", Var.Const(new QueryDefinition("SELECT * FROM c")));
+        object sqlQuery = AzureExt.ArtifactFinder.DB.SqlQuery<DummyRow>("sql", query => query);
+        TableStorageEntityArtifactQueryFinder<DummyTableEntity> tableQuery = AzureExt.ArtifactFinder.StorageAccount.TableQuery<DummyTableEntity>("storage", Var.Const("orders"), "PartitionKey ne ''");
 
         Assert.NotNull(cosmosQuery);
         Assert.NotNull(sqlQuery);
