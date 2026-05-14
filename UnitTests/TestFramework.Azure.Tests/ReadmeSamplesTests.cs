@@ -104,7 +104,7 @@ public class ReadmeSamplesTests
         });
 
         Timeline timeline = Timeline.Create()
-            .Trigger(AzureTF.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<ReadmeHttpFunction>(nameof(ReadmeHttpFunction.Run)).Call())
+            .Trigger(AzureExt.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<ReadmeHttpFunction>(nameof(ReadmeHttpFunction.Run)).Call())
             .Build();
 
         TimelineRun run = await timeline.SetupRun(runtime.ServiceProvider).RunAsync();
@@ -130,7 +130,7 @@ public class ReadmeSamplesTests
 
         Timeline timeline = Timeline.Create()
             .Trigger(
-                AzureTF.Trigger.FunctionApp.Http("Default")
+                AzureExt.Trigger.FunctionApp.Http("Default")
                     .SelectEndpoint(Var.Const("orders/42"), Var.Const(HttpMethod.Post))
                     .WithHeader(Var.Const("x-correlation-id"), Var.Const("order-42"))
                     .WithHeaders(Var.Const(new Dictionary<string, string> { ["x-tenant"] = "lab" }))
@@ -147,15 +147,15 @@ public class ReadmeSamplesTests
         Assert.Equal("function-key", Assert.Single(sender.Request.Headers.GetValues("x-functions-key")));
         Assert.Equal("order-42", Assert.Single(sender.Request.Headers.GetValues("x-correlation-id")));
         Assert.Equal("lab", Assert.Single(sender.Request.Headers.GetValues("x-tenant")));
-        Assert.Equal("{\"id\":42}", await sender.Request.Content!.ReadAsStringAsync());
+        Assert.Equal("{\"id\":42}", Assert.Single(sender.RequestBodies));
     }
 
     [Fact]
     public void ServiceBusQueueSendWait_BuildsQueueSendAndReceiveSteps()
     {
         Timeline timeline = Timeline.Create()
-            .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBQueue", new ServiceBusMessage("Test message") { CorrelationId = "order-42" }))
-            .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived("MainSBQueue", correlationId: "order-42", completeMessage: true))
+            .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBQueue", new ServiceBusMessage("Test message") { CorrelationId = "order-42" }))
+            .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBQueue", correlationId: "order-42", completeMessage: true))
                 .WithTimeOut(TimeSpan.FromSeconds(10))
             .Build();
 
@@ -165,11 +165,11 @@ public class ReadmeSamplesTests
     [Fact]
     public void ServiceBusTopicTempSubscriptionWait_CreatesPreAndCleanupSteps()
     {
-        ServiceBusProcessEvent receiveEvent = AzureTF.Event.ServiceBus.MessageReceived("MainSBTopic", correlationId: "topic-1234", createTempSubscription: true, completeMessage: true);
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("MainSBTopic", correlationId: "topic-1234", createTempSubscription: true, completeMessage: true);
         Timeline timeline = Timeline.Create()
             .WaitForEvent(receiveEvent)
                 .WithTimeOut(TimeSpan.FromSeconds(10))
-            .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBTopic", new ServiceBusMessage("Test message") { CorrelationId = "topic-1234" }))
+            .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBTopic", new ServiceBusMessage("Test message") { CorrelationId = "topic-1234" }))
             .Build();
 
         Assert.NotNull(timeline);
@@ -207,7 +207,7 @@ public class ReadmeSamplesTests
 
         Timeline timeline = Timeline.Create()
             .Trigger(
-                AzureTF.Trigger.LogicApp.Http("logic")
+                AzureExt.Trigger.LogicApp.Http("logic")
                     .Workflow("StatelessOrders")
                     .Manual()
                     .WithBody(Var.Const("{\"id\":42}"))
@@ -258,7 +258,7 @@ public class ReadmeSamplesTests
     [Fact]
     public void FindDataArtifact_CreatesCosmosQueryFinderFromReadmeSample()
     {
-        object finder = AzureTF.ArtifactFinder.DB.CosmosQuery<ReadmeCosmosItem>(
+        object finder = AzureExt.ArtifactFinder.DB.CosmosQuery<ReadmeCosmosItem>(
             "MainDb",
             new QueryDefinition("SELECT * FROM c WHERE c.number = 1"));
 

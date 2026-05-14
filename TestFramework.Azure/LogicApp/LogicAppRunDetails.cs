@@ -1,3 +1,5 @@
+using TestFramework.Core.Steps;
+
 namespace TestFramework.Azure.LogicApp;
 
 /// <summary>
@@ -15,4 +17,4 @@ public sealed record LogicAppRunDetails(
     LogicAppRunStatus Status,
     string? Code,
     string? OutputsJson,
-    string RawJson);
+    string RawJson) : StepResultContext;

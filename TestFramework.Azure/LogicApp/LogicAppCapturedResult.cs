@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Net;
+using TestFramework.Core.Steps;
 
 namespace TestFramework.Azure.LogicApp;
 
@@ -24,7 +25,16 @@ public sealed record LogicAppCapturedResult(
     HttpStatusCode StatusCode,
     LogicAppRunStatus Status,
     string ResponseBody,
-    IReadOnlyDictionary<string, string[]> ResponseHeaders)
+    IReadOnlyDictionary<string, string[]> ResponseHeaders) : StepResultContext
 {
+    /// <summary>
+    /// Creates an explicit run-tracking context for the captured Logic App invocation.
+    /// </summary>
+    internal LogicAppRunContext RunContext => new(
+        WorkflowName,
+        !string.IsNullOrWhiteSpace(RunId)
+            ? RunId
+            : throw new InvalidOperationException("The Logic App capture result does not contain a workflow run id."));
+
     internal static IReadOnlyDictionary<string, string[]> EmptyHeaders { get; } = new ReadOnlyDictionary<string, string[]>(new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase));
 }

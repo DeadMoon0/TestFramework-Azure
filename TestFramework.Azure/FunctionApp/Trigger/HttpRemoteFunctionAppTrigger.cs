@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
+using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
@@ -19,7 +20,7 @@ using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.FunctionApp.Trigger;
 
-internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier, VariableReference<TriggerHttpRouting> trigger, VariableReference<CommonHttpRequest> request) : Step<HttpResponseMessage>, IHasEnvironmentRequirements
+internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier, VariableReference<TriggerHttpRouting> trigger, VariableReference<CommonHttpRequest> request) : Step<HttpResponseResultContext>, IHasEnvironmentRequirements
 {
     public override string Name => "Http Remote FunctionApp Trigger";
 
@@ -27,12 +28,12 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
 
     public override bool DoesReturn => true;
 
-    public override Step<HttpResponseMessage> Clone()
+    public override Step<HttpResponseResultContext> Clone()
     {
         return new HttpRemoteFunctionAppTrigger(appIdentifier, trigger, request).WithClonedOptions(this);
     }
 
-    public override async Task<HttpResponseMessage?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<HttpResponseResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         var _trigger = trigger.GetRequiredValue(variableStore);
         var _request = request.GetRequiredValue(variableStore);
@@ -44,7 +45,7 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         Uri fullTriggerUri = new Uri(remoteConnection.BasePath, _trigger.Path);
         IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
 
-        return await SendWithLocalWarmupRetryAsync(
+        using HttpResponseMessage response = await SendWithLocalWarmupRetryAsync(
             sender,
             fullTriggerUri,
             _trigger.Method,
@@ -52,6 +53,8 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
             functionConfig,
             config,
             cancellationToken).ConfigureAwait(false);
+
+        return await HttpResponseResultContext.FromHttpResponseAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<HttpResponseMessage> SendWithLocalWarmupRetryAsync(
@@ -91,8 +94,8 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         || string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)
         || string.Equals(uri.Host, "host.docker.internal", StringComparison.OrdinalIgnoreCase);
 
-    public override StepInstance<Step<HttpResponseMessage>, HttpResponseMessage> GetInstance() =>
-        new StepInstance<Step<HttpResponseMessage>, HttpResponseMessage>(this);
+    public override StepInstance<Step<HttpResponseResultContext>, HttpResponseResultContext> GetInstance() =>
+        new StepInstance<Step<HttpResponseResultContext>, HttpResponseResultContext>(this);
 
     public override void DeclareIO(StepIOContract contract)
     {

@@ -12,6 +12,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.FunctionApp.InProcessProxies;
+using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
@@ -24,18 +25,18 @@ namespace TestFramework.Azure.FunctionApp.Trigger;
 internal class InProcessHttpFunctionAppTrigger<TFunction>(
     Func<TFunction, FunctionAppHttpInProcessCallProxy, Task<IActionResult?>> action,
     VariableReference<CommonHttpRequest> request)
-    : Step<HttpResponseMessage>
+    : Step<HttpResponseResultContext>
     where TFunction : notnull
 {
     public override string Name => "In-Process Http FunctionApp Trigger";
     public override string Description => $"Directly invokes {typeof(TFunction).Name} in-process";
     public override bool DoesReturn => true;
 
-    public override Step<HttpResponseMessage> Clone() =>
+    public override Step<HttpResponseResultContext> Clone() =>
         new InProcessHttpFunctionAppTrigger<TFunction>(action, request).WithClonedOptions(this);
 
-    public override StepInstance<Step<HttpResponseMessage>, HttpResponseMessage> GetInstance() =>
-        new StepInstance<Step<HttpResponseMessage>, HttpResponseMessage>(this);
+    public override StepInstance<Step<HttpResponseResultContext>, HttpResponseResultContext> GetInstance() =>
+        new StepInstance<Step<HttpResponseResultContext>, HttpResponseResultContext>(this);
 
     public override void DeclareIO(StepIOContract contract)
     {
@@ -43,7 +44,7 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
             contract.Inputs.Add(new StepIOEntry(request.Identifier!.Identifier, StepIOKind.Variable, true, typeof(CommonHttpRequest)));
     }
 
-    public override async Task<HttpResponseMessage?> Execute(
+    public override async Task<HttpResponseResultContext?> Execute(
         IServiceProvider serviceProvider,
         VariableStore variableStore,
         ArtifactStore artifactStore,
@@ -83,7 +84,8 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
         FunctionAppHttpInProcessCallProxy proxy = new(httpRequest, serviceProvider, variableStore);
         IActionResult? result = await action(functionInstance, proxy);
 
-        return ConvertToHttpResponseMessage(result);
+        using HttpResponseMessage response = ConvertToHttpResponseMessage(result);
+        return await HttpResponseResultContext.FromHttpResponseAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
     private static HttpResponseMessage ConvertToHttpResponseMessage(IActionResult? result)

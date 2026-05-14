@@ -42,7 +42,7 @@
 | Priority | Goal | Description |
 |----------|------|-------------|
 | 1 | **Full Azure coverage** | Blob, Table, Cosmos, SQL, ServiceBus, FunctionApp as first-class citizens |
-| 2 | **Fluent API** | `AzureTF.Trigger.FunctionApp.Http(…)` — readable, type-safe, IDE-friendly |
+| 2 | **Fluent API** | `AzureExt.Trigger.FunctionApp.Http(…)` — readable, type-safe, IDE-friendly |
 | 3 | **Automatic lifecycle** | Artifacts are automatically torn down after the test |
 | 4 | **Identifier-based config** | Multiple instances of the same service type can be configured in parallel |
 | 5 | **Isolation** | Service Bus tests use temporary subscriptions with server-side filtering |
@@ -99,7 +99,7 @@ C4Context
     System_Ext(sb, "Azure Service Bus", "Queues & topics")
     System_Ext(func, "Azure Functions", "Serverless compute")
 
-    Rel(dev, azure_tf, "Defines tests with AzureTF.*")
+    Rel(dev, azure_tf, "Defines tests with AzureExt.*")
     Rel(azure_tf, core, "Implements Steps, Artifacts, Events")
     Rel(azure_tf, config, "Loads configs via ConfigInstance")
     Rel(azure_tf, blob, "Upload / Download / Delete")
@@ -116,7 +116,7 @@ C4Context
 ```mermaid
 graph TB
     subgraph TestFramework.Azure
-        ATF[AzureTF static API]
+        ATF[AzureExt static API]
         CFG[Configuration]
         TRG[Triggers]
         ART[Artifacts]
@@ -156,7 +156,7 @@ graph TB
 
 | Decision | Rationale |
 |----------|-----------|
-| **Static entry-point `AzureTF`** | Single discoverable API surface — `AzureTF.Trigger.*`, `AzureTF.Artifact.*`, etc. |
+| **Static entry-point `AzureExt`** | Single discoverable API surface — `AzureExt.Trigger.*`, `AzureExt.Artifact.*`, etc. |
 | **Identifier pattern** | Each Azure service instance is addressed by an identifier → multiple instances in parallel |
 | **Artifact triple (Reference/Data/Describer)** | Reuses the Core CRTP pattern per Azure service |
 | **Staged builder for Function App HTTP** | Interface-based stages prevent incomplete configurations |
@@ -172,7 +172,7 @@ graph TB
 ```mermaid
 graph TB
     subgraph TestFramework.Azure
-        ATF[AzureTF]
+        ATF[AzureExt]
         subgraph Triggers
             FHTTP[HttpRemoteFunctionAppTrigger]
             FMAN[ManagedRemoteFunctionAppTrigger]
@@ -212,11 +212,11 @@ graph TB
     ATF --> TBLF
 ```
 
-### 5.2 AzureTF — Static API Structure
+### 5.2 AzureExt — Static API Structure
 
 ```mermaid
 classDiagram
-    class AzureTF {
+    class AzureExt {
         <<static>>
         +TriggerProxy Trigger
         +ArtifactProxy Artifact
@@ -242,11 +242,11 @@ classDiagram
     class ServiceBusEventProxy {
         +MessageReceived(id, ...) ServiceBusProcessEvent
     }
-    AzureTF --> FunctionAppTriggerProxy
-    AzureTF --> ServiceBusTriggerProxy
-    AzureTF --> DbArtifactProxy
-    AzureTF --> StorageAccountArtifactProxy
-    AzureTF --> ServiceBusEventProxy
+    AzureExt --> FunctionAppTriggerProxy
+    AzureExt --> ServiceBusTriggerProxy
+    AzureExt --> DbArtifactProxy
+    AzureExt --> StorageAccountArtifactProxy
+    AzureExt --> ServiceBusEventProxy
 ```
 
 ### 5.3 Artifact Implementations per Azure Service
@@ -429,7 +429,7 @@ sequenceDiagram
     participant TR as TimelineRun
 
     Test->>TL: .SetupArtifact("input-blob")
-    Test->>TL: .Trigger(AzureTF.Trigger.FunctionApp.Http("myApp")...)
+    Test->>TL: .Trigger(AzureExt.Trigger.FunctionApp.Http("myApp")...)
     Test->>TL: .RegisterArtifact("output-doc", cosmosRef)
     Test->>TL: .CaptureArtifactVersion("output-doc")
     Test->>TL: .Build() + .SetupRun() + .RunAsync()
@@ -640,7 +640,7 @@ public record StorageAccountIdentifier(string Identifier)
 | **Ping check** | Optional | Optional | Not needed |
 | **Debugging** | Not possible | Not possible | Full breakpoint debugging |
 | **Prerequisite** | Deployed + online | Deployed + online + AdminCode | Project reference to FunctionApp |
-| **Builder** | `AzureTF.Trigger.FunctionApp.Http(id)` | `AzureTF.Trigger.FunctionApp.Managed<T>(id, method)` | `AzureTF.Trigger.FunctionApp.InProcessHttp<T>(action)` |
+| **Builder** | `AzureExt.Trigger.FunctionApp.Http(id)` | `AzureExt.Trigger.FunctionApp.Managed<T>(id, method)` | `AzureExt.Trigger.FunctionApp.InProcessHttp<T>(action)` |
 
 ### 8.4 Supported IActionResult Types (InProcess)
 
@@ -692,7 +692,7 @@ stateDiagram-v2
 
 Register `ICosmosClientOptionsProvider` or call `ConfigureCosmosClientOptions(...)` to customize `CosmosClientOptions` for Cosmos SDK behavior.
 
-`AzureTF.Trigger.IsLive.Cosmos(...)` does not use a separate Cosmos config timeout. It uses the normal step timeout configured by the timeline, for example `.WithTimeOut(...)` on the builder.
+`AzureExt.Trigger.IsLive.Cosmos(...)` does not use a separate Cosmos config timeout. It uses the normal step timeout configured by the timeline, for example `.WithTimeOut(...)` on the builder.
 
 ### 8.8 SQL Migration Tracking
 
@@ -729,9 +729,9 @@ stateDiagram-v2
 
 **Context:** The Azure API must be easy to discover without needing to know which extension methods exist.
 
-**Decision:** `AzureTF` as a static class with nested proxy classes.
+**Decision:** `AzureExt` as a static class with nested proxy classes.
 
-**Consequence:** Auto-complete immediately shows `AzureTF.Trigger.*`, `AzureTF.Artifact.*`, etc. Trade-off: not extensible by third parties without modifying the class.
+**Consequence:** Auto-complete immediately shows `AzureExt.Trigger.*`, `AzureExt.Artifact.*`, etc. Trade-off: not extensible by third parties without modifying the class.
 
 ### ADR-2: VariableReference for Dynamic Artifact Identifiers
 
@@ -783,7 +783,7 @@ mindmap
       Identifier pattern is extensible
       IConfigProvider is swappable
     Usability
-      AzureTF fluent API
+    AzureExt fluent API
       Staged builder for Functions
       JSON configuration
     Testability
@@ -796,7 +796,7 @@ mindmap
 
 | Scenario | Goal | Expected behaviour |
 |----------|------|--------------------|
-| Write new Cosmos test | Usability | `AzureTF.Artifact.DB.CosmosRef<T>(…)` returns type-safe ref; describer handles upsert/delete |
+| Write new Cosmos test | Usability | `AzureExt.Artifact.DB.CosmosRef<T>(…)` returns type-safe ref; describer handles upsert/delete |
 | Test blob not cleaned up | Reliability | Cleanup stage calls `BlobClient.DeleteAsync()` for every artifact that was set up |
 | Add new SQL database | Maintainability | Only add a config section entry; optionally register a DbContext |
 | Service Bus test interferes | Testability | Temp subscription with CorrelationId filter isolates the test |
@@ -822,7 +822,7 @@ mindmap
 
 | Term | Definition |
 |------|-----------|
-| **AzureTF** | Static entry-point class for all Azure operations |
+| **AzureExt** | Static entry-point class for all Azure operations |
 | **Identifier** | Strongly typed name for an Azure service instance (e.g. `"MainStorage"`) — maps to a JSON config section |
 | **ConfigStore\<T\>** | Dictionary of configs for one service type, keyed by identifier |
 | **Trigger** | Step that initiates an action in Azure (Function HTTP call, send Service Bus message) |
@@ -916,7 +916,7 @@ var serviceProvider = ConfigInstance
 [Fact]
 public async Task Blob_Upload_And_Verify()
 {
-    var blobRef  = AzureTF.Artifact.StorageAccount.BlobRef("MainStorage", Var.Const("test/sample.json"));
+    var blobRef  = AzureExt.Artifact.StorageAccount.BlobRef("MainStorage", Var.Const("test/sample.json"));
     var blobData = new StorageAccountBlobArtifactData(
         Encoding.UTF8.GetBytes("{\"key\": \"value\"}"),
         new Dictionary<string, string> { ["version"] = "1.0" });
@@ -942,7 +942,7 @@ public async Task Blob_Upload_And_Verify()
 [Fact]
 public async Task Function_HTTP_Trigger()
 {
-    var trigger = AzureTF.Trigger.FunctionApp.Http("MainFunc")
+    var trigger = AzureExt.Trigger.FunctionApp.Http("MainFunc")
         .SelectEndpoint("/api/process", HttpMethod.Post)
         .WithBody("{\"input\": \"test\"}")
         .Call();
@@ -967,12 +967,12 @@ public async Task ServiceBus_Queue_Send_Receive()
     var correlationId = Guid.NewGuid().ToString();
 
     var timeline = Timeline.Create()
-        .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived(
+        .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived(
             "MainSBQueue",
             correlationId: correlationId,
             completeMessage: true))
             .WithTimeOut(TimeSpan.FromMinutes(2))
-        .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBQueue",
+        .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBQueue",
             new ServiceBusMessage("payload") { CorrelationId = correlationId }))
         .Build();
 
@@ -990,13 +990,13 @@ public async Task ServiceBus_Topic_Send_Receive_With_Temp_Subscription()
     var correlationId = Guid.NewGuid().ToString();
 
     var timeline = Timeline.Create()
-        .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived(
+        .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived(
             "MainSBTopic",
             correlationId: correlationId,
             createTempSubscription: true,
             completeMessage: true))
             .WithTimeOut(TimeSpan.FromMinutes(2))
-        .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBTopic",
+        .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBTopic",
             new ServiceBusMessage("payload") { CorrelationId = correlationId }))
         .Build();
 
@@ -1014,7 +1014,7 @@ public record MyItem(string id, string partitionKey, string Name);
 public async Task Cosmos_Item_Lifecycle()
 {
     var itemId    = Guid.NewGuid().ToString();
-    var cosmosRef = AzureTF.Artifact.DB.CosmosRef<MyItem>("MainDb", itemId, itemId);
+    var cosmosRef = AzureExt.Artifact.DB.CosmosRef<MyItem>("MainDb", itemId, itemId);
     var cosmosData = new CosmosDbItemArtifactData<MyItem>(new MyItem(itemId, itemId, "TestItem"));
 
     var timeline = Timeline.Create()
@@ -1043,7 +1043,7 @@ services.AddSqlArtifactContexts(registry =>
 });
 
 // 2. Use in a test
-var sqlRef  = AzureTF.Artifact.DB.SqlRef<OrderEntity>("MainSql", orderId.ToString());
+var sqlRef  = AzureExt.Artifact.DB.SqlRef<OrderEntity>("MainSql", orderId.ToString());
 var sqlData = new SqlRowArtifactData<OrderEntity>(new OrderEntity { Id = orderId, Name = "TestOrder" });
 
 var timeline = Timeline.Create()
@@ -1061,7 +1061,7 @@ var timeline = Timeline.Create()
 [Fact]
 public async Task Function_InProcess_Debug()
 {
-    var trigger = AzureTF.Trigger.FunctionApp
+    var trigger = AzureExt.Trigger.FunctionApp
         .InProcessHttp<MyFunction>(async proxy =>
         {
             var func = new MyFunction(proxy.GetService<IMyService>()!);
@@ -1087,7 +1087,7 @@ public async Task E2E_Blob_Function_Cosmos()
 
     var timeline = Timeline.Create("E2E")
         .SetupArtifact("inputBlob")
-        .Trigger(AzureTF.Trigger.FunctionApp.Http("MainFunc")
+        .Trigger(AzureExt.Trigger.FunctionApp.Http("MainFunc")
             .SelectEndpoint($"/api/process?blob={blobPath}", HttpMethod.Post)
             .Call())
             .WithTimeOut(TimeSpan.FromMinutes(2))

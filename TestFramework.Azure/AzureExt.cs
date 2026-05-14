@@ -27,7 +27,7 @@ namespace TestFramework.Azure;
 /// <summary>
 /// Entry point for the Azure-specific TestFramework DSL.
 /// </summary>
-public static class AzureTF
+public static class AzureExt
 {
     /// <summary>
     /// Access Azure triggers and liveness checks.

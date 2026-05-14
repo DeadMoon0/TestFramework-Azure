@@ -1,5 +1,6 @@
 ﻿using Azure.Data.Tables;
 using System.Collections.Generic;
+using System.Text;
 using TestFramework.Azure.DB.CosmosDB;
 using TestFramework.Azure.DB.SqlServer;
 using TestFramework.Azure.Identifier;
@@ -109,6 +110,30 @@ public static class AzureArtifactExtension
         => run.Artifact<StorageAccountBlobArtifactData>(identifier);
 
     /// <summary>
+    /// Returns the latest blob payload bytes as a value handle.
+    /// </summary>
+    public static ValueHandle<byte[]> Bytes(this ArtifactHandle<StorageAccountBlobArtifactData> handle)
+        => handle.Select(data => data.Data);
+
+    /// <summary>
+    /// Returns the latest blob payload decoded as UTF-8 text.
+    /// </summary>
+    public static ValueHandle<string> Utf8Text(this ArtifactHandle<StorageAccountBlobArtifactData> handle)
+        => handle.Select(data => Encoding.UTF8.GetString(data.Data));
+
+    /// <summary>
+    /// Returns the latest blob metadata snapshot.
+    /// </summary>
+    public static ValueHandle<IReadOnlyDictionary<string, string>> Metadata(this ArtifactHandle<StorageAccountBlobArtifactData> handle)
+        => handle.Select(data => data.MetaData);
+
+    /// <summary>
+    /// Returns a single metadata value from the latest blob snapshot.
+    /// </summary>
+    public static ValueHandle<string> Metadata(this ArtifactHandle<StorageAccountBlobArtifactData> handle, string key)
+        => handle.Select(data => data.MetaData[key]);
+
+    /// <summary>
     /// Returns an assertion handle for a Cosmos artifact in a completed run.
     /// </summary>
     /// <typeparam name="TItem">The Cosmos item type.</typeparam>
@@ -119,6 +144,18 @@ public static class AzureArtifactExtension
         => run.Artifact<CosmosDbItemArtifactData<TItem>>(identifier);
 
     /// <summary>
+    /// Returns the latest Cosmos item as a value handle.
+    /// </summary>
+    public static ValueHandle<TItem> Item<TItem>(this ArtifactHandle<CosmosDbItemArtifactData<TItem>> handle)
+        => handle.Select(data => data.Item);
+
+    /// <summary>
+    /// Projects the latest Cosmos item to a specific value.
+    /// </summary>
+    public static ValueHandle<TValue> Item<TItem, TValue>(this ArtifactHandle<CosmosDbItemArtifactData<TItem>> handle, System.Func<TItem, TValue> selector)
+        => handle.Item().Select(selector);
+
+    /// <summary>
     /// Returns an assertion handle for a table artifact in a completed run.
     /// </summary>
     /// <typeparam name="T">The table entity type.</typeparam>
@@ -127,6 +164,18 @@ public static class AzureArtifactExtension
     /// <returns>An assertion handle for the table artifact.</returns>
     public static ArtifactHandle<TableStorageEntityArtifactData<T>> TableArtifact<T>(this TimelineRun run, ArtifactIdentifier identifier) where T : class, ITableEntity
         => run.Artifact<TableStorageEntityArtifactData<T>>(identifier);
+
+    /// <summary>
+    /// Returns the latest table entity as a value handle.
+    /// </summary>
+    public static ValueHandle<T> Entity<T>(this ArtifactHandle<TableStorageEntityArtifactData<T>> handle) where T : class, ITableEntity
+        => handle.Select(data => data.Entity);
+
+    /// <summary>
+    /// Projects the latest table entity to a specific value.
+    /// </summary>
+    public static ValueHandle<TValue> Entity<T, TValue>(this ArtifactHandle<TableStorageEntityArtifactData<T>> handle, System.Func<T, TValue> selector) where T : class, ITableEntity
+        => handle.Entity().Select(selector);
 
     // ── SQL ──────────────────────────────────────────────────────────────────
 
@@ -162,4 +211,16 @@ public static class AzureArtifactExtension
     /// <returns>An assertion handle for the SQL artifact.</returns>
     public static ArtifactHandle<SqlRowArtifactData<T>> SqlArtifact<T>(this TimelineRun run, ArtifactIdentifier identifier) where T : class
         => run.Artifact<SqlRowArtifactData<T>>(identifier);
+
+    /// <summary>
+    /// Returns the latest SQL row as a value handle.
+    /// </summary>
+    public static ValueHandle<T> Row<T>(this ArtifactHandle<SqlRowArtifactData<T>> handle) where T : class
+        => handle.Select(data => data.Row);
+
+    /// <summary>
+    /// Projects the latest SQL row to a specific value.
+    /// </summary>
+    public static ValueHandle<TValue> Row<T, TValue>(this ArtifactHandle<SqlRowArtifactData<T>> handle, System.Func<T, TValue> selector) where T : class
+        => handle.Row().Select(selector);
 }

@@ -30,8 +30,8 @@ If you are new to the Azure package, learn it in this order:
 
 Recommended first flows:
 
-- Function App: `AzureTF.Trigger.FunctionApp.Http("Default") ... .Call()`
-- Service Bus: send with `AzureTF.Trigger.ServiceBus.Send(...)`, then wait with `AzureTF.Event.ServiceBus.MessageReceived(...)`
+- Function App: `AzureExt.Trigger.FunctionApp.Http("Default") ... .Call()`
+- Service Bus: send with `AzureExt.Trigger.ServiceBus.Send(...)`, then wait with `AzureExt.Event.ServiceBus.MessageReceived(...)`
 - Logic App: use `CallAndCapture()` for stateless workflows, `Call()` plus `RunCompleted(...)` for stateful workflows
 - Data systems: start with one artifact or one finder against a single named identifier before composing larger end-to-end scenarios
 
@@ -162,7 +162,7 @@ using TestFramework.Azure;
 using TestFramework.Core.Timelines;
 
 Timeline timeline = Timeline.Create()
-    .Trigger(AzureTF.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<HttpTests>(nameof(HttpTests.Run)).Call())
+    .Trigger(AzureExt.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<HttpTests>(nameof(HttpTests.Run)).Call())
     .Build();
 
 TimelineRun run = await timeline.SetupRun(config.BuildServiceProvider()).RunAsync();
@@ -174,7 +174,7 @@ run.EnsureRanToCompletion();
 
 ## Function App Execution Modes
 
-`AzureTF.Trigger.FunctionApp` exposes three different execution styles:
+`AzureExt.Trigger.FunctionApp` exposes three different execution styles:
 
 | Mode | Use when | Runtime dependency | Typical benefit |
 |------|----------|--------------------|-----------------|
@@ -200,7 +200,7 @@ Example with explicit path, body, and headers:
 ```csharp
 Timeline timeline = Timeline.Create()
     .Trigger(
-        AzureTF.Trigger.FunctionApp.Http("Default")
+        AzureExt.Trigger.FunctionApp.Http("Default")
             .SelectEndpoint(Var.Const("orders/42"), Var.Const(HttpMethod.Post))
             .WithHeader(Var.Const("x-correlation-id"), Var.Const("order-42"))
             .WithHeaders(Var.Const(new Dictionary<string, string> { ["x-tenant"] = "lab" }))
@@ -214,7 +214,7 @@ Example with the default Function App route prefix:
 ```csharp
 Timeline timeline = Timeline.Create()
     .Trigger(
-        AzureTF.Trigger.FunctionApp.Http("Default")
+        AzureExt.Trigger.FunctionApp.Http("Default")
             .SelectFunction("HttpEchoTest", HttpMethod.Post)
             .WithBody(Var.Const("payload"))
             .Call())
@@ -232,7 +232,7 @@ using TestFramework.Core.Variables;
 
 Timeline timeline = Timeline.Create()
     .Trigger(
-        AzureTF.Trigger.LogicApp.Http("logic")
+        AzureExt.Trigger.LogicApp.Http("logic")
             .Workflow("StatelessOrders")
             .Manual()
             .WithBody(Var.Const("{\"id\":42}"))
@@ -259,14 +259,15 @@ using TestFramework.Azure.LogicApp;
 
 Timeline timeline = Timeline.Create()
     .Trigger(
-        AzureTF.Trigger.LogicApp.Http("ConsumptionOrders")
+        AzureExt.Trigger.LogicApp.Http("ConsumptionOrders")
             .Workflow("OrderProcessor")
             .Manual()
             .WithBody(Var.Const("{\"id\":42}"))
             .CallForRunContext())
-    .CaptureResultAs<LogicAppRunContext>("logicRun")
+    .Name("logic-call")
+    .GetRunContext("logicRun")
     .WaitForEvent(
-        AzureTF.Event.LogicApp.RunCompleted(
+        AzureExt.Event.LogicApp.RunCompleted(
             "ConsumptionOrders",
             Var.Ref<LogicAppRunContext>("logicRun")))
     .Build();
@@ -289,7 +290,7 @@ Use `CallAndCapture()` when the Consumption workflow is effectively stateless an
 |------|-----------------|-------|
 | Queue | `ConnectionString`, `QueueName` | `SubscriptionName` must be omitted. Works with session and non-session queues. |
 | Topic + subscription | `ConnectionString`, `TopicName`, `SubscriptionName` | Use when the test should receive from a fixed subscription. |
-| Topic + temp subscription | `ConnectionString`, `TopicName` | Call `AzureTF.Event.ServiceBus.MessageReceived(..., createTempSubscription: true)` to create and clean up a filtered temp subscription automatically. |
+| Topic + temp subscription | `ConnectionString`, `TopicName` | Call `AzureExt.Event.ServiceBus.MessageReceived(..., createTempSubscription: true)` to create and clean up a filtered temp subscription automatically. |
 
 ## Sample: Service Bus Queue Send + Wait
 
@@ -299,8 +300,8 @@ using TestFramework.Azure;
 using TestFramework.Core.Timelines;
 
 Timeline timeline = Timeline.Create()
-    .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBQueue", new ServiceBusMessage("Test message") { CorrelationId = "order-42" }))
-    .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived("MainSBQueue", correlationId: "order-42", completeMessage: true))
+    .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBQueue", new ServiceBusMessage("Test message") { CorrelationId = "order-42" }))
+    .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBQueue", correlationId: "order-42", completeMessage: true))
         .WithTimeOut(TimeSpan.FromSeconds(10))
     .Build();
 ```
@@ -309,9 +310,9 @@ Timeline timeline = Timeline.Create()
 
 ```csharp
 Timeline timeline = Timeline.Create()
-    .WaitForEvent(AzureTF.Event.ServiceBus.MessageReceived("MainSBTopic", correlationId: "topic-1234", createTempSubscription: true, completeMessage: true))
+    .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBTopic", correlationId: "topic-1234", createTempSubscription: true, completeMessage: true))
         .WithTimeOut(TimeSpan.FromSeconds(10))
-    .Trigger(AzureTF.Trigger.ServiceBus.Send("MainSBTopic", new ServiceBusMessage("Test message") { CorrelationId = "topic-1234" }))
+    .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBTopic", new ServiceBusMessage("Test message") { CorrelationId = "topic-1234" }))
     .Build();
 ```
 
@@ -319,7 +320,7 @@ Timeline timeline = Timeline.Create()
 
 Use `ConfigureCosmosClientOptions(...)` when you need to customize the underlying Cosmos SDK client.
 
-For `AzureTF.Trigger.IsLive.Cosmos(...)`, timeout control comes from the normal timeline step timeout, for example via `.WithTimeOut(...)` on the builder. The optional `AlivenessLevel` lets you choose whether the check should stop at endpoint reachability, account authentication, or require the configured container to exist.
+For `AzureExt.Trigger.IsLive.Cosmos(...)`, timeout control comes from the normal timeline step timeout, for example via `.WithTimeOut(...)` on the builder. The optional `AlivenessLevel` lets you choose whether the check should stop at endpoint reachability, account authentication, or require the configured container to exist.
 
 ```csharp
 using Microsoft.Azure.Cosmos;
@@ -341,7 +342,7 @@ ConfigInstance config = ConfigInstance.FromJsonFile("local.testSettings.json")
     .Build();
 
 Timeline timeline = Timeline.Create()
-    .Trigger(AzureTF.Trigger.IsLive.Cosmos("MainDb", AlivenessLevel.Authenticated))
+    .Trigger(AzureExt.Trigger.IsLive.Cosmos("MainDb", AlivenessLevel.Authenticated))
         .WithTimeOut(TimeSpan.FromSeconds(5))
     .Build();
 ```
@@ -355,7 +356,7 @@ using TestFramework.Azure;
 Timeline timeline = Timeline.Create()
     .FindArtifacts(
         "cosmosItemQuery",
-        AzureTF.ArtifactFinder.DB.CosmosQuery<MyCosmosItem>(
+        AzureExt.ArtifactFinder.DB.CosmosQuery<MyCosmosItem>(
             "MainDb",
             new QueryDefinition("SELECT * FROM c WHERE c.number = 1")))
     .Build();

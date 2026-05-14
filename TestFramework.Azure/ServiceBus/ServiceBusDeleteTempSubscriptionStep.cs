@@ -18,19 +18,19 @@ namespace TestFramework.Azure.ServiceBus;
 
 internal class ServiceBusDeleteTempSubscriptionStep(
     ServiceBusIdentifier identifier,
-    string tempSubscriptionName) : Step<object?>
+    string tempSubscriptionName) : Step<EmptyStepResultContext>
 {
     public override string Name => "ServiceBus Delete Temp Subscription";
     public override string Description => $"Deletes the temporary subscription '{tempSubscriptionName}'.";
     public override bool DoesReturn => false;
 
-    public override Step<object?> Clone() =>
+    public override Step<EmptyStepResultContext> Clone() =>
         new ServiceBusDeleteTempSubscriptionStep(identifier, tempSubscriptionName)
             .WithClonedOptions(this);
 
     public override void DeclareIO(StepIOContract contract) { }
 
-    public override async Task<object?> Execute(IServiceProvider serviceProvider, VariableStore variableStore,
+    public override async Task<EmptyStepResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore,
         ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
@@ -51,6 +51,6 @@ internal class ServiceBusDeleteTempSubscriptionStep(
         return null;
     }
 
-    public override StepInstance<Step<object?>, object?> GetInstance() =>
-        new StepInstance<Step<object?>, object?>(this);
+    public override StepInstance<Step<EmptyStepResultContext>, EmptyStepResultContext> GetInstance() =>
+        new StepInstance<Step<EmptyStepResultContext>, EmptyStepResultContext>(this);
 }

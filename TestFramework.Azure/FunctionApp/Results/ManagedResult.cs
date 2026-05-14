@@ -1,11 +1,12 @@
 ﻿using System.Net;
+using TestFramework.Core.Steps;
 
 namespace TestFramework.Azure.FunctionApp.Results;
 
 /// <summary>
 /// Captures the HTTP-style result produced by a managed Function App invocation.
 /// </summary>
-public class ManagedResult
+public sealed record ManagedResult : StepResultContext
 {
     /// <summary>
     /// The status code returned by the invoked function.
