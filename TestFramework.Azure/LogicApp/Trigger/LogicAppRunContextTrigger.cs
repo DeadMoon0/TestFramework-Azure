@@ -14,6 +14,8 @@ namespace TestFramework.Azure.LogicApp.Trigger;
 internal sealed class LogicAppRunContextTrigger(Step<LogicAppTriggerResult> inner)
     : Step<LogicAppRunContext>, IHasEnvironmentRequirements
 {
+    public override StepExecutionPhase Phase => inner.Phase;
+
     public override string Name => inner.Name + " Run Context";
 
     public override string Description => inner.Description + " Returns the explicit workflow/run identity for stateful polling.";

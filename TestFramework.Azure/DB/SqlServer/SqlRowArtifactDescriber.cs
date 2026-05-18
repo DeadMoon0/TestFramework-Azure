@@ -16,6 +16,22 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
     where TRow : class
 {
     /// <summary>
+    /// Serializes setup work for SQL row artifacts by shared database resource.
+    /// </summary>
+    public override ArtifactSetupParallelizationMode SetupParallelization => ArtifactSetupParallelizationMode.SerializeByArtifactType;
+
+    /// <summary>
+    /// Groups setup work by SQL database so multiple rows targeting the same DbContext do not execute concurrently.
+    /// </summary>
+    public override string? GetSetupParallelizationResourceKey(ArtifactInstanceGeneric artifactInstance)
+    {
+        if (artifactInstance.Reference is not SqlRowArtifactReference<TRow> reference)
+            return base.GetSetupParallelizationResourceKey(artifactInstance);
+
+        return $"sql-row:{reference.DbIdentifier}";
+    }
+
+    /// <summary>
     /// Ensures the referenced row exists during artifact setup.
     /// </summary>
     public override async Task Setup(IServiceProvider serviceProvider, SqlRowArtifactData<TRow> data, SqlRowArtifactReference<TRow> reference, VariableStore variableStore, ScopedLogger logger)

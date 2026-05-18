@@ -22,6 +22,8 @@ internal class ServiceBusCreateTempSubscriptionStep(
     VariableReference<string>? correlationId,
     TimeSpan timeout) : Step<EmptyStepResultContext>
 {
+    public override StepExecutionPhase Phase => StepExecutionPhase.Prepare;
+
     public override string Name => "ServiceBus Create Temp Subscription";
     public override string Description => $"Creates a temporary subscription '{tempSubscriptionName}' for the duration of the test.";
     public override bool DoesReturn => false;

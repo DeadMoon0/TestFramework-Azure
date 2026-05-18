@@ -100,6 +100,8 @@ public class IsLiveTrigger
 
 internal abstract class AzureIsLiveTriggerBase(VariableReference<AlivenessLevel> alivenessLevel) : Step<EmptyStepResultContext>
 {
+    public override StepExecutionPhase Phase => StepExecutionPhase.Observe;
+
     public override bool DoesReturn => false;
 
     protected VariableReference<AlivenessLevel> AlivenessLevelReference { get; } = alivenessLevel;
