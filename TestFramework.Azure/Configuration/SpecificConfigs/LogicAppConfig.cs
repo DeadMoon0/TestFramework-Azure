@@ -1,3 +1,4 @@
+using System;
 using TestFramework.Azure.LogicApp;
 
 namespace TestFramework.Azure.Configuration.SpecificConfigs;
@@ -30,6 +31,56 @@ public record LogicAppConfig
     /// Settings used when the Logic App is hosted on the Consumption runtime.
     /// </summary>
     public LogicAppConsumptionConfig Consumption { get; init; } = new();
+
+    /// <summary>
+    /// Gets a value indicating whether this Logic App can be invoked directly.
+    /// </summary>
+    public bool SupportsDirectInvocation => HostingMode switch
+    {
+        LogicAppHostingMode.Standard => !string.IsNullOrWhiteSpace(Standard.BaseUrl),
+        LogicAppHostingMode.Consumption => !string.IsNullOrWhiteSpace(Consumption.InvokeUrl),
+        _ => false,
+    };
+
+    /// <summary>
+    /// Gets a value indicating whether this Logic App supports management operations.
+    /// </summary>
+    public bool SupportsManagementOperations => HostingMode switch
+    {
+        LogicAppHostingMode.Standard => !string.IsNullOrWhiteSpace(Standard.BaseUrl),
+        LogicAppHostingMode.Consumption => !string.IsNullOrWhiteSpace(Consumption.WorkflowResourceId),
+        _ => false,
+    };
+
+    internal void EnsureSupportsDirectInvocation(string operationDescription)
+    {
+        if (SupportsDirectInvocation)
+            return;
+
+        throw HostingMode switch
+        {
+            LogicAppHostingMode.Standard => new InvalidOperationException(
+                $"Logic App direct invocation requires '{nameof(Standard)}:{nameof(LogicAppStandardConfig.BaseUrl)}' to {operationDescription}."),
+            LogicAppHostingMode.Consumption => new InvalidOperationException(
+                $"Logic App direct invocation requires '{nameof(Consumption)}:{nameof(LogicAppConsumptionConfig.InvokeUrl)}' to {operationDescription}."),
+            _ => new InvalidOperationException($"Logic App direct invocation is not configured to {operationDescription}."),
+        };
+    }
+
+    internal void EnsureSupportsManagement(string operationDescription)
+    {
+        if (SupportsManagementOperations)
+            return;
+
+        throw HostingMode switch
+        {
+            LogicAppHostingMode.Standard => new InvalidOperationException(
+                $"Logic App management operations require '{nameof(Standard)}:{nameof(LogicAppStandardConfig.BaseUrl)}' to {operationDescription}."),
+            LogicAppHostingMode.Consumption => new InvalidOperationException(
+                $"Logic App management operations require '{nameof(Consumption)}:{nameof(LogicAppConsumptionConfig.WorkflowResourceId)}' to {operationDescription}."),
+            _ => new InvalidOperationException($"Logic App management operations are not configured to {operationDescription}."),
+        };
+    }
 }
 
 /// <summary>

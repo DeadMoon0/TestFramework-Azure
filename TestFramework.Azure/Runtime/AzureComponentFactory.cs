@@ -511,18 +511,22 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
     private sealed class DefaultHttpComponentFactory : IHttpComponentFactory
     {
+        private static readonly HttpClient SharedClient = new()
+        {
+            Timeout = Timeout.InfiniteTimeSpan,
+        };
+
         public IHttpRequestSender CreateSender()
         {
-            return new DefaultHttpRequestSender();
+            return new DefaultHttpRequestSender(SharedClient);
         }
     }
 
-    private sealed class DefaultHttpRequestSender : IHttpRequestSender
+    private sealed class DefaultHttpRequestSender(HttpClient client) : IHttpRequestSender
     {
-        public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            using HttpClient client = new HttpClient();
-            return await client.SendAsync(request, cancellationToken);
+            return client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         }
     }
 }

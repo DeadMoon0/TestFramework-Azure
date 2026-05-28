@@ -30,6 +30,21 @@ Logic App mode matters:
 - stateless workflows use `CallAndCapture()` and return the callback result directly
 - Consumption workflows are supported through nested `Consumption` settings, and users only need to provide the URLs required by the features they use
 
+## Output Bindings
+
+Azure steps now expose strongly-typed result binders so useful outputs can flow directly into timeline variables without forcing consumers to unpack raw response objects by hand.
+
+```csharp
+Timeline timeline = Timeline.Create()
+	.Trigger(AzureExt.Trigger.LogicApp.CallAndCapture("workflow"))
+	.GetCallbackUrl("logicCallbackUrl")
+	.GetRunStatus("logicRunStatus")
+	.GetResponseBody("logicResponseBody")
+	.Build();
+```
+
+The same pattern is available for Function App HTTP results, managed Function App calls, Service Bus send results, Logic App execution/run-context results, and Azure `IsLive` probes.
+
 ## Related Repositories
 
 - [TestFramework-Core](https://github.com/DeadMoon0/TestFramework-Core) for the runtime engine this solution extends

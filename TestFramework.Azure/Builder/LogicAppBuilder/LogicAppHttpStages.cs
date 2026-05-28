@@ -50,44 +50,38 @@ public interface ILogicAppTriggerStage
     /// </summary>
     /// <param name="triggerName">The timer trigger name. Defaults to <c>Recurrence</c>.</param>
     /// <returns>The stage that can execute the trigger.</returns>
-    ILogicAppFireAndForgetTriggerStage Timer(string triggerName = "Recurrence");
+    ILogicAppExecutionStage Timer(string triggerName = "Recurrence");
 
     /// <summary>
     /// Selects a timer or recurrence trigger by variable-backed name.
     /// </summary>
     /// <param name="triggerName">The timer trigger name variable.</param>
     /// <returns>The stage that can execute the trigger.</returns>
-    ILogicAppFireAndForgetTriggerStage Timer(VariableReference<string> triggerName);
+    ILogicAppExecutionStage Timer(VariableReference<string> triggerName);
 }
 
 /// <summary>
-/// Executes a Logic App trigger that does not need an HTTP payload.
+/// Executes a Logic App trigger and returns a normalized execution result.
 /// </summary>
-public interface ILogicAppFireAndForgetTriggerStage
+public interface ILogicAppExecutionStage
 {
     /// <summary>
-    /// Finalizes the request and returns the executable trigger step.
+    /// Finalizes the request and returns the executable Logic App step.
     /// </summary>
-    /// <returns>The Logic App trigger step.</returns>
-    Step<LogicAppTriggerResult> Call();
-
-    /// <summary>
-    /// Finalizes the request and returns the explicit Logic App run context used for stateful run polling.
-    /// </summary>
-    /// <returns>The Logic App run-context step.</returns>
-    Step<LogicAppRunContext> CallForRunContext();
+    /// <returns>The Logic App execution step.</returns>
+    Step<LogicAppExecutionResult> Execute();
 }
 
 /// <summary>
 /// Shapes the outgoing request body and headers for a Logic App manual trigger call.
 /// </summary>
-public interface ILogicAppHttpPayloadStage : ILogicAppFireAndForgetTriggerStage
+public interface ILogicAppHttpPayloadStage : ILogicAppExecutionStage
 {
     /// <summary>
-    /// Finalizes the request and returns a stateless Logic App trigger step that captures the callback response directly.
+    /// Finalizes the request and captures the callback response directly.
     /// </summary>
-    /// <returns>The Logic App capture step.</returns>
-    Step<LogicAppCapturedResult> CallAndCapture();
+    /// <returns>The Logic App execution step.</returns>
+    Step<LogicAppExecutionResult> CaptureResponse();
 
     /// <summary>
     /// Sets a string request body.

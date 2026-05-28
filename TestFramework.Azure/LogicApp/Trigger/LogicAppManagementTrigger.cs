@@ -1,42 +1,25 @@
-using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
-using TestFramework.Core.Artifacts;
-using TestFramework.Core.Environment;
-using TestFramework.Core.Logging;
-using TestFramework.Core.Steps;
-using TestFramework.Core.Steps.Options;
 using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.LogicApp.Trigger;
 
-internal sealed class LogicAppManagementTrigger(
-    LogicAppIdentifier identifier,
-    VariableReference<string>? workflowName,
-    VariableReference<string> triggerName)
-    : Step<LogicAppTriggerResult>, IHasEnvironmentRequirements
+internal static class LogicAppManagementTrigger
 {
-    public override string Name => "Management LogicApp Trigger";
-
-    public override string Description => "Triggers a Logic App timer or recurrence workflow through the management trigger run endpoint.";
-
-    public override bool DoesReturn => true;
-
-    public override Step<LogicAppTriggerResult> Clone() => new LogicAppManagementTrigger(identifier, workflowName, triggerName).WithClonedOptions(this);
-
-    public override async Task<LogicAppTriggerResult?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    internal static async Task<LogicAppExecutionResult> ExecuteAsync(IServiceProvider serviceProvider, VariableStore variableStore, LogicAppIdentifier identifier, VariableReference<string>? workflowName, VariableReference<string> triggerName, CancellationToken cancellationToken)
     {
         LogicAppConfig config = serviceProvider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
+        config.EnsureSupportsManagement("trigger Logic App workflows through management endpoints");
         string resolvedWorkflowName = LogicAppRoutes.ResolveWorkflowName(config, workflowName?.GetValue(variableStore));
         string resolvedTriggerName = triggerName.GetRequiredValue(variableStore);
         IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
@@ -50,27 +33,39 @@ internal sealed class LogicAppManagementTrigger(
         {
             if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Conflict)
             {
-                string observedRunId = await WaitForScheduledRunAsync(serviceProvider, sender, identifier, config, resolvedWorkflowName, resolvedTriggerName, observationStart, cancellationToken);
-                return new LogicAppTriggerResult(
+                string observedRunId = await WaitForObservedRunAsync(serviceProvider, sender, identifier, config, resolvedWorkflowName, resolvedTriggerName, observationStart, cancellationToken);
+                return new LogicAppExecutionResult(
                     resolvedWorkflowName,
                     resolvedTriggerName,
                     triggerRunUri.ToString(),
                     observedRunId,
-                    HttpStatusCode.Accepted);
+                    HttpStatusCode.Accepted,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
             }
 
             response.EnsureSuccessStatusCode();
         }
 
-        return new LogicAppTriggerResult(
+        return new LogicAppExecutionResult(
             resolvedWorkflowName,
             resolvedTriggerName,
             triggerRunUri.ToString(),
             LogicAppRoutes.ResolveRunId(response),
-            response.StatusCode);
+            response.StatusCode,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
 
-    private static async Task<string> WaitForScheduledRunAsync(IServiceProvider serviceProvider, IHttpRequestSender sender, LogicAppIdentifier identifier, LogicAppConfig config, string workflowName, string triggerName, DateTimeOffset observationStart, CancellationToken cancellationToken)
+    internal static async Task<string> WaitForObservedRunAsync(IServiceProvider serviceProvider, IHttpRequestSender sender, LogicAppIdentifier identifier, LogicAppConfig config, string workflowName, string triggerName, DateTimeOffset observationStart, CancellationToken cancellationToken)
     {
         Uri runsUri = LogicAppRoutes.BuildRunsUri(config, workflowName);
 
@@ -92,7 +87,7 @@ internal sealed class LogicAppManagementTrigger(
         }
     }
 
-    private static bool TryResolveObservedRunId(string payload, string triggerName, DateTimeOffset observationStart, out string? runId)
+    internal static bool TryResolveObservedRunId(string payload, string triggerName, DateTimeOffset observationStart, out string? runId)
     {
         runId = null;
 
@@ -175,18 +170,4 @@ internal sealed class LogicAppManagementTrigger(
 
         return null;
     }
-
-    public override StepInstance<Step<LogicAppTriggerResult>, LogicAppTriggerResult> GetInstance() =>
-        new StepInstance<Step<LogicAppTriggerResult>, LogicAppTriggerResult>(this);
-
-    public override void DeclareIO(StepIOContract contract)
-    {
-        if (workflowName is not null && workflowName.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(workflowName.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
-        if (triggerName.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(triggerName.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
-    }
-
-    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.LogicApp, identifier)];
 }

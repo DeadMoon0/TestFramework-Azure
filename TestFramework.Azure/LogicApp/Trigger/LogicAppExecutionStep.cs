@@ -1,0 +1,107 @@
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+using TestFramework.Azure.Builder.LogicAppBuilder;
+using TestFramework.Azure.Configuration;
+using TestFramework.Azure.Configuration.SpecificConfigs;
+using TestFramework.Azure.FunctionApp.TriggerConfigs;
+using TestFramework.Azure.Identifier;
+using TestFramework.Core.Artifacts;
+using TestFramework.Core.Environment;
+using TestFramework.Core.Logging;
+using TestFramework.Core.Steps;
+using TestFramework.Core.Steps.Options;
+using TestFramework.Core.Variables;
+
+namespace TestFramework.Azure.LogicApp.Trigger;
+
+internal sealed class LogicAppExecutionStep(
+    LogicAppIdentifier identifier,
+    LogicAppExecutionRequest request)
+    : Step<LogicAppExecutionResult>, IHasEnvironmentRequirements
+{
+    public override string Name => request.TriggerMode == LogicAppTriggerExecutionMode.HttpCallback
+        ? request.CaptureResponse
+            ? "Http LogicApp Capture"
+            : "Http LogicApp Execution"
+        : "Management LogicApp Execution";
+
+    public override string Description => request.TriggerMode == LogicAppTriggerExecutionMode.HttpCallback
+        ? request.CaptureResponse
+            ? "Triggers a Logic App manual HTTP workflow and captures the direct callback response."
+            : "Triggers a Logic App manual HTTP workflow and returns the normalized execution context."
+        : "Triggers a Logic App timer or recurrence workflow through the management endpoint.";
+
+    public override bool DoesReturn => true;
+
+    public override Step<LogicAppExecutionResult> Clone() => new LogicAppExecutionStep(identifier, request).WithClonedOptions(this);
+
+    public override async Task<LogicAppExecutionResult?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    {
+        return request.TriggerMode switch
+        {
+            LogicAppTriggerExecutionMode.HttpCallback => await ExecuteHttpAsync(serviceProvider, variableStore, cancellationToken),
+            LogicAppTriggerExecutionMode.ManagementRun => await LogicAppManagementTrigger.ExecuteAsync(serviceProvider, variableStore, identifier, request.WorkflowName, request.TriggerName, cancellationToken),
+            _ => throw new InvalidOperationException($"Unsupported Logic App trigger mode '{request.TriggerMode}'.")
+        };
+    }
+
+    public override StepInstance<Step<LogicAppExecutionResult>, LogicAppExecutionResult> GetInstance() => new(this);
+
+    public override void DeclareIO(StepIOContract contract)
+    {
+        if (request.WorkflowName is not null && request.WorkflowName.HasIdentifier)
+            contract.Inputs.Add(new StepIOEntry(request.WorkflowName.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
+        if (request.TriggerName.HasIdentifier)
+            contract.Inputs.Add(new StepIOEntry(request.TriggerName.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
+        if (request.Request is not null && request.Request.HasIdentifier)
+            contract.Inputs.Add(new StepIOEntry(request.Request.Identifier!.Identifier, StepIOKind.Variable, true, typeof(CommonHttpRequest)));
+    }
+
+    public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
+        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.LogicApp, identifier)];
+
+    private async Task<LogicAppExecutionResult> ExecuteHttpAsync(IServiceProvider serviceProvider, VariableStore variableStore, CancellationToken cancellationToken)
+    {
+        VariableReference<CommonHttpRequest> httpRequest = request.Request
+            ?? throw new InvalidOperationException("HTTP Logic App execution requires a request payload builder.");
+
+        LogicAppHttpInvokeResponse invocation = await LogicAppHttpTriggerExecution.InvokeAsync(
+            serviceProvider,
+            variableStore,
+            identifier,
+            request.WorkflowName,
+            request.TriggerName,
+            httpRequest,
+            request.CaptureResponse,
+            cancellationToken);
+
+        return new LogicAppExecutionResult(
+            invocation.WorkflowName,
+            invocation.TriggerName,
+            invocation.CallbackUrl,
+            invocation.RunId,
+            invocation.StatusCode,
+            request.CaptureResponse ? LogicAppHttpTriggerExecution.ResolveCapturedStatus(invocation.StatusCode) : null,
+            null,
+            request.CaptureResponse ? invocation.ResponseBody : null,
+            request.CaptureResponse ? invocation.ResponseHeaders : null,
+            null,
+            null);
+    }
+}
+
+internal sealed record LogicAppExecutionRequest(
+    VariableReference<string>? WorkflowName,
+    VariableReference<string> TriggerName,
+    LogicAppTriggerExecutionMode TriggerMode,
+    VariableReference<CommonHttpRequest>? Request,
+    bool CaptureResponse);
+
+internal enum LogicAppTriggerExecutionMode
+{
+    HttpCallback,
+    ManagementRun,
+}

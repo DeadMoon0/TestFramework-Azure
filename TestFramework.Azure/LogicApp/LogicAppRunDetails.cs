@@ -17,4 +17,21 @@ public sealed record LogicAppRunDetails(
     LogicAppRunStatus Status,
     string? Code,
     string? OutputsJson,
-    string RawJson) : StepResultContext;
+    string RawJson) : StepResultContext
+{
+    /// <summary>
+    /// Returns the normalized execution result for output binding and diagnostics.
+    /// </summary>
+    public LogicAppExecutionResult ExecutionResult => new(
+        WorkflowName,
+        null,
+        null,
+        RunId,
+        null,
+        Status,
+        Code,
+        null,
+        null,
+        OutputsJson,
+        RawJson);
+};

@@ -20,6 +20,27 @@ public sealed record LogicAppTriggerResult(
     HttpStatusCode StatusCode) : StepResultContext
 {
     /// <summary>
+    /// Gets the invoked callback URL using the consumer-facing invoke URI terminology.
+    /// </summary>
+    public string InvokeUri => CallbackUrl;
+
+    /// <summary>
+    /// Returns the normalized execution result for output binding and diagnostics.
+    /// </summary>
+    public LogicAppExecutionResult ExecutionResult => new(
+        WorkflowName,
+        TriggerName,
+        CallbackUrl,
+        RunId,
+        StatusCode,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null);
+
+    /// <summary>
     /// Creates an explicit run-tracking context for stateful Logic App polling.
     /// </summary>
     public LogicAppRunContext RunContext => new(

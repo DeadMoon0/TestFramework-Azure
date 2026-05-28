@@ -19,7 +19,10 @@ internal static class LogicAppRoutes
     internal static Uri BuildListCallbackUrlUri(LogicAppConfig config, string workflowName, string triggerName)
     {
         if (config.HostingMode == LogicAppHostingMode.Consumption)
+        {
+            config.EnsureSupportsDirectInvocation("invoke a Consumption Logic App workflow directly");
             return ResolveConsumptionUri(config.Consumption.InvokeUrl, workflowName, triggerName, null, $"{nameof(LogicAppConfig.Consumption)}:{nameof(LogicAppConsumptionConfig.InvokeUrl)}");
+        }
 
         string workflow = Uri.EscapeDataString(workflowName);
         string trigger = Uri.EscapeDataString(triggerName);
@@ -29,7 +32,10 @@ internal static class LogicAppRoutes
     internal static Uri BuildRunUri(LogicAppConfig config, string workflowName, string runId)
     {
         if (config.HostingMode == LogicAppHostingMode.Consumption)
+        {
+            config.EnsureSupportsManagement("read Logic App run details");
             return BuildConsumptionManagementUri(config, $"runs/{Uri.EscapeDataString(runId)}");
+        }
 
         string workflow = Uri.EscapeDataString(workflowName);
         string run = Uri.EscapeDataString(runId);
@@ -39,7 +45,10 @@ internal static class LogicAppRoutes
     internal static Uri BuildTriggerRunUri(LogicAppConfig config, string workflowName, string triggerName)
     {
         if (config.HostingMode == LogicAppHostingMode.Consumption)
+        {
+            config.EnsureSupportsManagement("trigger a Logic App through management endpoints");
             return BuildConsumptionManagementUri(config, $"triggers/{Uri.EscapeDataString(triggerName)}/run");
+        }
 
         string workflow = Uri.EscapeDataString(workflowName);
         string trigger = Uri.EscapeDataString(triggerName);
@@ -49,7 +58,10 @@ internal static class LogicAppRoutes
     internal static Uri BuildRunsUri(LogicAppConfig config, string workflowName)
     {
         if (config.HostingMode == LogicAppHostingMode.Consumption)
+        {
+            config.EnsureSupportsManagement("list Logic App workflow runs");
             return BuildConsumptionManagementUri(config, "runs");
+        }
 
         string workflow = Uri.EscapeDataString(workflowName);
         return new Uri(new Uri(RequireStandardBaseUrl(config)), $"runtime/webhooks/workflow/api/management/workflows/{workflow}/runs?api-version={StandardApiVersion}");
@@ -72,10 +84,12 @@ internal static class LogicAppRoutes
         if (config.HostingMode == LogicAppHostingMode.Standard)
             return;
 
+        config.EnsureSupportsManagement("authorize Logic App management requests");
+
         ILogicAppConsumptionManagementRequestAuthorizer authorizer = serviceProvider.GetService<ILogicAppConsumptionManagementRequestAuthorizer>()
             ?? throw new InvalidOperationException(
                 $"Logic App '{identifier}' requires management capability for this operation. "
-                + $"Register {nameof(ILogicAppConsumptionManagementRequestAuthorizer)} to enable RunCompleted(...), RunReachedStatus(...), timer/recurrence triggers, and management-backed liveness for Consumption workflows.");
+                + $"Register {nameof(ILogicAppConsumptionManagementRequestAuthorizer)} to enable RunCompleted(...), RunReachedStatus(...), timer triggers, and management-backed liveness for Consumption workflows.");
         await authorizer.AuthorizeAsync(identifier, config, request, cancellationToken);
     }
 
@@ -109,10 +123,10 @@ internal static class LogicAppRoutes
             return new Uri(new Uri(RequireStandardBaseUrl(config)), "admin/host/status");
 
         string resolvedWorkflowName = ResolveWorkflowName(config, workflowName);
-        if (HasConsumptionManagementResourceId(config))
+        if (config.SupportsManagementOperations)
             return BuildRunsUri(config, resolvedWorkflowName);
 
-        if (!string.IsNullOrWhiteSpace(config.Consumption.InvokeUrl))
+        if (config.SupportsDirectInvocation)
             return ResolveConsumptionUri(config.Consumption.InvokeUrl, resolvedWorkflowName, null, null, $"{nameof(LogicAppConfig.Consumption)}:{nameof(LogicAppConsumptionConfig.InvokeUrl)}");
 
         throw new InvalidOperationException(
@@ -124,14 +138,15 @@ internal static class LogicAppRoutes
         => !string.IsNullOrWhiteSpace(config.Consumption.WorkflowResourceId);
 
     internal static string RequireStandardBaseUrl(LogicAppConfig config)
-        => config.Standard.BaseUrl ?? throw new InvalidOperationException($"Logic App in Standard mode requires '{nameof(LogicAppConfig.Standard)}:{nameof(LogicAppStandardConfig.BaseUrl)}' to be configured.");
+    {
+        config.EnsureSupportsManagement("resolve Standard Logic App endpoints");
+        return config.Standard.BaseUrl!;
+    }
 
     private static Uri BuildConsumptionManagementUri(LogicAppConfig config, string relativePath)
     {
-        string resourceId = config.Consumption.WorkflowResourceId
-            ?? throw new InvalidOperationException(
-                $"Logic App Consumption management operations require '{nameof(LogicAppConfig.Consumption)}:{nameof(LogicAppConsumptionConfig.WorkflowResourceId)}'. "
-                + "Invoke-only scenarios can omit it, but RunCompleted(...), RunReachedStatus(...), timer/recurrence triggers, and management-backed liveness cannot.");
+        config.EnsureSupportsManagement("use Consumption Logic App management endpoints");
+        string resourceId = config.Consumption.WorkflowResourceId!;
         string trimmedResourceId = resourceId.TrimEnd('/');
         return new Uri($"https://management.azure.com{trimmedResourceId}/{relativePath}?api-version={ConsumptionManagementApiVersion}", UriKind.Absolute);
     }
@@ -141,7 +156,7 @@ internal static class LogicAppRoutes
         if (string.IsNullOrWhiteSpace(template))
             throw new InvalidOperationException(
                 $"Logic App Consumption invoke operations require '{propertyName}'. "
-                + "Configure it for Manual().Call(), CallAndCapture(), and invoke-only liveness.");
+                + "Configure it for Manual().Execute(), CaptureResponse(), and invoke-only liveness.");
 
         string resolved = template
             .Replace("{workflowName}", Uri.EscapeDataString(workflowName), StringComparison.Ordinal)

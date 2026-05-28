@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace TestFramework.Azure.LogicApp;
@@ -16,6 +17,28 @@ internal static class LogicAppJson
         return !string.IsNullOrWhiteSpace(callbackUrl)
             ? callbackUrl
             : throw new InvalidOperationException("The Logic App callback URL response did not contain a callback URL.");
+    }
+
+    internal static bool TryExtractCallbackUrl(string payload, out string? callbackUrl)
+    {
+        callbackUrl = null;
+
+        if (string.IsNullOrWhiteSpace(payload))
+            return false;
+
+        try
+        {
+            callbackUrl = ExtractCallbackUrl(payload);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     internal static string RebaseLocalCallbackUrl(string baseUrl, string callbackUrl)
@@ -48,8 +71,8 @@ internal static class LogicAppJson
     {
         JObject document = JObject.Parse(payload);
         JToken? properties = document["properties"];
-        string? statusText = properties?["status"]?.Value<string>() ?? document["status"]?.Value<string>();
-        string? code = properties?["code"]?.Value<string>() ?? document["code"]?.Value<string>();
+        string? statusText = ResolveStatusText(properties, document);
+        string? code = ResolveCode(properties, document);
         JToken? outputs = properties?["outputs"] ?? document["outputs"];
 
         return new LogicAppRunDetails(
@@ -88,8 +111,8 @@ internal static class LogicAppJson
                 continue;
 
             JToken? properties = run["properties"];
-            string? statusText = properties?["status"]?.Value<string>() ?? run["status"]?.Value<string>();
-            string? code = properties?["code"]?.Value<string>() ?? run["code"]?.Value<string>();
+            string? statusText = ResolveStatusText(properties, run);
+            string? code = ResolveCode(properties, run);
             JToken? outputs = properties?["outputs"] ?? run["outputs"];
 
             return new LogicAppRunDetails(
@@ -102,6 +125,30 @@ internal static class LogicAppJson
         }
 
         return null;
+    }
+
+    private static string? ResolveStatusText(JToken? properties, JToken root)
+    {
+        string? statusText = properties?["status"]?.Value<string>() ?? root["status"]?.Value<string>();
+        LogicAppRunStatus status = ParseStatus(statusText);
+        if (IsTerminal(status))
+            return statusText;
+
+        string? responseStatusText = properties?["response"]?["status"]?.Value<string>()
+            ?? root["response"]?["status"]?.Value<string>();
+        LogicAppRunStatus responseStatus = ParseStatus(responseStatusText);
+
+        return IsTerminal(responseStatus) ? responseStatusText : statusText;
+    }
+
+    private static string? ResolveCode(JToken? properties, JToken root)
+    {
+        return properties?["code"]?.Value<string>()
+            ?? root["code"]?.Value<string>()
+            ?? properties?["response"]?["code"]?.Value<string>()
+            ?? root["response"]?["code"]?.Value<string>()
+            ?? properties?["response"]?["error"]?["code"]?.Value<string>()
+            ?? root["response"]?["error"]?["code"]?.Value<string>();
     }
 
     internal static LogicAppRunStatus ParseStatus(string? value)

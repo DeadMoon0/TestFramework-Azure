@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
@@ -25,11 +27,13 @@ internal static class LogicAppHttpTriggerExecution
         VariableReference<string>? workflowName,
         VariableReference<string> triggerName,
         VariableReference<CommonHttpRequest> request,
+        bool includeResponseBody,
         CancellationToken cancellationToken)
     {
         LogicAppConfig config = serviceProvider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
         string resolvedWorkflowName = LogicAppRoutes.ResolveWorkflowName(config, workflowName?.GetValue(variableStore));
         string resolvedTriggerName = triggerName.GetRequiredValue(variableStore);
+        config.EnsureSupportsDirectInvocation("invoke Logic App HTTP triggers");
         CommonHttpRequest resolvedRequest = request.GetRequiredValue(variableStore);
         IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
         string callbackUrl;
@@ -47,15 +51,20 @@ internal static class LogicAppHttpTriggerExecution
 
             using HttpResponseMessage callbackUrlResponse = await sender.SendAsync(callbackUrlRequest, cancellationToken);
             callbackUrlResponse.EnsureSuccessStatusCode();
-            string callbackUrlPayload = await (callbackUrlResponse.Content?.ReadAsStringAsync(cancellationToken) ?? Task.FromResult(string.Empty));
+            string callbackUrlPayload = await ReadCallbackUrlPayloadAsync(callbackUrlResponse, cancellationToken);
             callbackUrl = LogicAppJson.RebaseLocalCallbackUrl(LogicAppRoutes.RequireStandardBaseUrl(config), LogicAppJson.ExtractCallbackUrl(callbackUrlPayload));
         }
 
         using HttpRequestMessage invokeRequest = new(HttpMethod.Post, callbackUrl);
         resolvedRequest.ApplyToHttpRequestMessage(invokeRequest);
 
-        using HttpResponseMessage invokeResponse = await sender.SendAsync(invokeRequest, cancellationToken);
-        string responseBody = await (invokeResponse.Content?.ReadAsStringAsync(cancellationToken) ?? Task.FromResult(string.Empty));
+        DateTimeOffset observationStart = DateTimeOffset.UtcNow;
+        using HttpResponseMessage invokeResponse = includeResponseBody
+            ? await sender.SendAsync(invokeRequest, cancellationToken)
+            : await SendForRunTrackingAsync(serviceProvider, sender, identifier, config, resolvedWorkflowName, resolvedTriggerName, callbackUrl, invokeRequest, observationStart, cancellationToken);
+        string responseBody = includeResponseBody
+            ? await (invokeResponse.Content?.ReadAsStringAsync(cancellationToken) ?? Task.FromResult(string.Empty))
+            : string.Empty;
 
         return new LogicAppHttpInvokeResponse(
             resolvedWorkflowName,
@@ -90,6 +99,136 @@ internal static class LogicAppHttpTriggerExecution
         }
 
         return headers.Count == 0 ? LogicAppCapturedResult.EmptyHeaders : new ReadOnlyDictionary<string, string[]>(headers);
+    }
+
+    private static async Task<string> ReadCallbackUrlPayloadAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.Content is null)
+            throw new InvalidOperationException("The Logic App callback URL response did not contain a body.");
+
+        using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        byte[] buffer = new byte[4096];
+        StringBuilder payloadBuilder = new();
+
+        while (true)
+        {
+            int bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+            if (bytesRead == 0)
+                break;
+
+            payloadBuilder.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
+            string currentPayload = payloadBuilder.ToString();
+            if (LogicAppJson.TryExtractCallbackUrl(currentPayload, out _))
+                return currentPayload;
+        }
+
+        string payload = payloadBuilder.ToString();
+        if (!string.IsNullOrWhiteSpace(payload))
+            return payload;
+
+        throw new InvalidOperationException("The Logic App callback URL response did not contain a readable payload.");
+    }
+
+    private static async Task<HttpResponseMessage> SendForRunTrackingAsync(
+        IServiceProvider serviceProvider,
+        IHttpRequestSender sender,
+        LogicAppIdentifier identifier,
+        LogicAppConfig config,
+        string workflowName,
+        string triggerName,
+        string callbackUrl,
+        HttpRequestMessage invokeRequest,
+        DateTimeOffset observationStart,
+        CancellationToken cancellationToken)
+    {
+        HttpRequestMessage ownedInvokeRequest = await CloneHttpRequestMessageAsync(invokeRequest, cancellationToken);
+        CancellationTokenSource invokeLifetime = new();
+        Task<HttpResponseMessage> invokeTask = sender.SendAsync(ownedInvokeRequest, invokeLifetime.Token);
+        Task<string> observedRunTask = LogicAppManagementTrigger.WaitForObservedRunAsync(serviceProvider, sender, identifier, config, workflowName, triggerName, observationStart, cancellationToken);
+
+        try
+        {
+            Task completedTask = await Task.WhenAny(invokeTask, observedRunTask);
+            if (completedTask == invokeTask)
+            {
+                HttpResponseMessage response = await invokeTask;
+                invokeLifetime.Dispose();
+                if (!string.IsNullOrWhiteSpace(LogicAppRoutes.ResolveRunId(response)))
+                {
+                    ownedInvokeRequest.Dispose();
+                    return response;
+                }
+
+                response.Dispose();
+                ownedInvokeRequest.Dispose();
+                string observedRunIdFromCompletedInvoke = await observedRunTask;
+                return CreateObservedRunResponse(callbackUrl, observedRunIdFromCompletedInvoke);
+            }
+
+            string runId = await observedRunTask;
+            DetachInvokeCompletion(invokeTask, ownedInvokeRequest, invokeLifetime);
+            return CreateObservedRunResponse(callbackUrl, runId);
+        }
+        catch
+        {
+            invokeLifetime.Cancel();
+            ownedInvokeRequest.Dispose();
+            invokeLifetime.Dispose();
+            throw;
+        }
+    }
+
+    private static void DetachInvokeCompletion(Task<HttpResponseMessage> invokeTask, HttpRequestMessage invokeRequest, CancellationTokenSource invokeLifetime)
+    {
+        _ = invokeTask.ContinueWith(
+            static (task, stateObject) =>
+            {
+                (Task<HttpResponseMessage> Task, HttpRequestMessage Request, CancellationTokenSource Lifetime) state = ((Task<HttpResponseMessage>, HttpRequestMessage, CancellationTokenSource))stateObject!;
+
+                try
+                {
+                    if (state.Task.Status == TaskStatus.RanToCompletion)
+                        state.Task.Result.Dispose();
+                }
+                finally
+                {
+                    state.Request.Dispose();
+                    state.Lifetime.Dispose();
+                }
+            },
+            (invokeTask, invokeRequest, invokeLifetime),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private static async Task<HttpRequestMessage> CloneHttpRequestMessageAsync(HttpRequestMessage source, CancellationToken cancellationToken)
+    {
+        HttpRequestMessage clone = new(source.Method, source.RequestUri);
+
+        foreach ((string key, IEnumerable<string> values) in source.Headers)
+            clone.Headers.TryAddWithoutValidation(key, values);
+
+        if (source.Content is not null)
+        {
+            byte[] contentBytes = await source.Content.ReadAsByteArrayAsync(cancellationToken);
+            ByteArrayContent clonedContent = new(contentBytes);
+
+            foreach ((string key, IEnumerable<string> values) in source.Content.Headers)
+                clonedContent.Headers.TryAddWithoutValidation(key, values);
+
+            clone.Content = clonedContent;
+        }
+
+        return clone;
+    }
+
+    private static HttpResponseMessage CreateObservedRunResponse(string callbackUrl, string runId)
+    {
+        HttpResponseMessage response = new(HttpStatusCode.Accepted);
+        response.RequestMessage = new HttpRequestMessage(HttpMethod.Post, callbackUrl);
+        response.Headers.Add("x-ms-workflow-run-id", runId);
+        return response;
     }
 }
 

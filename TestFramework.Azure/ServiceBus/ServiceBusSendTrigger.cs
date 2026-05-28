@@ -22,7 +22,7 @@ namespace TestFramework.Azure.ServiceBus;
 /// </summary>
 /// <param name="identifier">The Service Bus identifier to resolve.</param>
 /// <param name="message">The message variable to send.</param>
-public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableReference<ServiceBusMessage> message) : Step<EmptyStepResultContext>, IHasEnvironmentRequirements
+public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableReference<ServiceBusMessage> message) : Step<ServiceBusSentMessageContext>, IHasEnvironmentRequirements
 {
     /// <summary>
     /// Gets the display name used for this step.
@@ -35,13 +35,13 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
     /// <summary>
     /// Gets a value indicating whether this step returns a value.
     /// </summary>
-    public override bool DoesReturn => false;
+    public override bool DoesReturn => true;
 
     /// <summary>
     /// Creates a copy of this trigger and its options.
     /// </summary>
     /// <returns>The cloned step.</returns>
-    public override Step<EmptyStepResultContext> Clone()
+    public override Step<ServiceBusSentMessageContext> Clone()
     {
         return new ServiceBusSendTrigger(identifier, message).WithClonedOptions(this);
     }
@@ -65,7 +65,7 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
     /// <param name="logger">The step logger.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task that completes when the message has been sent.</returns>
-    public override async Task<EmptyStepResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore,
+    public override async Task<ServiceBusSentMessageContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore,
         ScopedLogger logger, CancellationToken cancellationToken)
     {
         ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
@@ -81,14 +81,14 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
 
         logger.LogInformation("Sent message to Service Bus: {0}", _message);
 
-        return null;
+        return new ServiceBusSentMessageContext(_message);
     }
 
     /// <summary>
     /// Creates a runtime step instance.
     /// </summary>
     /// <returns>The runtime step instance.</returns>
-    public override StepInstance<Step<EmptyStepResultContext>, EmptyStepResultContext> GetInstance() => new StepInstance<Step<EmptyStepResultContext>, EmptyStepResultContext>(this);
+    public override StepInstance<Step<ServiceBusSentMessageContext>, ServiceBusSentMessageContext> GetInstance() => new StepInstance<Step<ServiceBusSentMessageContext>, ServiceBusSentMessageContext>(this);
 
     /// <summary>
     /// Declares the environment requirement for the configured Service Bus resource.

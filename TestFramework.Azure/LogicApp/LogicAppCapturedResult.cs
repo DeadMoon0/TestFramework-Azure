@@ -28,6 +28,27 @@ public sealed record LogicAppCapturedResult(
     IReadOnlyDictionary<string, string[]> ResponseHeaders) : StepResultContext
 {
     /// <summary>
+    /// Gets the invoked callback URL using the consumer-facing invoke URI terminology.
+    /// </summary>
+    public string InvokeUri => CallbackUrl;
+
+    /// <summary>
+    /// Returns the normalized execution result for output binding and diagnostics.
+    /// </summary>
+    public LogicAppExecutionResult ExecutionResult => new(
+        WorkflowName,
+        TriggerName,
+        CallbackUrl,
+        RunId,
+        StatusCode,
+        Status,
+        null,
+        ResponseBody,
+        ResponseHeaders,
+        null,
+        null);
+
+    /// <summary>
     /// Creates an explicit run-tracking context for the captured Logic App invocation.
     /// </summary>
     internal LogicAppRunContext RunContext => new(

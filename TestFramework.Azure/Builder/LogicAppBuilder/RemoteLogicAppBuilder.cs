@@ -11,7 +11,7 @@ using TestFramework.Core.Variables;
 namespace TestFramework.Azure.Builder.LogicAppBuilder;
 
 internal sealed class RemoteLogicAppBuilder(LogicAppIdentifier appIdentifier)
-    : ILogicAppWorkflowStage, ILogicAppTriggerStage, ILogicAppHttpPayloadStage, ILogicAppFireAndForgetTriggerStage
+    : ILogicAppWorkflowStage, ILogicAppTriggerStage, ILogicAppHttpPayloadStage, ILogicAppExecutionStage
 {
     private VariableReference<string>? _workflowName;
     private VariableReference<string>? _triggerName;
@@ -35,39 +35,32 @@ internal sealed class RemoteLogicAppBuilder(LogicAppIdentifier appIdentifier)
         return this;
     }
 
-    public ILogicAppFireAndForgetTriggerStage Timer(string triggerName = "Recurrence") => Timer(Var.Const(triggerName));
+    public ILogicAppExecutionStage Timer(string triggerName = "Recurrence") => Timer(Var.Const(triggerName));
 
-    public ILogicAppFireAndForgetTriggerStage Timer(VariableReference<string> triggerName)
+    public ILogicAppExecutionStage Timer(VariableReference<string> triggerName)
     {
         _triggerName = triggerName;
         _triggerMode = LogicAppTriggerExecutionMode.ManagementRun;
         return this;
     }
 
-    public Step<LogicAppTriggerResult> Call()
+    public Step<LogicAppExecutionResult> Execute()
     {
         if (_triggerName is null)
             throw new InvalidOperationException("No Logic App trigger was selected. Call Workflow(...).Manual(...) or Timer(...) first.");
 
-        return _triggerMode switch
-        {
-            LogicAppTriggerExecutionMode.HttpCallback => new LogicAppHttpTrigger(appIdentifier, _workflowName, _triggerName, _request.BuildVariable()),
-            LogicAppTriggerExecutionMode.ManagementRun => new LogicAppManagementTrigger(appIdentifier, _workflowName, _triggerName),
-            _ => throw new InvalidOperationException($"Unsupported Logic App trigger mode '{_triggerMode}'.")
-        };
+        return new LogicAppExecutionStep(appIdentifier, BuildRequest(captureResponse: false));
     }
 
-    public Step<LogicAppRunContext> CallForRunContext() => new LogicAppRunContextTrigger(Call());
-
-    public Step<LogicAppCapturedResult> CallAndCapture()
+    public Step<LogicAppExecutionResult> CaptureResponse()
     {
         if (_triggerName is null)
             throw new InvalidOperationException("No Logic App trigger was selected. Call Workflow(...).Manual(...) first.");
 
         if (_triggerMode != LogicAppTriggerExecutionMode.HttpCallback)
-            throw new InvalidOperationException("CallAndCapture() is only supported for Logic App HTTP callback triggers. Use Call() for timer triggers.");
+            throw new InvalidOperationException("CaptureResponse() is only supported for Logic App HTTP callback triggers. Use Execute() for timer triggers.");
 
-        return new LogicAppHttpCaptureTrigger(appIdentifier, _workflowName, _triggerName, _request.BuildVariable());
+        return new LogicAppExecutionStep(appIdentifier, BuildRequest(captureResponse: true));
     }
 
     public ILogicAppHttpPayloadStage WithBody(VariableReference<string> text)
@@ -106,9 +99,11 @@ internal sealed class RemoteLogicAppBuilder(LogicAppIdentifier appIdentifier)
         return this;
     }
 
-    private enum LogicAppTriggerExecutionMode
-    {
-        HttpCallback,
-        ManagementRun,
-    }
+    private LogicAppExecutionRequest BuildRequest(bool captureResponse)
+        => new(
+            _workflowName,
+            _triggerName ?? throw new InvalidOperationException("No Logic App trigger was selected."),
+            _triggerMode,
+            _triggerMode == LogicAppTriggerExecutionMode.HttpCallback ? _request.BuildVariable() : null,
+            captureResponse);
 }

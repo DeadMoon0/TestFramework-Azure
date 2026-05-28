@@ -347,6 +347,28 @@ public static class AzureExt
     public class LogicAppEvents
     {
         /// <summary>
+        /// Waits until the Logic App run represented by a normalized execution result reaches a specific status.
+        /// </summary>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<LogicAppExecutionResult> executionResult, LogicAppRunStatus status)
+            => new(identifier,
+                executionResult.Transform(result => result?.RunContext.WorkflowName ?? string.Empty),
+                executionResult.Transform(result => result?.RunContext.RunId ?? string.Empty),
+                Var.Const(status),
+                executionResult,
+                typeof(LogicAppExecutionResult));
+
+        /// <summary>
+        /// Waits until the Logic App run represented by a normalized execution result reaches a specific status.
+        /// </summary>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<LogicAppExecutionResult> executionResult, VariableReference<LogicAppRunStatus> status)
+            => new(identifier,
+                executionResult.Transform(result => result?.RunContext.WorkflowName ?? string.Empty),
+                executionResult.Transform(result => result?.RunContext.RunId ?? string.Empty),
+                status,
+                executionResult,
+                typeof(LogicAppExecutionResult));
+
+        /// <summary>
         /// Waits until the Logic App run represented by an explicit run context reaches a specific status.
         /// </summary>
         public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<LogicAppRunContext> runContext, LogicAppRunStatus status)
@@ -401,6 +423,17 @@ public static class AzureExt
         /// </summary>
         public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<string> runId, VariableReference<LogicAppRunStatus> status, VariableReference<string>? workflowName = null)
             => new(identifier, workflowName, runId, status);
+
+        /// <summary>
+        /// Waits until a Logic App run represented by a normalized execution result reaches any terminal state.
+        /// </summary>
+        public LogicAppRunEvent RunCompleted(LogicAppIdentifier identifier, VariableReference<LogicAppExecutionResult> executionResult)
+            => new(identifier,
+                executionResult.Transform(result => result?.RunContext.WorkflowName ?? string.Empty),
+                executionResult.Transform(result => result?.RunContext.RunId ?? string.Empty),
+                null,
+                executionResult,
+                typeof(LogicAppExecutionResult));
 
         /// <summary>
         /// Waits until a Logic App run represented by an explicit run context reaches any terminal state.

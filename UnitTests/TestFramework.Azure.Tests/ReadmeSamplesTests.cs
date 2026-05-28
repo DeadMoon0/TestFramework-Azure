@@ -211,15 +211,15 @@ public class ReadmeSamplesTests
                     .Workflow("StatelessOrders")
                     .Manual()
                     .WithBody(Var.Const("{\"id\":42}"))
-                    .CallAndCapture())
+                    .CaptureResponse())
             .Name("logic-call")
             .Build();
 
         TimelineRun run = await timeline.SetupRun(runtime.ServiceProvider).RunAsync();
 
         run.EnsureRanToCompletion();
-        LogicAppCapturedResult result = Assert.IsType<LogicAppCapturedResult>(run.Step("logic-call").LastResult.Result);
-        Assert.Equal(LogicAppRunStatus.Succeeded, result.Status);
+        LogicAppExecutionResult result = Assert.IsType<LogicAppExecutionResult>(run.Step("logic-call").LastResult.Result);
+        Assert.Equal(LogicAppRunStatus.Succeeded, result.RunStatus);
         Assert.Equal("{\"message\":\"captured\"}", result.ResponseBody);
         Assert.Equal(new Uri("https://logic.test/invoke/manual?sig=abc"), sender.Requests[1].RequestUri);
         Assert.Equal("{\"id\":42}", sender.RequestBodies[1]);

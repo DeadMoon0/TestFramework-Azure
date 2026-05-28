@@ -104,6 +104,29 @@ public class AzureSurfaceTests
         Assert.Equal("azure.logicapp", AzureEnvironmentResourceKinds.LogicApp);
     }
 
+    [Fact]
+    public void AzureIsLiveResult_ExposesKnownResourceKind()
+    {
+        Azure.Trigger.IsLive.AzureIsLiveResult result = new(
+            AzureEnvironmentResourceKinds.FunctionApp,
+            "func",
+            AlivenessLevel.Authenticated,
+            true,
+            null);
+
+        Assert.Equal(Azure.Trigger.IsLive.AzureKnownResourceKind.FunctionApp, result.KnownResourceKind);
+    }
+
+    [Fact]
+    public void LogicAppResults_ExposeInvokeUriAliasOverCallbackUrl()
+    {
+        Azure.LogicApp.LogicAppTriggerResult triggerResult = new("workflow", "manual", "https://callback", "run-1", System.Net.HttpStatusCode.Accepted);
+        Azure.LogicApp.LogicAppCapturedResult capturedResult = new("workflow", "manual", "https://callback", "run-1", System.Net.HttpStatusCode.OK, Azure.LogicApp.LogicAppRunStatus.Succeeded, "{}", Azure.LogicApp.LogicAppCapturedResult.EmptyHeaders);
+
+        Assert.Equal(triggerResult.CallbackUrl, triggerResult.InvokeUri);
+        Assert.Equal(capturedResult.CallbackUrl, capturedResult.InvokeUri);
+    }
+
     private sealed class StubAzureComponentFactory : IAzureComponentFactory
     {
         public ICosmosComponentFactory Cosmos { get; } = new StubCosmosFactory();

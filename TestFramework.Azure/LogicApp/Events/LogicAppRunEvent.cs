@@ -30,7 +30,7 @@ public sealed class LogicAppRunEvent(
     VariableReference<LogicAppRunStatus>? expectedStatus,
     VariableReferenceGeneric? projectedSourceReference = null,
     Type? projectedSourceType = null)
-    : AsyncEvent<LogicAppRunEvent, LogicAppRunDetails>, IHasEnvironmentRequirements
+    : AsyncEvent<LogicAppRunEvent, LogicAppExecutionResult>, IHasEnvironmentRequirements
 {
     /// <summary>
     /// Gets the display name used for this event.
@@ -51,7 +51,7 @@ public sealed class LogicAppRunEvent(
     /// Creates a copy of this event and its options.
     /// </summary>
     /// <returns>The cloned event.</returns>
-    public override Step<LogicAppRunDetails> Clone() => new LogicAppRunEvent(identifier, workflowName, runId, expectedStatus, projectedSourceReference, projectedSourceType).WithClonedOptions(this);
+    public override Step<LogicAppExecutionResult> Clone() => new LogicAppRunEvent(identifier, workflowName, runId, expectedStatus, projectedSourceReference, projectedSourceType).WithClonedOptions(this);
 
     /// <summary>
     /// Declares the event inputs required by the configured workflow and run references.
@@ -96,9 +96,10 @@ public sealed class LogicAppRunEvent(
     /// <param name="logger">The event logger.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The matching run details, or <see langword="null"/> while polling should continue.</returns>
-    public override async Task<LogicAppRunDetails?> DoEventPolling(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<LogicAppExecutionResult?> DoEventPolling(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
     {
         LogicAppConfig config = serviceProvider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
+        config.EnsureSupportsManagement("observe Logic App workflow runs");
         string resolvedWorkflowName = LogicAppRoutes.ResolveWorkflowName(config, workflowName?.GetValue(variableStore));
         string resolvedRunId = runId.GetRequiredValue(variableStore);
         LogicAppRunStatus? expected = expectedStatus?.GetValue(variableStore);
@@ -112,7 +113,7 @@ public sealed class LogicAppRunEvent(
             LogicAppRunDetails? details = await TryReadRunDetailsAsync(serviceProvider, sender, config, resolvedWorkflowName, resolvedRunId, cancellationToken);
             if (details is not null)
             {
-                LogicAppRunDetails? resolved = ResolvePollingResult(details, expected);
+                LogicAppExecutionResult? resolved = ResolvePollingResult(details, expected);
                 if (resolved is not null)
                     return resolved;
             }
@@ -121,13 +122,13 @@ public sealed class LogicAppRunEvent(
         }
     }
 
-    private static LogicAppRunDetails? ResolvePollingResult(LogicAppRunDetails details, LogicAppRunStatus? expected)
+    private static LogicAppExecutionResult? ResolvePollingResult(LogicAppRunDetails details, LogicAppRunStatus? expected)
     {
         if (expected is null)
-            return LogicAppJson.IsTerminal(details.Status) ? details : null;
+            return LogicAppJson.IsTerminal(details.Status) ? details.ExecutionResult : null;
 
         if (details.Status == expected.Value)
-            return details;
+            return details.ExecutionResult;
 
         if (LogicAppJson.IsTerminal(details.Status))
             throw new InvalidOperationException($"Logic App run '{details.RunId}' for workflow '{details.WorkflowName}' reached terminal status '{details.Status}' instead of '{expected.Value}'.");
@@ -137,6 +138,9 @@ public sealed class LogicAppRunEvent(
 
     private async Task<LogicAppRunDetails?> TryReadRunDetailsAsync(IServiceProvider serviceProvider, IHttpRequestSender sender, LogicAppConfig config, string workflowName, string runId, CancellationToken cancellationToken)
     {
+        if (config.HostingMode == LogicAppHostingMode.Standard)
+            return await TryReadRunDetailsFromRunsListAsync(serviceProvider, sender, config, workflowName, runId, cancellationToken);
+
         using HttpRequestMessage request = LogicAppRoutes.CreateManagementRequest(HttpMethod.Get, LogicAppRoutes.BuildRunUri(config, workflowName, runId), config);
         await LogicAppRoutes.AuthorizeManagementRequestAsync(serviceProvider, identifier, config, request, cancellationToken);
         using HttpResponseMessage response = await sender.SendAsync(request, cancellationToken);
@@ -173,7 +177,7 @@ public sealed class LogicAppRunEvent(
         {
             throw new InvalidOperationException(
                 $"Logic App workflow '{resolvedWorkflowName}' on '{identifier}' is stateless and does not support managed run polling through RunCompleted/RunReachedStatus. "
-                + "Use CallAndCapture() for stateless workflows instead.");
+                + "Use CaptureResponse() for stateless workflows instead.");
         }
     }
 }
