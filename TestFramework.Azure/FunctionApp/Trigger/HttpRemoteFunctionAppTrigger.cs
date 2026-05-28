@@ -44,6 +44,7 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         if (config.DoPing) await remoteConnection.EnsurePingAsync();
         Uri fullTriggerUri = new Uri(remoteConnection.BasePath, _trigger.Path);
         IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
+        logger.LogInformation("FunctionApp HTTP '{0}' -> {1} {2}", appIdentifier, _trigger.Method, fullTriggerUri);
 
         using HttpResponseMessage response = await SendWithLocalWarmupRetryAsync(
             sender,
@@ -52,7 +53,10 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
             _request,
             functionConfig,
             config,
+            logger,
             cancellationToken).ConfigureAwait(false);
+
+        logger.LogInformation("FunctionApp HTTP '{0}' <- {1}", appIdentifier, response.StatusCode);
 
         return await HttpResponseResultContext.FromHttpResponseAsync(response, cancellationToken).ConfigureAwait(false);
     }
@@ -64,8 +68,12 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         CommonHttpRequest request,
         FunctionAppConfig functionConfig,
         FunctionAppTriggerConfig triggerConfig,
+        ScopedLogger logger,
         CancellationToken cancellationToken)
     {
+        // This is intentionally narrower than timeline retries: local hosts often return a transient 404
+        // while the route table is still warming up, and callers should not need to model that startup quirk
+        // as a user-visible step retry.
         bool shouldRetryNotFound = IsLocalDevelopmentHost(fullTriggerUri) && triggerConfig.LocalNotFoundRetryDuration > TimeSpan.Zero;
         DateTime retryDeadline = DateTime.UtcNow.Add(triggerConfig.LocalNotFoundRetryDuration);
 
@@ -76,6 +84,7 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
             if (!shouldRetryNotFound || response.StatusCode != HttpStatusCode.NotFound || DateTime.UtcNow >= retryDeadline)
                 return response;
 
+            logger.LogWarning("FunctionApp HTTP warmup retry for '{0}' after 404 from local host. Retrying after {1}.", fullTriggerUri, triggerConfig.LocalNotFoundRetryDelay);
             response.Dispose();
             await Task.Delay(triggerConfig.LocalNotFoundRetryDelay, cancellationToken).ConfigureAwait(false);
         }

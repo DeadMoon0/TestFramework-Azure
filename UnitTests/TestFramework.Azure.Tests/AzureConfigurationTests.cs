@@ -28,6 +28,7 @@ using TestFramework.Azure.ServiceBus;
 using TestFramework.Azure.StorageAccount.Blob;
 using TestFramework.Azure.StorageAccount.Table;
 using TestFramework.Core.Artifacts;
+using TestFramework.Core.Debugger;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Steps.Options;
@@ -432,11 +433,50 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public void FunctionAppSelectFunction_ThrowsForBlankLiteralName()
+    {
+        ArgumentException exception = Assert.Throws<ArgumentException>(() => AzureExt.Trigger.FunctionApp
+            .Http("func")
+            .SelectFunction(" ", HttpMethod.Post));
+
+        Assert.Equal("functionName", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task FunctionAppSelectFunction_ThrowsForBlankResolvedName()
+    {
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            {
+                BaseUrl = "https://example.test/",
+                Code = "secret",
+                AdminCode = null,
+            }));
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        var trigger = AzureExt.Trigger.FunctionApp
+            .Http("func")
+            .SelectFunction(Var.Const("  "), Var.Const(HttpMethod.Post))
+            .Call();
+
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+
+        Assert.Contains("cannot be blank", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(sender.Requests);
+    }
+
+    [Fact]
     public async Task HttpRemoteFunctionAppTrigger_RetriesLocalhostNotFoundDuringWarmup()
     {
         FakeHttpRequestSender sender = new(
             new HttpResponseMessage(HttpStatusCode.NotFound),
             new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        RecordingRunDebugger debugger = new();
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
@@ -453,7 +493,7 @@ public class AzureConfigurationTests
                 LocalNotFoundRetryDelay = TimeSpan.Zero,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
-        });
+        }, debugger);
 
         TriggerHttpRouting routing = new("api/orders", HttpMethod.Post, Var.Const(new Dictionary<string, string>()));
         CommonHttpRequest request = new();
@@ -466,6 +506,8 @@ public class AzureConfigurationTests
         Assert.Equal(HttpStatusCode.InternalServerError, actual.StatusCode);
         Assert.Equal(2, sender.Requests.Count);
         Assert.All(sender.Requests, loggedRequest => Assert.Equal("http://localhost:7071/api/orders", loggedRequest.RequestUri!.ToString()));
+        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("FunctionApp HTTP 'func' -> POST http://localhost:7071/api/orders", StringComparison.Ordinal));
+        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("warmup retry", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -693,6 +735,44 @@ public class AzureConfigurationTests
         Assert.Equal("https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc", sender.Requests[0].RequestUri!.ToString());
         Assert.Equal("run-consumption-123", result!.RunId);
         Assert.Equal("https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc", result.InvokeUri);
+    }
+
+    [Fact]
+    public async Task LogicAppHttpTrigger_CompletesFromObservedRun_WhenInvokeRequestHangs()
+    {
+        RouteAwareLogicAppHttpRequestSender sender = new();
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig
+                {
+                    BaseUrl = "https://logic.test/",
+                    Code = "logic-code",
+                    AdminCode = "logic-admin",
+                },
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new RouteAwareHttpComponentFactory(sender) });
+        });
+
+        Step<LogicAppExecutionResult> trigger = AzureExt.Trigger.LogicApp
+            .Http("logic")
+            .Workflow("OrderProcessor")
+            .Manual()
+            .WithBody(Var.Const("payload"))
+            .Execute();
+
+        using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(1));
+        LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, cancellation.Token);
+
+        Assert.NotNull(result);
+        Assert.Equal("run-observed-123", result!.RunId);
+        Assert.Equal(HttpStatusCode.Accepted, result.StatusCode);
+        Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/triggers/manual/listCallbackUrl?api-version=2022-03-01", sender.RequestUris[0]!.ToString());
+        Assert.Contains(sender.RequestUris, uri => uri!.ToString() == "https://logic.test/invoke/manual?sig=abc");
+        Assert.Contains(sender.RequestUris, uri => uri!.ToString() == "https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/runs?api-version=2022-03-01");
     }
 
     [Fact]
@@ -1180,7 +1260,8 @@ public class AzureConfigurationTests
         Assert.NotNull(completed);
         Assert.Equal(LogicAppRunStatus.Succeeded, completed!.RunStatus);
         Assert.Equal(2, sender.Requests.Count);
-        Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/runs?api-version=2022-03-01", sender.Requests[0].RequestUri!.ToString());
+        Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/runs/run-123?api-version=2022-03-01", sender.Requests[0].RequestUri!.ToString());
+        Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/runs?api-version=2022-03-01", sender.Requests[1].RequestUri!.ToString());
     }
 
     [Fact]
@@ -1338,6 +1419,7 @@ public class AzureConfigurationTests
             Content = new StringContent("managed")
         };
         FakeHttpRequestSender sender = new(response);
+        RecordingRunDebugger debugger = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
@@ -1348,7 +1430,7 @@ public class AzureConfigurationTests
             }));
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
-        });
+        }, debugger);
 
         ManagedRemoteFunctionAppTrigger trigger = new("func", Var.Const(new TriggerRouting("cleanup")));
 
@@ -1360,6 +1442,8 @@ public class AzureConfigurationTests
         Assert.Equal("https://example.test/api/admin/functions/cleanup", sender.Request!.RequestUri!.ToString());
         Assert.Equal("secret", sender.Request.Headers.GetValues("x-functions-key").Single());
         Assert.Equal("{}", await sender.Request.Content!.ReadAsStringAsync());
+        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("FunctionApp managed 'func' -> POST https://example.test/api/admin/functions/cleanup", StringComparison.Ordinal));
+        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("FunctionApp managed 'func' <- OK", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1405,6 +1489,7 @@ public class AzureConfigurationTests
     {
         HttpResponseMessage response = new(HttpStatusCode.OK);
         FakeHttpRequestSender sender = new(response);
+        RecordingRunDebugger debugger = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
@@ -1415,7 +1500,7 @@ public class AzureConfigurationTests
             }));
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
-        });
+        }, debugger);
 
         var trigger = AzureExt.Trigger.IsLive.FunctionApp("func");
 
@@ -1423,6 +1508,7 @@ public class AzureConfigurationTests
 
         Assert.Equal("https://example.test/api/admin/host/status", sender.Request!.RequestUri!.ToString());
         Assert.Equal("admin-code", sender.Request.Headers.GetValues("x-functions-key").Single());
+        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("probing host status", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -2331,27 +2417,23 @@ public class AzureConfigurationTests
         public VariableStore VariableStore { get; }
         public ArtifactStore ArtifactStore { get; }
 
-        private RuntimeContext(Action<IServiceCollection>? configureServices)
+        private RuntimeContext(Action<IServiceCollection>? configureServices, IRunDebugger? debugger)
         {
             ServiceCollection services = new();
             configureServices?.Invoke(services);
             ServiceProvider = services.BuildServiceProvider();
 
-            Logger = (ScopedLogger)Activator.CreateInstance(
-                typeof(ScopedLogger),
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
-                binder: null,
-                args: new object?[] { null },
-                culture: null)!;
-
             Type coreAssemblyType = typeof(VariableStore);
             Type debuggingRunSessionType = coreAssemblyType.Assembly.GetType("TestFramework.Core.Debugger.DebuggingRunSession", throwOnError: true)!;
-            Type emptyRunDebuggerType = coreAssemblyType.Assembly.GetType("TestFramework.Core.Debugger.EmptyRunDebugger", throwOnError: true)!;
-            object emptyRunDebugger = emptyRunDebuggerType.GetMethod("CreateNew", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!.Invoke(null, null)!;
+            object activeDebugger = debugger ?? new NullRunDebugger();
             object debuggingSession = debuggingRunSessionType
                 .GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
                 .Single()
-                .Invoke([emptyRunDebugger]);
+                .Invoke([activeDebugger]);
+
+            Logger = (ScopedLogger)typeof(ScopedLogger)
+                .GetMethod("CreateWithDebuggerSession", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!
+                .Invoke(null, [debuggingSession])!;
 
             VariableStore = (VariableStore)Activator.CreateInstance(
                 typeof(VariableStore),
@@ -2368,7 +2450,47 @@ public class AzureConfigurationTests
                 culture: null)!;
         }
 
-        public static RuntimeContext Create(Action<IServiceCollection>? configureServices = null) => new(configureServices);
+        public static RuntimeContext Create(Action<IServiceCollection>? configureServices = null, IRunDebugger? debugger = null) => new(configureServices, debugger);
+    }
+
+    private sealed class RecordingRunDebugger : IRunDebugger
+    {
+        public List<DebugLogEntry> LogEntries { get; } = [];
+
+        public Task SignalInitTimelineRunAsync(string sessionId, string name, string projectPath, TimelineRunStructure runStructure) => Task.CompletedTask;
+
+        public Task SignalEntityTransitionAsync(string sessionId, DebugEntityKind entityKind, string? stage, int? stepId, DebugLifecycleState state, DebugLifecycleState? previousState = null, DebugLifecycleState? outcomeState = null) => Task.CompletedTask;
+
+        public Task SignalValueUpdateAsync(string sessionId, string name, DebugValueKind valueKind, string? stage, int? stepId, DebugValueEnvelope value) => Task.CompletedTask;
+
+        public Task SignalLogEntryAsync(string sessionId, DebugLogEntry entry)
+        {
+            LogEntries.Add(entry);
+            return Task.CompletedTask;
+        }
+
+        public Task SignalAssertionAsync(string sessionId, DebugAssertionEntry entry) => Task.CompletedTask;
+
+        public Task SignalTimelineRunFinishedAsync(string sessionId) => Task.CompletedTask;
+
+        public Task SignalAndWaitBreakpointHitAsync(string sessionId, string stage, int stepId) => Task.CompletedTask;
+    }
+
+    private sealed class NullRunDebugger : IRunDebugger
+    {
+        public Task SignalInitTimelineRunAsync(string sessionId, string name, string projectPath, TimelineRunStructure runStructure) => Task.CompletedTask;
+
+        public Task SignalEntityTransitionAsync(string sessionId, DebugEntityKind entityKind, string? stage, int? stepId, DebugLifecycleState state, DebugLifecycleState? previousState = null, DebugLifecycleState? outcomeState = null) => Task.CompletedTask;
+
+        public Task SignalValueUpdateAsync(string sessionId, string name, DebugValueKind valueKind, string? stage, int? stepId, DebugValueEnvelope value) => Task.CompletedTask;
+
+        public Task SignalLogEntryAsync(string sessionId, DebugLogEntry entry) => Task.CompletedTask;
+
+        public Task SignalAssertionAsync(string sessionId, DebugAssertionEntry entry) => Task.CompletedTask;
+
+        public Task SignalTimelineRunFinishedAsync(string sessionId) => Task.CompletedTask;
+
+        public Task SignalAndWaitBreakpointHitAsync(string sessionId, string stage, int stepId) => Task.CompletedTask;
     }
 
     private sealed class FakeAzureComponentFactory : IAzureComponentFactory
@@ -2712,10 +2834,14 @@ public class AzureConfigurationTests
         public IHttpRequestSender CreateSender() => sender;
     }
 
+    private sealed class RouteAwareHttpComponentFactory(RouteAwareLogicAppHttpRequestSender sender) : IHttpComponentFactory
+    {
+        public IHttpRequestSender CreateSender() => sender;
+    }
+
     private sealed class FakeHttpRequestSender(params HttpResponseMessage[] responses) : IHttpRequestSender
     {
         private int _nextResponseIndex;
-        private readonly ResponseSnapshot[] _snapshots = responses.Select(ResponseSnapshot.Create).ToArray();
 
         public List<HttpRequestMessage> Requests { get; } = [];
         public IReadOnlyList<HttpResponseMessage> Responses => responses;
@@ -2725,13 +2851,13 @@ public class AzureConfigurationTests
         public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Requests.Add(await CloneRequestAsync(request, cancellationToken));
-            ResponseSnapshot response = _nextResponseIndex < _snapshots.Length
-                ? _snapshots[_nextResponseIndex++]
-                : _snapshots.Last();
+            HttpResponseMessage response = _nextResponseIndex < responses.Length
+                ? responses[_nextResponseIndex++]
+                : responses.Last();
             return await CloneResponseAsync(response, cancellationToken);
         }
 
-        private static Task<HttpResponseMessage> CloneResponseAsync(ResponseSnapshot response, CancellationToken cancellationToken)
+        private static async Task<HttpResponseMessage> CloneResponseAsync(HttpResponseMessage response, CancellationToken cancellationToken)
         {
             HttpResponseMessage clone = new(response.StatusCode)
             {
@@ -2742,16 +2868,20 @@ public class AzureConfigurationTests
             foreach (var header in response.Headers)
                 clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
 
-            if (response.ContentBytes is not null)
+            if (response.Content is not null)
             {
-                ByteArrayContent contentClone = new(response.ContentBytes);
-                foreach (var header in response.ContentHeaders)
+                byte[] contentBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                ByteArrayContent contentClone = new(contentBytes);
+                foreach (var header in response.Content.Headers)
                     contentClone.Headers.TryAddWithoutValidation(header.Key, header.Value);
 
                 clone.Content = contentClone;
             }
 
-            return Task.FromResult(clone);
+            if (response.RequestMessage is not null)
+                clone.RequestMessage = await CloneRequestAsync(response.RequestMessage, cancellationToken);
+
+            return clone;
         }
 
         private static async Task<HttpRequestMessage> CloneRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -2773,34 +2903,6 @@ public class AzureConfigurationTests
 
             return clone;
         }
-
-        private sealed record ResponseSnapshot(
-            HttpStatusCode StatusCode,
-            string? ReasonPhrase,
-            Version Version,
-            List<KeyValuePair<string, string[]>> Headers,
-            byte[]? ContentBytes,
-            List<KeyValuePair<string, string[]>> ContentHeaders)
-        {
-            public static ResponseSnapshot Create(HttpResponseMessage response)
-            {
-                byte[]? contentBytes = response.Content?.ReadAsByteArrayAsync().GetAwaiter().GetResult();
-                List<KeyValuePair<string, string[]>> headers = response.Headers
-                    .Select(header => new KeyValuePair<string, string[]>(header.Key, header.Value.ToArray()))
-                    .ToList();
-                List<KeyValuePair<string, string[]>> contentHeaders = response.Content?.Headers
-                    .Select(header => new KeyValuePair<string, string[]>(header.Key, header.Value.ToArray()))
-                    .ToList() ?? [];
-
-                return new ResponseSnapshot(
-                    response.StatusCode,
-                    response.ReasonPhrase,
-                    response.Version,
-                    headers,
-                    contentBytes,
-                    contentHeaders);
-            }
-        }
     }
 
     private sealed class HangingHttpRequestSender : IHttpRequestSender
@@ -2812,6 +2914,56 @@ public class AzureConfigurationTests
             RequestUris.Add(request.RequestUri);
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             throw new InvalidOperationException("The hanging sender should be canceled before completing.");
+        }
+    }
+
+    private sealed class RouteAwareLogicAppHttpRequestSender : IHttpRequestSender
+    {
+        public List<Uri?> RequestUris { get; } = [];
+
+        public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestUris.Add(request.RequestUri);
+
+            string uri = request.RequestUri!.ToString();
+            if (uri.Contains("/listCallbackUrl?api-version=2022-03-01", StringComparison.Ordinal))
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"value\":\"https://logic.test/invoke/manual?sig=abc\"}")
+                };
+            }
+
+            if (uri.Contains("/runs?api-version=2022-03-01", StringComparison.Ordinal))
+            {
+                string startTime = DateTimeOffset.UtcNow.AddSeconds(1).ToString("O");
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent($$"""
+                    {
+                        "value": [
+                            {
+                                "name": "run-observed-123",
+                                "properties": {
+                                    "trigger": {
+                                        "name": "manual",
+                                        "startTime": "{{startTime}}"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                    """)
+                };
+            }
+
+            if (uri.Contains("/invoke/manual?sig=abc", StringComparison.Ordinal))
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException("The hanging invoke request should be canceled before completing.");
+            }
+
+            throw new InvalidOperationException($"Unexpected request URI '{uri}'.");
         }
     }
 

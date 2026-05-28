@@ -10,6 +10,12 @@ It lets you model a test run as an ordered flow of triggers, waits, variables, a
 
 This solution adds Azure-focused building blocks on top of that runtime.
 
+## Boundary First
+
+`TestFramework.Azure` owns Azure-facing triggers, events, artifacts, and typed configuration.
+
+It does not own local Docker/bootstrap concerns. When you want the same Azure trigger surface against emulator-backed local infrastructure, keep the timeline and Azure APIs the same and switch the run environment through `TestFramework.Container.Azure`.
+
 ## What This Solution Covers
 
 TestFramework-Azure contains the Azure extension package for the ecosystem.
@@ -58,6 +64,7 @@ The same pattern is available for Function App HTTP results, managed Function Ap
 - Keep TestFramework-Core nearby because most Azure timelines build directly on its timeline and configuration model
 - For Logic Apps, prefer the package README first because it now documents the stateful vs stateless API split explicitly
 - For remote Function Apps, prefer `SelectFunction(name, method)` when you want the default `api/{name}` route instead of spelling it out by hand
+- For local Docker-backed Azure runs, move to `TestFramework.Container.Azure`; keep `TestFramework.Azure` focused on the Azure interaction layer, not the bootstrap layer
 
 ## CI Pull Requests
 

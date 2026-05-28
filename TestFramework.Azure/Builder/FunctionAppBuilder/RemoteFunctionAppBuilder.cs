@@ -32,7 +32,10 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
     }
 
     public IFunctionAppHttpPayloadStage SelectFunction(string functionName, HttpMethod method)
-        => SelectFunction(Var.Const(functionName), Var.Const(method));
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(functionName);
+        return SelectFunction(Var.Const(functionName), Var.Const(method));
+    }
 
     public IFunctionAppHttpPayloadStage SelectFunction(VariableReference<string> functionName, VariableReference<HttpMethod> method)
     {
@@ -43,7 +46,7 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
     public Step<HttpResponseResultContext> Call()
     {
         if (_routing is null)
-            throw new InvalidOperationException("No endpoint selected. Call SelectEndpoint or SelectEndpointWithMethod first.");
+            throw new InvalidOperationException($"Function App '{appIdentifier}' has no selected HTTP endpoint. Call SelectFunction(...), SelectEndpoint(...), or SelectEndpointWithMethod(...) first.");
 
         return new HttpRemoteFunctionAppTrigger(appIdentifier, _routing, _request.BuildVariable());
     }
@@ -91,8 +94,14 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
         public override bool HasIdentifier => false;
         public override VariableIdentifier? Identifier => null;
 
-        public override TriggerHttpRouting? GetValue(VariableStore store) =>
-            new TriggerHttpRouting(path.GetRequiredValue(store), method.GetRequiredValue(store), null!);
+        public override TriggerHttpRouting? GetValue(VariableStore store)
+        {
+            string resolvedPath = path.GetRequiredValue(store);
+            if (string.IsNullOrWhiteSpace(resolvedPath))
+                throw new InvalidOperationException("Function App endpoint path cannot be blank.");
+
+            return new TriggerHttpRouting(resolvedPath.Trim(), method.GetRequiredValue(store), null!);
+        }
 
         public override VariableReference<TNew> Transform<TNew>(Func<TriggerHttpRouting?, TNew?> transform) where TNew : default =>
             throw new NotSupportedException();
@@ -111,9 +120,13 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
         public override TriggerHttpRouting? GetValue(VariableStore store)
         {
             string resolvedFunctionName = functionName.GetRequiredValue(store);
-            string normalized = resolvedFunctionName.StartsWith("api/", StringComparison.OrdinalIgnoreCase)
-                ? resolvedFunctionName
-                : $"api/{resolvedFunctionName.TrimStart('/')}";
+            if (string.IsNullOrWhiteSpace(resolvedFunctionName))
+                throw new InvalidOperationException("Function App function name cannot be blank.");
+
+            string trimmedName = resolvedFunctionName.Trim();
+            string normalized = trimmedName.StartsWith("api/", StringComparison.OrdinalIgnoreCase)
+                ? trimmedName
+                : $"api/{trimmedName.TrimStart('/')}";
             return new TriggerHttpRouting(normalized, method.GetRequiredValue(store), null!);
         }
 

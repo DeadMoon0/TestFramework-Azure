@@ -76,6 +76,7 @@
 | Dependency | Builds on `TestFramework.Core` (engine) and `TestFramework.Config` (configuration) |
 | Config source | JSON file (e.g. `local.testSettings.json`) with sections per Azure service |
 | Azure resources | Must be pre-provisioned — the framework does not create infrastructure |
+| Local Docker bootstrap | Explicitly out of scope here — handled by `TestFramework.Container.Azure` so Timeline and Azure triggers stay clean |
 
 ---
 

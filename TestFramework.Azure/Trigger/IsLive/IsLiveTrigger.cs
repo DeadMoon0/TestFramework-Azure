@@ -144,21 +144,26 @@ internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier,
         RemoteConnection remoteConnection = new(new Uri(functionConfig.BaseUrl));
         if (currentAlivenessLevel == AlivenessLevel.Reachable)
         {
+            logger.LogInformation("FunctionApp IsLive '{0}' using reachable probe against '{1}'.", identifier, remoteConnection.BasePath);
             await remoteConnection.EnsurePingAsync();
+            logger.LogInformation("FunctionApp IsLive '{0}' reachable probe succeeded.", identifier);
             return CreateResult(variableStore);
         }
 
         if (triggerConfig.DoPing)
         {
+            logger.LogInformation("FunctionApp IsLive '{0}' pre-pinging '{1}' before authenticated host-status probe.", identifier, remoteConnection.BasePath);
             await remoteConnection.EnsurePingAsync();
         }
 
         using HttpRequestMessage request = new(HttpMethod.Get, new Uri(remoteConnection.BasePath, HostStatusUri));
         request.Headers.Add("x-functions-key", functionConfig.AdminCode ?? functionConfig.Code);
+        logger.LogInformation("FunctionApp IsLive '{0}' probing host status at '{1}'.", identifier, request.RequestUri?.ToString() ?? "(unknown)");
 
         IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
         using HttpResponseMessage response = await sender.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
+        logger.LogInformation("FunctionApp IsLive '{0}' returned status {1}.", identifier, response.StatusCode);
         return CreateResult(variableStore, response.StatusCode);
     }
 
@@ -186,7 +191,9 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
         RemoteConnection remoteConnection = new(probeBaseUri);
         if (currentAlivenessLevel == AlivenessLevel.Reachable)
         {
+            logger.LogInformation("LogicApp IsLive '{0}' using reachable probe against '{1}' in {2} mode.", identifier, remoteConnection.BasePath, logicAppConfig.HostingMode);
             await remoteConnection.EnsurePingAsync();
+            logger.LogInformation("LogicApp IsLive '{0}' reachable probe succeeded.", identifier);
             return CreateResult(variableStore);
         }
 
@@ -205,6 +212,7 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
         }
 
         IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
+        logger.LogInformation("LogicApp IsLive '{0}' probing '{1}' in {2} mode.", identifier, request.RequestUri?.ToString() ?? "(unknown)", logicAppConfig.HostingMode);
         using HttpResponseMessage response = await sender.SendAsync(request, cancellationToken);
         if (logicAppConfig.HostingMode == LogicAppHostingMode.Consumption)
         {
@@ -216,10 +224,12 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
             if ((int)response.StatusCode >= 500)
                 response.EnsureSuccessStatusCode();
 
+            logger.LogInformation("LogicApp IsLive '{0}' returned status {1}.", identifier, response.StatusCode);
             return CreateResult(variableStore, response.StatusCode);
         }
 
         response.EnsureSuccessStatusCode();
+        logger.LogInformation("LogicApp IsLive '{0}' returned status {1}.", identifier, response.StatusCode);
         return CreateResult(variableStore, response.StatusCode);
     }
 

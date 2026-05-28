@@ -59,7 +59,7 @@ internal static class LogicAppHttpTriggerExecution
         resolvedRequest.ApplyToHttpRequestMessage(invokeRequest);
 
         DateTimeOffset observationStart = DateTimeOffset.UtcNow;
-        using HttpResponseMessage invokeResponse = includeResponseBody
+        using HttpResponseMessage invokeResponse = includeResponseBody || !config.SupportsManagementOperations
             ? await sender.SendAsync(invokeRequest, cancellationToken)
             : await SendForRunTrackingAsync(serviceProvider, sender, identifier, config, resolvedWorkflowName, resolvedTriggerName, callbackUrl, invokeRequest, observationStart, cancellationToken);
         string responseBody = includeResponseBody
@@ -142,9 +142,10 @@ internal static class LogicAppHttpTriggerExecution
         CancellationToken cancellationToken)
     {
         HttpRequestMessage ownedInvokeRequest = await CloneHttpRequestMessageAsync(invokeRequest, cancellationToken);
-        CancellationTokenSource invokeLifetime = new();
+        CancellationTokenSource invokeLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        CancellationTokenSource observationLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task<HttpResponseMessage> invokeTask = sender.SendAsync(ownedInvokeRequest, invokeLifetime.Token);
-        Task<string> observedRunTask = LogicAppManagementTrigger.WaitForObservedRunAsync(serviceProvider, sender, identifier, config, workflowName, triggerName, observationStart, cancellationToken);
+        Task<string> observedRunTask = LogicAppManagementTrigger.WaitForObservedRunAsync(serviceProvider, sender, identifier, config, workflowName, triggerName, observationStart, observationLifetime.Token);
 
         try
         {
@@ -152,54 +153,78 @@ internal static class LogicAppHttpTriggerExecution
             if (completedTask == invokeTask)
             {
                 HttpResponseMessage response = await invokeTask;
-                invokeLifetime.Dispose();
+                ownedInvokeRequest.Dispose();
+
                 if (!string.IsNullOrWhiteSpace(LogicAppRoutes.ResolveRunId(response)))
                 {
-                    ownedInvokeRequest.Dispose();
+                    observationLifetime.Cancel();
+                    _ = ObserveCompletionAsync(observedRunTask, observationLifetime);
+                    invokeLifetime.Dispose();
                     return response;
                 }
 
                 response.Dispose();
-                ownedInvokeRequest.Dispose();
                 string observedRunIdFromCompletedInvoke = await observedRunTask;
+                observationLifetime.Dispose();
+                invokeLifetime.Dispose();
                 return CreateObservedRunResponse(callbackUrl, observedRunIdFromCompletedInvoke);
             }
 
-            string runId = await observedRunTask;
-            DetachInvokeCompletion(invokeTask, ownedInvokeRequest, invokeLifetime);
-            return CreateObservedRunResponse(callbackUrl, runId);
+            string observedRunId = await observedRunTask;
+            invokeLifetime.Cancel();
+            _ = ObserveCompletionAsync(invokeTask, ownedInvokeRequest, invokeLifetime);
+            observationLifetime.Dispose();
+            return CreateObservedRunResponse(callbackUrl, observedRunId);
         }
         catch
         {
-            invokeLifetime.Cancel();
+            CancelIfPending(invokeTask, invokeLifetime);
+            CancelIfPending(observedRunTask, observationLifetime);
             ownedInvokeRequest.Dispose();
             invokeLifetime.Dispose();
+            observationLifetime.Dispose();
             throw;
         }
     }
 
-    private static void DetachInvokeCompletion(Task<HttpResponseMessage> invokeTask, HttpRequestMessage invokeRequest, CancellationTokenSource invokeLifetime)
+    private static void CancelIfPending(Task task, CancellationTokenSource cancellationTokenSource)
     {
-        _ = invokeTask.ContinueWith(
-            static (task, stateObject) =>
-            {
-                (Task<HttpResponseMessage> Task, HttpRequestMessage Request, CancellationTokenSource Lifetime) state = ((Task<HttpResponseMessage>, HttpRequestMessage, CancellationTokenSource))stateObject!;
+        if (task.IsCompleted)
+            return;
 
-                try
-                {
-                    if (state.Task.Status == TaskStatus.RanToCompletion)
-                        state.Task.Result.Dispose();
-                }
-                finally
-                {
-                    state.Request.Dispose();
-                    state.Lifetime.Dispose();
-                }
-            },
-            (invokeTask, invokeRequest, invokeLifetime),
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
+        cancellationTokenSource.Cancel();
+    }
+
+    private static async Task ObserveCompletionAsync(Task task, CancellationTokenSource cancellationTokenSource)
+    {
+        try
+        {
+            await task;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            cancellationTokenSource.Dispose();
+        }
+    }
+
+    private static async Task ObserveCompletionAsync(Task<HttpResponseMessage> task, HttpRequestMessage invokeRequest, CancellationTokenSource cancellationTokenSource)
+    {
+        try
+        {
+            HttpResponseMessage response = await task;
+            response.Dispose();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            invokeRequest.Dispose();
+            cancellationTokenSource.Dispose();
+        }
     }
 
     private static async Task<HttpRequestMessage> CloneHttpRequestMessageAsync(HttpRequestMessage source, CancellationToken cancellationToken)

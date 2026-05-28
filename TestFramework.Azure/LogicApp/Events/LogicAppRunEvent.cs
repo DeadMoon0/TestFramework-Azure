@@ -138,9 +138,6 @@ public sealed class LogicAppRunEvent(
 
     private async Task<LogicAppRunDetails?> TryReadRunDetailsAsync(IServiceProvider serviceProvider, IHttpRequestSender sender, LogicAppConfig config, string workflowName, string runId, CancellationToken cancellationToken)
     {
-        if (config.HostingMode == LogicAppHostingMode.Standard)
-            return await TryReadRunDetailsFromRunsListAsync(serviceProvider, sender, config, workflowName, runId, cancellationToken);
-
         using HttpRequestMessage request = LogicAppRoutes.CreateManagementRequest(HttpMethod.Get, LogicAppRoutes.BuildRunUri(config, workflowName, runId), config);
         await LogicAppRoutes.AuthorizeManagementRequestAsync(serviceProvider, identifier, config, request, cancellationToken);
         using HttpResponseMessage response = await sender.SendAsync(request, cancellationToken);

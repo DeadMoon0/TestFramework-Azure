@@ -48,10 +48,12 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
         message.Headers.Add("x-functions-key", functionConfig.Code);
         message.Content = new StringContent("{}", new System.Net.Http.Headers.MediaTypeHeaderValue(MediaTypeNames.Application.Json));
         IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
+        logger.LogInformation("FunctionApp managed '{0}' -> POST {1} (function: {2})", appIdentifier, fullTriggerUri, _trigger.Name);
         using HttpResponseMessage response = await sender.SendAsync(message, cancellationToken);
         string? responseBody = response.Content is null
             ? null
             : await response.Content.ReadAsStringAsync(cancellationToken);
+        logger.LogInformation("FunctionApp managed '{0}' <- {1}", appIdentifier, response.StatusCode);
         response.EnsureSuccessStatusCode();
         return new ManagedResult()
         {
