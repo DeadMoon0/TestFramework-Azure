@@ -70,6 +70,13 @@ internal static class LogicAppJson
     internal static LogicAppRunDetails ParseRunDetails(string workflowName, string runId, string payload)
     {
         JObject document = JObject.Parse(payload);
+        if (document["value"] is not null)
+        {
+            LogicAppRunDetails? fromRunsList = TryParseRunDetailsFromRunsList(workflowName, runId, payload);
+            if (fromRunsList is not null)
+                return fromRunsList;
+        }
+
         JToken? properties = document["properties"];
         string? statusText = ResolveStatusText(properties, document);
         string? code = ResolveCode(properties, document);
