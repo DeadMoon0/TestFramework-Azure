@@ -154,7 +154,7 @@ public static class CosmosSchemaRestClient
             }
         }
 
-        throw new TimeoutException($"Timed out while waiting for Cosmos resource '{resourceLink}' to become available.", lastError);
+        throw new TestFramework.Core.Exceptions.FrameworkTimeoutException($"Timed out while waiting for Cosmos resource '{resourceLink}' to become available.", lastError);
     }
 
     private static HttpRequestMessage CreateRequest(HttpMethod method, Uri endpoint, string key, string resourceType, string resourceLink, string relativeUri)
@@ -198,10 +198,10 @@ public static class CosmosSchemaRestClient
         DbConnectionStringBuilder builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
 
         if (!builder.TryGetValue("AccountEndpoint", out object? endpointValue) || endpointValue is not string endpointText)
-            throw new InvalidOperationException("The Cosmos connection string is missing 'AccountEndpoint'.");
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("The Cosmos connection string is missing 'AccountEndpoint'.");
 
         if (!builder.TryGetValue("AccountKey", out object? keyValue) || keyValue is not string keyText)
-            throw new InvalidOperationException("The Cosmos connection string is missing 'AccountKey'.");
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("The Cosmos connection string is missing 'AccountKey'.");
 
         return (new Uri(endpointText, UriKind.Absolute), keyText);
     }

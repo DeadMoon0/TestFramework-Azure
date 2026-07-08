@@ -111,13 +111,13 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
         string[] rawValues = GetPrimaryKeyValues(variableStore);
 
         var entityType = context.Model.FindEntityType(typeof(TRow))
-            ?? throw new InvalidOperationException($"Entity type '{typeof(TRow).Name}' is not registered in the DbContext.");
+            ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Entity type '{typeof(TRow).Name}' is not registered in the DbContext.");
 
         var keyProperties = entityType.FindPrimaryKey()?.Properties
-            ?? throw new InvalidOperationException($"No primary key defined for entity '{typeof(TRow).Name}'.");
+            ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"No primary key defined for entity '{typeof(TRow).Name}'.");
 
         if (rawValues.Length != keyProperties.Count)
-            throw new InvalidOperationException(
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                 $"Expected {keyProperties.Count} primary key value(s) for '{typeof(TRow).Name}' " +
                 $"({string.Join(", ", keyProperties.Select(p => p.Name))}), " +
                 $"but {rawValues.Length} were provided.");

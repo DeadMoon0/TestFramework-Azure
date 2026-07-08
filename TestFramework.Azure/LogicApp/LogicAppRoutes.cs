@@ -87,7 +87,7 @@ internal static class LogicAppRoutes
         config.EnsureSupportsManagement("authorize Logic App management requests");
 
         ILogicAppConsumptionManagementRequestAuthorizer authorizer = serviceProvider.GetService<ILogicAppConsumptionManagementRequestAuthorizer>()
-            ?? throw new InvalidOperationException(
+            ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                 $"Logic App '{identifier}' requires management capability for this operation. "
                 + $"Register {nameof(ILogicAppConsumptionManagementRequestAuthorizer)} to enable RunCompleted(...), RunReachedStatus(...), timer triggers, and management-backed liveness for Consumption workflows.");
         await authorizer.AuthorizeAsync(identifier, config, request, cancellationToken);
@@ -97,7 +97,7 @@ internal static class LogicAppRoutes
     {
         return !string.IsNullOrWhiteSpace(workflowName)
             ? workflowName
-            : config.WorkflowName ?? throw new InvalidOperationException("No Logic App workflow name was provided, and LogicAppConfig.WorkflowName is not configured.");
+            : config.WorkflowName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("No Logic App workflow name was provided, and LogicAppConfig.WorkflowName is not configured.");
     }
 
     internal static string? ResolveRunId(HttpResponseMessage response)
@@ -129,7 +129,7 @@ internal static class LogicAppRoutes
         if (config.SupportsDirectInvocation)
             return ResolveConsumptionUri(config.Consumption.InvokeUrl, resolvedWorkflowName, null, null, $"{nameof(LogicAppConfig.Consumption)}:{nameof(LogicAppConsumptionConfig.InvokeUrl)}");
 
-        throw new InvalidOperationException(
+        throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
             $"Logic App '{resolvedWorkflowName}' in Consumption mode has no usable liveness path configured. "
             + $"Set '{nameof(LogicAppConfig.Consumption)}:{nameof(LogicAppConsumptionConfig.InvokeUrl)}' for invoke-only access, or '{nameof(LogicAppConfig.Consumption)}:{nameof(LogicAppConsumptionConfig.WorkflowResourceId)}' for management-backed liveness.");
     }
@@ -154,7 +154,7 @@ internal static class LogicAppRoutes
     private static Uri ResolveConsumptionUri(string? template, string workflowName, string? triggerName, string? runId, string propertyName)
     {
         if (string.IsNullOrWhiteSpace(template))
-            throw new InvalidOperationException(
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                 $"Logic App Consumption invoke operations require '{propertyName}'. "
                 + "Configure it for Manual().Execute(), CaptureResponse(), and invoke-only liveness.");
 

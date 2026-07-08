@@ -63,14 +63,14 @@ public record ServiceBusConfig
     /// <summary>
     /// Gets the active queue or topic entity name.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when neither <see cref="QueueName"/> nor <see cref="TopicName"/> is configured.</exception>
+    /// <exception cref="TestFramework.Core.Exceptions.FrameworkConfigurationException">Thrown when neither <see cref="QueueName"/> nor <see cref="TopicName"/> is configured.</exception>
     public string EntityName
     {
         get
         {
             if (!string.IsNullOrEmpty(QueueName)) return QueueName;
             if (!string.IsNullOrEmpty(TopicName)) return TopicName;
-            throw new InvalidOperationException("Either QueueName or TopicName must be provided.");
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("Either QueueName or TopicName must be provided.");
         }
     }
 
@@ -94,7 +94,7 @@ public record ServiceBusConfig
         if (IsQueue) return ServiceBusConfigReceiveMode.Queue;
         if (!IsTopic)
         {
-            throw new InvalidOperationException("Either QueueName or TopicName must be provided.");
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("Either QueueName or TopicName must be provided.");
         }
 
         if (createTempSubscription)
@@ -107,11 +107,11 @@ public record ServiceBusConfig
             return ServiceBusConfigReceiveMode.TopicSubscription;
         }
 
-        throw new InvalidOperationException("SubscriptionName must be provided for topic-backed receive unless createTempSubscription is enabled.");
+        throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("SubscriptionName must be provided for topic-backed receive unless createTempSubscription is enabled.");
     }
 
     /// <summary>
     /// Gets the configured subscription name or throws when a topic-backed fixed subscription has not been configured.
     /// </summary>
-    public string SubscriptionNameRequired => SubscriptionName ?? throw new InvalidOperationException("SubscriptionName must be provided for topic-backed receive unless createTempSubscription is enabled.");
+    public string SubscriptionNameRequired => SubscriptionName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("SubscriptionName must be provided for topic-backed receive unless createTempSubscription is enabled.");
 }

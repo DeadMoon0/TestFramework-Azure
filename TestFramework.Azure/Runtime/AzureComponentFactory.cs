@@ -180,7 +180,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         {
             if (!await container.ExistsAsync(cancellationToken))
             {
-                throw new InvalidOperationException($"Blob container '{container.Name}' was not found or is not accessible.");
+                throw new TestFramework.Core.Exceptions.FrameworkStateException($"Blob container '{container.Name}' was not found or is not accessible.");
             }
         }
 
@@ -431,7 +431,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
             if (_processor is null)
             {
-                throw new InvalidOperationException("No Service Bus processor was created.");
+                throw new TestFramework.Core.Exceptions.FrameworkStateException("No Service Bus processor was created.");
             }
 
             _processor.ProcessMessageAsync += async args =>

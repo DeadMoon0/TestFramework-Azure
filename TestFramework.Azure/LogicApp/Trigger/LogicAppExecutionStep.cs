@@ -44,7 +44,7 @@ internal sealed class LogicAppExecutionStep(
         {
             LogicAppTriggerExecutionMode.HttpCallback => await ExecuteHttpAsync(serviceProvider, variableStore, cancellationToken),
             LogicAppTriggerExecutionMode.ManagementRun => await LogicAppManagementTrigger.ExecuteAsync(serviceProvider, variableStore, identifier, request.WorkflowName, request.TriggerName, cancellationToken),
-            _ => throw new InvalidOperationException($"Unsupported Logic App trigger mode '{request.TriggerMode}'.")
+            _ => throw new TestFramework.Core.Exceptions.UnsupportedFrameworkValueException($"Unsupported Logic App trigger mode '{request.TriggerMode}'.")
         };
     }
 
@@ -66,7 +66,7 @@ internal sealed class LogicAppExecutionStep(
     private async Task<LogicAppExecutionResult> ExecuteHttpAsync(IServiceProvider serviceProvider, VariableStore variableStore, CancellationToken cancellationToken)
     {
         VariableReference<CommonHttpRequest> httpRequest = request.Request
-            ?? throw new InvalidOperationException("HTTP Logic App execution requires a request payload builder.");
+            ?? throw new TestFramework.Core.Exceptions.FrameworkStateException("HTTP Logic App execution requires a request payload builder.");
 
         LogicAppHttpInvokeResponse invocation = await LogicAppHttpTriggerExecution.InvokeAsync(
             serviceProvider,

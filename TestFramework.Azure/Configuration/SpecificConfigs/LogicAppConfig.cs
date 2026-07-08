@@ -59,11 +59,11 @@ public record LogicAppConfig
 
         throw HostingMode switch
         {
-            LogicAppHostingMode.Standard => new InvalidOperationException(
+            LogicAppHostingMode.Standard => new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                 $"Logic App direct invocation requires '{nameof(Standard)}:{nameof(LogicAppStandardConfig.BaseUrl)}' to {operationDescription}."),
-            LogicAppHostingMode.Consumption => new InvalidOperationException(
+            LogicAppHostingMode.Consumption => new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                 $"Logic App direct invocation requires '{nameof(Consumption)}:{nameof(LogicAppConsumptionConfig.InvokeUrl)}' to {operationDescription}."),
-            _ => new InvalidOperationException($"Logic App direct invocation is not configured to {operationDescription}."),
+            _ => new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Logic App direct invocation is not configured to {operationDescription}."),
         };
     }
 
@@ -74,11 +74,11 @@ public record LogicAppConfig
 
         throw HostingMode switch
         {
-            LogicAppHostingMode.Standard => new InvalidOperationException(
+            LogicAppHostingMode.Standard => new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                 $"Logic App management operations require '{nameof(Standard)}:{nameof(LogicAppStandardConfig.BaseUrl)}' to {operationDescription}."),
-            LogicAppHostingMode.Consumption => new InvalidOperationException(
+            LogicAppHostingMode.Consumption => new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                 $"Logic App management operations require '{nameof(Consumption)}:{nameof(LogicAppConsumptionConfig.WorkflowResourceId)}' to {operationDescription}."),
-            _ => new InvalidOperationException($"Logic App management operations are not configured to {operationDescription}."),
+            _ => new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Logic App management operations are not configured to {operationDescription}."),
         };
     }
 }

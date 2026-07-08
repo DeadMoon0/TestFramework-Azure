@@ -93,7 +93,7 @@ internal class SqlMigrationTracker
                 IReadOnlyList<string> pending = (await context.Database.GetPendingMigrationsAsync()).ToList();
                 if (pending.Count > 0)
                 {
-                    throw new InvalidOperationException(
+                    throw new TestFramework.Core.Exceptions.FrameworkStateException(
                         $"Database '{identifier}' has {pending.Count} unapplied migration(s): " +
                         string.Join(", ", pending) + ". " +
                         "Run 'dotnet ef database update' or call reg.ApplyMigrationsOnFirstUse() in AddSqlArtifactContexts.");

@@ -38,7 +38,7 @@ internal class ServiceBusDeleteTempSubscriptionStep(
         IServiceBusAdministrationAdapter adminClient = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
         try
         {
-            string topicName = config.TopicName ?? throw new InvalidOperationException("A topic name is required for deleting a temporary subscription.");
+            string topicName = config.TopicName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("A topic name is required for deleting a temporary subscription.");
             await adminClient.DeleteSubscriptionAsync(topicName, tempSubscriptionName, cancellationToken);
             logger.LogInformation($"Deleted temp subscription '{tempSubscriptionName}' from topic '{topicName}'.");
         }

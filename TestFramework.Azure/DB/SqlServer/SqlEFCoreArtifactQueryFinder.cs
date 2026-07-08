@@ -63,18 +63,18 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
     private SqlRowArtifactReference<TRow> BuildReference(DbContext context, TRow entity)
     {
         var entityType = context.Model.FindEntityType(typeof(TRow))
-            ?? throw new InvalidOperationException($"Entity type '{typeof(TRow).Name}' is not registered in the DbContext.");
+            ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Entity type '{typeof(TRow).Name}' is not registered in the DbContext.");
 
         var keyProperties = entityType.FindPrimaryKey()?.Properties
-            ?? throw new InvalidOperationException($"No primary key defined for entity '{typeof(TRow).Name}'.");
+            ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"No primary key defined for entity '{typeof(TRow).Name}'.");
 
         // Extract key values as strings from the entity
         string[] pkStringValues = keyProperties
             .Select(prop =>
             {
                 object? value = prop.PropertyInfo?.GetValue(entity)
-                    ?? throw new InvalidOperationException($"Cannot read key property '{prop.Name}' from entity '{typeof(TRow).Name}'.");
-                return Convert.ToString(value) ?? throw new InvalidOperationException($"Key property '{prop.Name}' returned null.");
+                    ?? throw new TestFramework.Core.Exceptions.FrameworkStateException($"Cannot read key property '{prop.Name}' from entity '{typeof(TRow).Name}'.");
+                return Convert.ToString(value) ?? throw new TestFramework.Core.Exceptions.FrameworkStateException($"Key property '{prop.Name}' returned null.");
             })
             .ToArray();
 

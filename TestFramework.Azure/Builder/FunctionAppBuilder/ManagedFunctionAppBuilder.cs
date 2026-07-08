@@ -22,7 +22,7 @@ internal sealed class ManagedFunctionAppBuilder(FunctionAppIdentifier appIdentif
     public Step<ManagedResult> Call()
     {
         if (_routing is null)
-            throw new InvalidOperationException("No function selected. Call SelectFunctionWithMethod first.");
+            throw new TestFramework.Core.Exceptions.FrameworkStateException("No function selected. Call SelectFunctionWithMethod first.");
 
         return new ManagedRemoteFunctionAppTrigger(appIdentifier, _routing);
     }

@@ -84,13 +84,13 @@ public static class CosmosModelSchemaResolver
                 || string.Equals(candidate.SerializedName, propertyName, StringComparison.OrdinalIgnoreCase))
             ?.Property;
 
-        return property ?? throw new InvalidOperationException(errorMessage);
+        return property ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(errorMessage);
     }
 
     private static string ResolvePropertyValue<TItem>(TItem item, PropertyInfo property, string logicalName)
     {
         return property.GetValue(item)?.ToString()
-            ?? throw new InvalidOperationException($"Cannot have a {logicalName} that is NULL. {item}");
+            ?? throw new TestFramework.Core.Exceptions.FrameworkStateException($"Cannot have a {logicalName} that is NULL. {item}");
     }
 
     private static string ResolveSerializedPropertyName(PropertyInfo property)

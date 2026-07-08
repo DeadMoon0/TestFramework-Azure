@@ -16,7 +16,7 @@ internal static class LogicAppJson
 
         return !string.IsNullOrWhiteSpace(callbackUrl)
             ? callbackUrl
-            : throw new InvalidOperationException("The Logic App callback URL response did not contain a callback URL.");
+            : throw new TestFramework.Core.Exceptions.FrameworkStateException("The Logic App callback URL response did not contain a callback URL.");
     }
 
     internal static bool TryExtractCallbackUrl(string payload, out string? callbackUrl)
@@ -35,7 +35,7 @@ internal static class LogicAppJson
         {
             return false;
         }
-        catch (InvalidOperationException)
+        catch (TestFramework.Core.Exceptions.FrameworkStateException)
         {
             return false;
         }

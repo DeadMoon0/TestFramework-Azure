@@ -60,7 +60,7 @@ public class TableStorageEntityArtifactReference<T>(StorageAccountIdentifier ide
             return new ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>
             {
                 Found = true,
-                Data = new TableStorageEntityArtifactData<T>(response.Entity ?? throw new InvalidOperationException("Found table response without entity.")) { Identifier = versionIdentifier }
+                Data = new TableStorageEntityArtifactData<T>(response.Entity ?? throw new TestFramework.Core.Exceptions.FrameworkStateException("Found table response without entity.")) { Identifier = versionIdentifier }
             };
         }
 

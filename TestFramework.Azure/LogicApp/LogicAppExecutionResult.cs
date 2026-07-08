@@ -40,7 +40,7 @@ public sealed record LogicAppExecutionResult(
         WorkflowName,
         !string.IsNullOrWhiteSpace(RunId)
             ? RunId
-            : throw new InvalidOperationException("The Logic App execution result does not contain a workflow run id."));
+            : throw new TestFramework.Core.Exceptions.FrameworkStateException("The Logic App execution result does not contain a workflow run id."));
 
     /// <summary>
     /// Formats only the persisted execution fields and avoids traversing derived contexts.

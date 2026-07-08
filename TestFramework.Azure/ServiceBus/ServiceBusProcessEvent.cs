@@ -131,7 +131,7 @@ public class ServiceBusProcessEvent(
             ServiceBusConfigReceiveMode.Queue => null,
             ServiceBusConfigReceiveMode.TopicSubscription => config.SubscriptionNameRequired,
             ServiceBusConfigReceiveMode.TopicTemporarySubscription => TempSubscriptionName,
-            _ => throw new InvalidOperationException($"Unsupported Service Bus receive mode for '{identifier}'."),
+            _ => throw new TestFramework.Core.Exceptions.UnsupportedFrameworkValueException($"Unsupported Service Bus receive mode for '{identifier}'."),
         };
 
         await using IServiceBusMessagePump pump = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateMessagePump(config, subscriptionName);

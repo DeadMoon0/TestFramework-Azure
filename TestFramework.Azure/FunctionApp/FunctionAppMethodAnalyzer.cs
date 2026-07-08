@@ -39,18 +39,18 @@ internal static class FunctionAppMethodAnalyzer
             return new TriggerHttpRouting(path, httpMethod, null!);
         }
 
-        throw new InvalidOperationException(
+        throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
             $"Method '{methodName}' on '{typeof(TFunctionType).Name}' has no parameter with [HttpTrigger] attribute.");
     }
 
     private static (MethodInfo method, FunctionAttribute functionAttr) GetMethodAndFunctionAttribute<TFunctionType>(string methodName)
     {
         MethodInfo method = typeof(TFunctionType).GetMethod(methodName)
-            ?? throw new InvalidOperationException(
+            ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                 $"Method '{methodName}' not found on type '{typeof(TFunctionType).Name}'.");
 
         FunctionAttribute functionAttr = method.GetCustomAttribute<FunctionAttribute>()
-            ?? throw new InvalidOperationException(
+            ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                 $"Method '{methodName}' on '{typeof(TFunctionType).Name}' is missing the [Function] attribute.");
 
         return (method, functionAttr);

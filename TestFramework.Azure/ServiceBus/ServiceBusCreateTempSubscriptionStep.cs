@@ -46,7 +46,7 @@ internal class ServiceBusCreateTempSubscriptionStep(
         ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
 
         if (!config.IsTopic)
-            throw new InvalidOperationException(
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                 $"createTempSubscription is only supported for topics, not queues. Identifier: '{identifier}'");
 
         // TTL is at least 1 hour, never shorter than the step timeout.

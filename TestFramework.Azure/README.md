@@ -48,6 +48,37 @@ ConfigInstance config = ConfigInstance.FromJsonFile("local.testSettings.json")
     .Build();
 ```
 
+## How Azure Config Fits The Core Config Model
+
+`ConfigInstance` is still the normal setup entry point for Azure timelines.
+
+Use it to:
+
+- load JSON or create an empty base
+- call `LoadAzureConfig()` or related helpers
+- register extra services
+- build the `IServiceProvider` that you pass into `SetupRun(...)`
+
+`ConfigStore<T>` is not a competing setup API. It is the Azure package's typed runtime registry for named records such as `Default`, `MainDb`, or `MainSql`.
+
+That means the usual shape stays:
+
+1. build the run provider with `ConfigInstance`
+2. let Azure config helpers populate the typed stores inside DI
+3. let Azure triggers, artifacts, or your own services resolve those stores by identifier at runtime
+
+If you see `ConfigStore<T>` in advanced samples, read it as a module-owned lookup service inside the provider, not as a second top-level configuration model you must choose instead of `ConfigInstance`.
+
+## Output Binding Mental Model
+
+When Azure-oriented APIs expose callback URLs, response payloads, workflow run identifiers, or similar values, treat them as explicit result extraction from a step.
+
+- they are not a second hidden execution model
+- they are not a replacement for normal `TimelineRun` assertions
+- they are the Azure-shaped way to surface a step result that the scenario can then register, assert, or pass forward explicitly
+
+If a scenario starts to feel too Azure-magic-heavy, pull the extracted value into a named variable or artifact and keep the rest of the assertions generic.
+
 ## Configuration Records
 
 The Azure package reads named records from configuration sections through `LoadAzureConfig()` or `LoadAzureConfigs(...)`.

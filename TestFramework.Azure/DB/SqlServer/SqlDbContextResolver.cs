@@ -33,12 +33,12 @@ internal class SqlDbContextResolver(SqlDbContextRegistry registry, ConfigStore<S
             }
 
             if (contextType is null)
-                throw new InvalidOperationException(
+                throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                     $"Could not resolve CLR type '{config.ContextType}' configured for SqlDatabase identifier '{identifier}'. " +
                     $"Ensure the assembly is loaded and the type name is correct.");
 
             if (!typeof(DbContext).IsAssignableFrom(contextType))
-                throw new InvalidOperationException(
+                throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                     $"The configured ContextType '{config.ContextType}' for identifier '{identifier}' does not inherit from DbContext.");
 
             DbContext contextFromType = (DbContext)serviceProvider.GetRequiredService(contextType);
@@ -49,7 +49,7 @@ internal class SqlDbContextResolver(SqlDbContextRegistry registry, ConfigStore<S
         if (registry.TryResolveDefault(serviceProvider, out DbContext? defaultContext) && defaultContext is not null)
             return defaultContext;
 
-        throw new InvalidOperationException(
+        throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
             $"No DbContext could be resolved for SqlDatabase identifier '{identifier}'. " +
             $"Register a context via AddSqlArtifactContexts(reg => reg.AddForIdentifier<TContext>(\"{identifier}\")) " +
             $"or reg.AddDefault<TContext>(), or set ContextType in config.");

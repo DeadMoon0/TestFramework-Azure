@@ -46,7 +46,7 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
     public Step<HttpResponseResultContext> Call()
     {
         if (_routing is null)
-            throw new InvalidOperationException($"Function App '{appIdentifier}' has no selected HTTP endpoint. Call SelectFunction(...), SelectEndpoint(...), or SelectEndpointWithMethod(...) first.");
+            throw new TestFramework.Core.Exceptions.FrameworkStateException($"Function App '{appIdentifier}' has no selected HTTP endpoint. Call SelectFunction(...), SelectEndpoint(...), or SelectEndpointWithMethod(...) first.");
 
         return new HttpRemoteFunctionAppTrigger(appIdentifier, _routing, _request.BuildVariable());
     }
@@ -98,7 +98,7 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
         {
             string resolvedPath = path.GetRequiredValue(store);
             if (string.IsNullOrWhiteSpace(resolvedPath))
-                throw new InvalidOperationException("Function App endpoint path cannot be blank.");
+                throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("Function App endpoint path cannot be blank.");
 
             return new TriggerHttpRouting(resolvedPath.Trim(), method.GetRequiredValue(store), null!);
         }
@@ -121,7 +121,7 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
         {
             string resolvedFunctionName = functionName.GetRequiredValue(store);
             if (string.IsNullOrWhiteSpace(resolvedFunctionName))
-                throw new InvalidOperationException("Function App function name cannot be blank.");
+                throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("Function App function name cannot be blank.");
 
             string trimmedName = resolvedFunctionName.Trim();
             string normalized = trimmedName.StartsWith("api/", StringComparison.OrdinalIgnoreCase)

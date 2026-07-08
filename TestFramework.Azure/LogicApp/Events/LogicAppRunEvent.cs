@@ -131,7 +131,7 @@ public sealed class LogicAppRunEvent(
             return details.ExecutionResult;
 
         if (LogicAppJson.IsTerminal(details.Status))
-            throw new InvalidOperationException($"Logic App run '{details.RunId}' for workflow '{details.WorkflowName}' reached terminal status '{details.Status}' instead of '{expected.Value}'.");
+            throw new TestFramework.Core.Exceptions.FrameworkStateException($"Logic App run '{details.RunId}' for workflow '{details.WorkflowName}' reached terminal status '{details.Status}' instead of '{expected.Value}'.");
 
         return null;
     }
@@ -172,7 +172,7 @@ public sealed class LogicAppRunEvent(
 
         if (mode == LogicAppWorkflowMode.Stateless)
         {
-            throw new InvalidOperationException(
+            throw new TestFramework.Core.Exceptions.UnsupportedFrameworkValueException(
                 $"Logic App workflow '{resolvedWorkflowName}' on '{identifier}' is stateless and does not support managed run polling through RunCompleted/RunReachedStatus. "
                 + "Use CaptureResponse() for stateless workflows instead.");
         }

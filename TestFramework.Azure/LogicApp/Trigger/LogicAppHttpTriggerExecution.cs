@@ -104,7 +104,7 @@ internal static class LogicAppHttpTriggerExecution
     private static async Task<string> ReadCallbackUrlPayloadAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (response.Content is null)
-            throw new InvalidOperationException("The Logic App callback URL response did not contain a body.");
+            throw new TestFramework.Core.Exceptions.FrameworkStateException("The Logic App callback URL response did not contain a body.");
 
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         byte[] buffer = new byte[4096];
@@ -126,7 +126,7 @@ internal static class LogicAppHttpTriggerExecution
         if (!string.IsNullOrWhiteSpace(payload))
             return payload;
 
-        throw new InvalidOperationException("The Logic App callback URL response did not contain a readable payload.");
+        throw new TestFramework.Core.Exceptions.FrameworkStateException("The Logic App callback URL response did not contain a readable payload.");
     }
 
     private static async Task<HttpResponseMessage> SendForRunTrackingAsync(

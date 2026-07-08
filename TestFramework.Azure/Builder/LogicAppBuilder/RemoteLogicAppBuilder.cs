@@ -47,7 +47,7 @@ internal sealed class RemoteLogicAppBuilder(LogicAppIdentifier appIdentifier)
     public Step<LogicAppExecutionResult> Execute()
     {
         if (_triggerName is null)
-            throw new InvalidOperationException("No Logic App trigger was selected. Call Workflow(...).Manual(...) or Timer(...) first.");
+            throw new TestFramework.Core.Exceptions.FrameworkStateException("No Logic App trigger was selected. Call Workflow(...).Manual(...) or Timer(...) first.");
 
         return new LogicAppExecutionStep(appIdentifier, BuildRequest(captureResponse: false));
     }
@@ -55,10 +55,10 @@ internal sealed class RemoteLogicAppBuilder(LogicAppIdentifier appIdentifier)
     public Step<LogicAppExecutionResult> CaptureResponse()
     {
         if (_triggerName is null)
-            throw new InvalidOperationException("No Logic App trigger was selected. Call Workflow(...).Manual(...) first.");
+            throw new TestFramework.Core.Exceptions.FrameworkStateException("No Logic App trigger was selected. Call Workflow(...).Manual(...) first.");
 
         if (_triggerMode != LogicAppTriggerExecutionMode.HttpCallback)
-            throw new InvalidOperationException("CaptureResponse() is only supported for Logic App HTTP callback triggers. Use Execute() for timer triggers.");
+            throw new TestFramework.Core.Exceptions.UnsupportedFrameworkValueException("CaptureResponse() is only supported for Logic App HTTP callback triggers. Use Execute() for timer triggers.");
 
         return new LogicAppExecutionStep(appIdentifier, BuildRequest(captureResponse: true));
     }
@@ -102,7 +102,7 @@ internal sealed class RemoteLogicAppBuilder(LogicAppIdentifier appIdentifier)
     private LogicAppExecutionRequest BuildRequest(bool captureResponse)
         => new(
             _workflowName,
-            _triggerName ?? throw new InvalidOperationException("No Logic App trigger was selected."),
+            _triggerName ?? throw new TestFramework.Core.Exceptions.FrameworkStateException("No Logic App trigger was selected."),
             _triggerMode,
             _triggerMode == LogicAppTriggerExecutionMode.HttpCallback ? _request.BuildVariable() : null,
             captureResponse);

@@ -203,7 +203,7 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
 
         if (logicAppConfig.HostingMode == LogicAppHostingMode.Standard)
         {
-            string hostKey = logicAppConfig.Standard.AdminCode ?? logicAppConfig.Standard.Code ?? throw new InvalidOperationException($"Logic App '{identifier}' requires Standard:AdminCode or Standard:Code for authenticated liveness checks.");
+            string hostKey = logicAppConfig.Standard.AdminCode ?? logicAppConfig.Standard.Code ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Logic App '{identifier}' requires Standard:AdminCode or Standard:Code for authenticated liveness checks.");
             request.Headers.Add("x-functions-key", hostKey);
         }
         else if (LogicAppRoutes.HasConsumptionManagementResourceId(logicAppConfig))
@@ -217,7 +217,7 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
         if (logicAppConfig.HostingMode == LogicAppHostingMode.Consumption)
         {
             if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
-                throw new InvalidOperationException(
+                throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                     $"Logic App '{identifier}' rejected the configured Consumption liveness probe. "
                     + "If this host only has invoke access, use reachable-level checks or configure management capability with WorkflowResourceId plus ILogicAppConsumptionManagementRequestAuthorizer.");
 
@@ -333,7 +333,7 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
         TimeSpan timeout = TimeOutOptions.TimeOut.GetValue(variableStore);
         if (timeout <= TimeSpan.Zero)
         {
-            throw new InvalidOperationException($"Cosmos IsLive timeout for '{identifier}' must be greater than zero.");
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Cosmos IsLive timeout for '{identifier}' must be greater than zero.");
         }
 
         ICosmosContainerAdapter container = serviceProvider.GetAzureComponentFactory().Cosmos.CreateContainer(config);
@@ -375,11 +375,11 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested && timeoutTokenSource.IsCancellationRequested)
         {
-            throw new TimeoutException(timeoutMessage, exception);
+            throw new TestFramework.Core.Exceptions.FrameworkTimeoutException(timeoutMessage, exception);
         }
         catch (TimeoutException exception)
         {
-            throw new TimeoutException(timeoutMessage, exception);
+            throw new TestFramework.Core.Exceptions.FrameworkTimeoutException(timeoutMessage, exception);
         }
 
         return CreateResult(variableStore);
@@ -400,7 +400,7 @@ internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier,
         DbContext context = resolver.Resolve(identifier);
         if (!await context.Database.CanConnectAsync(cancellationToken))
         {
-            throw new InvalidOperationException($"Could not connect to SQL database '{identifier}'.");
+            throw new TestFramework.Core.Exceptions.FrameworkStateException($"Could not connect to SQL database '{identifier}'.");
         }
 
         return CreateResult(variableStore);

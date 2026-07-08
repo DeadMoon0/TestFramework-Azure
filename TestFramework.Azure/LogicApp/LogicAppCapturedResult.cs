@@ -55,7 +55,7 @@ public sealed record LogicAppCapturedResult(
         WorkflowName,
         !string.IsNullOrWhiteSpace(RunId)
             ? RunId
-            : throw new InvalidOperationException("The Logic App capture result does not contain a workflow run id."));
+            : throw new TestFramework.Core.Exceptions.FrameworkStateException("The Logic App capture result does not contain a workflow run id."));
 
     internal static IReadOnlyDictionary<string, string[]> EmptyHeaders { get; } = new ReadOnlyDictionary<string, string[]>(new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase));
 }

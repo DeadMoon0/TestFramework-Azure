@@ -96,14 +96,14 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
 
     internal PartitionKey GetPartitionKey(VariableStore variableStore)
     {
-        if (this._partitionKey is null) throw new InvalidOperationException("Cannot get the PartitionKey when it is not Set.");
+        if (this._partitionKey is null) throw new TestFramework.Core.Exceptions.FrameworkStateException("Cannot get the PartitionKey when it is not set.");
         if (IsPinned) return pinnedPartitionKey;
         return this._partitionKey.GetRequiredValue(variableStore);
     }
 
     internal string GetId(VariableStore variableStore)
     {
-        if (this._id is null) throw new InvalidOperationException("Cannot get the Id when it is not Set.");
+        if (this._id is null) throw new TestFramework.Core.Exceptions.FrameworkStateException("Cannot get the Id when it is not set.");
         if (IsPinned) return pinnedId;
         return this._id.GetRequiredValue(variableStore);
     }
@@ -130,7 +130,7 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
             {
                 using (JsonTextReader jsonTextReader = new JsonTextReader(sr))
                 {
-                    return JsonSerializer.CreateDefault().Deserialize<T>(jsonTextReader) ?? throw new InvalidOperationException("Could not read and parse JSON from CosmosDb.");
+                    return JsonSerializer.CreateDefault().Deserialize<T>(jsonTextReader) ?? throw new TestFramework.Core.Exceptions.FrameworkStateException("Could not read and parse JSON from CosmosDb.");
                 }
             }
         }

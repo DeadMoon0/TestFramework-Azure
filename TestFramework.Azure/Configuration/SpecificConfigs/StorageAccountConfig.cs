@@ -34,15 +34,15 @@ public record StorageAccountConfig
     /// <summary>
     /// Gets the configured queue name or throws when no queue name has been supplied.
     /// </summary>
-    public string QueueContainerNameRequired => QueueContainerName ?? throw new InvalidOperationException("QueueContainerName is required.");
+    public string QueueContainerNameRequired => QueueContainerName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("QueueContainerName is required.");
 
     /// <summary>
     /// Gets the configured blob container name or throws when no blob container name has been supplied.
     /// </summary>
-    public string BlobContainerNameRequired => BlobContainerName ?? throw new InvalidOperationException("BlobContainerName is required.");
+    public string BlobContainerNameRequired => BlobContainerName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("BlobContainerName is required.");
 
     /// <summary>
     /// Gets the configured table name or throws when no table name has been supplied.
     /// </summary>
-    public string TableContainerNameRequired => TableContainerName ?? throw new InvalidOperationException("TableContainerName is required.");
+    public string TableContainerNameRequired => TableContainerName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("TableContainerName is required.");
 }
