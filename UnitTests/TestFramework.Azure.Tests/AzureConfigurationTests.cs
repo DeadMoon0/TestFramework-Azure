@@ -29,6 +29,7 @@ using TestFramework.Azure.StorageAccount.Blob;
 using TestFramework.Azure.StorageAccount.Table;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Debugger;
+using TestFramework.Core.Exceptions;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Steps.Options;
@@ -463,7 +464,7 @@ public class AzureConfigurationTests
             .SelectFunction(Var.Const("  "), Var.Const(HttpMethod.Post))
             .Call();
 
-        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        FrameworkConfigurationException exception = await Assert.ThrowsAsync<FrameworkConfigurationException>(() =>
             trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
 
         Assert.Contains("cannot be blank", exception.Message, StringComparison.OrdinalIgnoreCase);
@@ -1369,7 +1370,7 @@ public class AzureConfigurationTests
 
         var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-stateless"), Var.Const("StatelessOrders"));
 
-        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        UnsupportedFrameworkValueException exception = await Assert.ThrowsAsync<UnsupportedFrameworkValueException>(() =>
             evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
 
         Assert.Contains("stateless", exception.Message, StringComparison.OrdinalIgnoreCase);
@@ -1629,7 +1630,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.LogicApp("logic");
 
-        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        FrameworkConfigurationException exception = await Assert.ThrowsAsync<FrameworkConfigurationException>(() =>
             trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
 
         Assert.Contains("management capability", exception.Message, StringComparison.OrdinalIgnoreCase);
@@ -1934,7 +1935,7 @@ public class AzureConfigurationTests
         var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos");
         trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(50));
 
-        TimeoutException exception = await Assert.ThrowsAsync<TimeoutException>(() =>
+        FrameworkTimeoutException exception = await Assert.ThrowsAsync<FrameworkTimeoutException>(() =>
             trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
 
         Assert.Contains("WithTimeOut", exception.Message, StringComparison.Ordinal);
@@ -2391,7 +2392,7 @@ public class AzureConfigurationTests
 
         ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic", messageId: Var.Const("missing-sub"));
 
-        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        FrameworkConfigurationException exception = await Assert.ThrowsAsync<FrameworkConfigurationException>(() =>
             receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
 
         Assert.Contains("createTempSubscription", exception.Message, StringComparison.Ordinal);
