@@ -25,7 +25,11 @@ namespace TestFramework.Azure.ServiceBus;
 /// <param name="messageId">Optional message id filter.</param>
 /// <param name="correlationId">Optional correlation id filter.</param>
 /// <param name="predicate">Optional custom predicate applied to received messages.</param>
-/// <param name="completeMessage">Whether matching messages should be completed automatically.</param>
+/// <param name="completeMessage">
+/// Whether a matching message is completed. Defaults to <see langword="true"/> when unspecified;
+/// pass <see langword="false"/> explicitly to leave the message on the entity. Note that an
+/// uncompleted message becomes visible again and can satisfy a later run's wait.
+/// </param>
 /// <param name="createTempSubscription">Whether a temporary subscription should be created for topic-backed receive flows.</param>
 public class ServiceBusProcessEvent(
     ServiceBusIdentifier identifier,
@@ -126,7 +130,8 @@ public class ServiceBusProcessEvent(
         ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
         bool useTempSubscription = createTempSubscription?.GetValue(variableStore) == true;
 
-        string? subscriptionName = config.GetReceiveMode(useTempSubscription) switch
+        ServiceBusConfigReceiveMode receiveMode = config.GetReceiveMode(useTempSubscription);
+        string? subscriptionName = receiveMode switch
         {
             ServiceBusConfigReceiveMode.Queue => null,
             ServiceBusConfigReceiveMode.TopicSubscription => config.SubscriptionNameRequired,
@@ -134,13 +139,21 @@ public class ServiceBusProcessEvent(
             _ => throw new TestFramework.Core.Exceptions.UnsupportedFrameworkValueException($"Unsupported Service Bus receive mode for '{identifier}'."),
         };
 
+        // A temporary subscription filters server-side, so anything delivered there matches by
+        // construction. The shared modes see other runs' traffic and must release those locks.
+        bool abandonNonMatching = receiveMode is ServiceBusConfigReceiveMode.Queue or ServiceBusConfigReceiveMode.TopicSubscription;
+
         await using IServiceBusMessagePump pump = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateMessagePump(config, subscriptionName);
         ServiceBusReceivedMessage? message = await pump.ReceiveMessageAsync(
             new ServiceBusReceiveRequest(
                 messageId?.GetValue(variableStore),
                 correlationId?.GetValue(variableStore),
                 predicate?.GetValue(variableStore),
-                completeMessage?.GetValue(variableStore) == true),
+                // Unspecified means complete: a matched-but-uncompleted message returns to the entity
+                // and can satisfy a LATER run's wait, which is a cross-run false pass.
+                completeMessage?.GetValue(variableStore) ?? true,
+                abandonNonMatching,
+                warning => logger.LogWarning("ServiceBus '{0}': {1}", identifier, warning)),
             cancellationToken);
 
         return message is null ? null : new ServiceBusReceivedMessageContext(message);

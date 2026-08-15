@@ -325,9 +325,15 @@ Use `CallAndCapture()` when the Consumption workflow is effectively stateless an
 
 | Mode | Required fields | Notes |
 |------|-----------------|-------|
-| Queue | `ConnectionString`, `QueueName` | `SubscriptionName` must be omitted. Works with session and non-session queues. |
-| Topic + subscription | `ConnectionString`, `TopicName`, `SubscriptionName` | Use when the test should receive from a fixed subscription. |
-| Topic + temp subscription | `ConnectionString`, `TopicName` | Call `AzureExt.Event.ServiceBus.MessageReceived(..., createTempSubscription: true)` to create and clean up a filtered temp subscription automatically. |
+| Queue | `ConnectionString`, `QueueName` | `SubscriptionName` must be omitted. Works with session and non-session queues. Non-matching messages are abandoned so their lock is released. |
+| Topic + subscription | `ConnectionString`, `TopicName`, `SubscriptionName` | Use when the test should receive from a fixed subscription. Non-matching messages are abandoned so their lock is released. |
+| Topic + temp subscription | `ConnectionString`, `TopicName` | Call `AzureExt.Event.ServiceBus.MessageReceived(..., createTempSubscription: true)` to create and clean up a filtered temp subscription automatically. Filtering happens server-side, so nothing is abandoned. |
+
+Message settlement:
+
+- A matching message is **completed by default**. Pass `completeMessage: false` to opt out.
+- Leaving a matched message uncompleted returns it to the entity, where it can satisfy a *later* run's wait - a cross-run false pass. Only opt out when another consumer owns the message.
+- In the shared modes, a non-matching message is abandoned rather than ignored. Ignoring it would hold its lock for the SDK's renewal window and starve concurrent runs; abandoning increases the message's `DeliveryCount`, which is the accepted tradeoff. The first abandon of a run is logged as a warning.
 
 ## Sample: Service Bus Queue Send + Wait
 

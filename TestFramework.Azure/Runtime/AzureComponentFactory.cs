@@ -93,11 +93,22 @@ internal interface IServiceBusSenderAdapter : IAsyncDisposable
     Task SendMessageAsync(ServiceBusMessage message, CancellationToken cancellationToken);
 }
 
+/// <param name="MessageId">Optional message id filter.</param>
+/// <param name="CorrelationId">Optional correlation id filter.</param>
+/// <param name="Predicate">Optional custom filter.</param>
+/// <param name="CompleteMessage">Whether a matching message is completed.</param>
+/// <param name="AbandonNonMatching">
+/// Whether non-matching messages are abandoned so their lock is released immediately. False for a
+/// temporary subscription, which filters server-side and therefore never sees a non-matching message.
+/// </param>
+/// <param name="Warn">Receives a one-off warning the first time a message is abandoned.</param>
 internal readonly record struct ServiceBusReceiveRequest(
     string? MessageId,
     string? CorrelationId,
     Func<ServiceBusReceivedMessage, bool>? Predicate,
-    bool CompleteMessage);
+    bool CompleteMessage,
+    bool AbandonNonMatching = false,
+    Action<string>? Warn = null);
 
 internal interface IServiceBusMessagePump : IAsyncDisposable
 {
@@ -402,6 +413,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
     {
         private readonly ServiceBusProcessor? _processor;
         private readonly ServiceBusSessionProcessor? _sessionProcessor;
+        private int _abandonWarningIssued;
 
         public DefaultServiceBusMessagePump(ServiceBusClient client, ServiceBusConfig config, string? subscriptionName)
         {
@@ -425,17 +437,13 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
             if (_sessionProcessor is not null)
             {
-                _sessionProcessor.ProcessMessageAsync += async args =>
-                {
-                    if (request.MessageId is { } messageId && args.Message.MessageId != messageId) return;
-                    if (request.CorrelationId is { } correlationId && args.Message.CorrelationId != correlationId) return;
-                    if (request.Predicate is { } predicate && !predicate(args.Message)) return;
-                    completionSource.TrySetResult(args.Message);
-                    if (request.CompleteMessage)
-                    {
-                        await args.CompleteMessageAsync(args.Message, cancellationToken);
-                    }
-                };
+                _sessionProcessor.ProcessMessageAsync += args => HandleMessageAsync(
+                    request,
+                    completionSource,
+                    args.Message,
+                    (message, token) => args.CompleteMessageAsync(message, token),
+                    (message, token) => args.AbandonMessageAsync(message, null, token),
+                    cancellationToken);
                 _sessionProcessor.ProcessErrorAsync += args =>
                 {
                     completionSource.TrySetException(args.Exception);
@@ -451,17 +459,13 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
                 throw new TestFramework.Core.Exceptions.FrameworkStateException("No Service Bus processor was created.");
             }
 
-            _processor.ProcessMessageAsync += async args =>
-            {
-                if (request.MessageId is { } messageId && args.Message.MessageId != messageId) return;
-                if (request.CorrelationId is { } correlationId && args.Message.CorrelationId != correlationId) return;
-                if (request.Predicate is { } predicate && !predicate(args.Message)) return;
-                completionSource.TrySetResult(args.Message);
-                if (request.CompleteMessage)
-                {
-                    await args.CompleteMessageAsync(args.Message, cancellationToken);
-                }
-            };
+            _processor.ProcessMessageAsync += args => HandleMessageAsync(
+                request,
+                completionSource,
+                args.Message,
+                (message, token) => args.CompleteMessageAsync(message, token),
+                (message, token) => args.AbandonMessageAsync(message, null, token),
+                cancellationToken);
             _processor.ProcessErrorAsync += args =>
             {
                 completionSource.TrySetException(args.Exception);
@@ -470,6 +474,58 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
             await _processor.StartProcessingAsync(cancellationToken);
             return await completionSource.Task.WaitAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Settles one delivered message. Shared by the queue and session handlers.
+        /// </summary>
+        /// <remarks>
+        /// Two ordering rules matter here. A non-matching message is abandoned rather than simply
+        /// ignored, because an ignored message keeps its lock (the SDK renews it for minutes) and
+        /// starves concurrent runs. A matching message is completed BEFORE the waiter is signalled,
+        /// because signalling first lets the waiter return and dispose the pump underneath the
+        /// in-flight settlement.
+        /// </remarks>
+        private async Task HandleMessageAsync(
+            ServiceBusReceiveRequest request,
+            TaskCompletionSource<ServiceBusReceivedMessage> completionSource,
+            ServiceBusReceivedMessage message,
+            Func<ServiceBusReceivedMessage, CancellationToken, Task> completeAsync,
+            Func<ServiceBusReceivedMessage, CancellationToken, Task> abandonAsync,
+            CancellationToken cancellationToken)
+        {
+            if (!Matches(request, message))
+            {
+                if (!request.AbandonNonMatching)
+                {
+                    return;
+                }
+
+                if (Interlocked.Exchange(ref _abandonWarningIssued, 1) == 0)
+                {
+                    request.Warn?.Invoke(
+                        "Abandoning a non-matching Service Bus message so its lock is released for concurrent runs. " +
+                        "This increases the message's DeliveryCount and moves it closer to dead-lettering.");
+                }
+
+                await abandonAsync(message, cancellationToken);
+                return;
+            }
+
+            if (request.CompleteMessage)
+            {
+                await completeAsync(message, cancellationToken);
+            }
+
+            completionSource.TrySetResult(message);
+        }
+
+        private static bool Matches(ServiceBusReceiveRequest request, ServiceBusReceivedMessage message)
+        {
+            if (request.MessageId is { } messageId && message.MessageId != messageId) return false;
+            if (request.CorrelationId is { } correlationId && message.CorrelationId != correlationId) return false;
+            if (request.Predicate is { } predicate && !predicate(message)) return false;
+            return true;
         }
 
         public async ValueTask DisposeAsync()

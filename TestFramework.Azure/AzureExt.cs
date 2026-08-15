@@ -476,7 +476,7 @@ public static class AzureExt
         /// <param name="messageId">Optional message id filter.</param>
         /// <param name="correlationId">Optional correlation id filter.</param>
         /// <param name="predicate">Optional custom predicate applied to received messages.</param>
-        /// <param name="completeMessage">Whether matching messages should be completed automatically.</param>
+        /// <param name="completeMessage">Whether a matching message is completed. Defaults to true when unspecified; pass false to leave the message on the entity, where it can satisfy a later run.</param>
         /// <param name="createTempSubscription">Whether a temporary topic subscription should be created for the receive flow.</param>
         /// <returns>A Service Bus event that completes when a matching message is observed.</returns>
         public ServiceBusProcessEvent MessageReceived(ServiceBusIdentifier identifier, VariableReference<string>? messageId = null, VariableReference<string>? correlationId = null, VariableReference<Func<ServiceBusReceivedMessage, bool>>? predicate = null, VariableReference<bool>? completeMessage = null, bool createTempSubscription = false)
@@ -491,7 +491,7 @@ public static class AzureExt
         /// <param name="messageId">Optional message id filter.</param>
         /// <param name="correlationId">Optional correlation id filter.</param>
         /// <param name="predicate">Optional custom predicate applied to received messages.</param>
-        /// <param name="completeMessage">Whether matching messages should be completed automatically.</param>
+        /// <param name="completeMessage">Whether a matching message is completed. Defaults to true when unspecified; pass false to leave the message on the entity, where it can satisfy a later run.</param>
         /// <param name="createTempSubscription">Variable-backed flag controlling temporary topic subscription creation.</param>
         /// <returns>A Service Bus event that completes when a matching message is observed.</returns>
         public ServiceBusProcessEvent MessageReceived<TVar>(ServiceBusIdentifier identifier, VariableReference<string>? messageId = null, VariableReference<string>? correlationId = null, VariableReference<Func<ServiceBusReceivedMessage, bool>>? predicate = null, VariableReference<bool>? completeMessage = null, ImmutableVariable<TVar, bool>? createTempSubscription = null) where TVar : VariableReference<bool>

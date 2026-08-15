@@ -2531,6 +2531,80 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public async Task ServiceBusProcessEvent_CompletesByDefault_AndAbandonsNonMatchingOnAQueue()
+    {
+        FakeServiceBusMessagePump pump = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("queue", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = "orders-queue",
+                TopicName = null,
+                SubscriptionName = null,
+                RequiredSession = false,
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
+        });
+
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q1"));
+
+        await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.True(pump.LastRequest!.Value.CompleteMessage);
+        Assert.True(pump.LastRequest.Value.AbandonNonMatching);
+    }
+
+    [Fact]
+    public async Task ServiceBusProcessEvent_HonoursAnExplicitOptOutFromCompletion()
+    {
+        FakeServiceBusMessagePump pump = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("queue", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = "orders-queue",
+                TopicName = null,
+                SubscriptionName = null,
+                RequiredSession = false,
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
+        });
+
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q1"), completeMessage: Var.Const(false));
+
+        await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.False(pump.LastRequest!.Value.CompleteMessage);
+    }
+
+    [Fact]
+    public async Task ServiceBusProcessEvent_DoesNotAbandonOnATemporarySubscription()
+    {
+        // A temp subscription filters server-side, so every delivered message matches by construction.
+        FakeServiceBusMessagePump pump = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = null,
+                TopicName = "orders-topic",
+                SubscriptionName = null,
+                RequiredSession = false,
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
+        });
+
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic", correlationId: Var.Const("c1"), createTempSubscription: true);
+
+        await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.False(pump.LastRequest!.Value.AbandonNonMatching);
+    }
+
+    [Fact]
     public async Task ServiceBusProcessEvent_UsesTemporarySubscriptionForTopicReceive()
     {
         ServiceBusReceivedMessage receivedMessage = ServiceBusModelFactory.ServiceBusReceivedMessage(messageId: "t1", body: new BinaryData("payload"));
