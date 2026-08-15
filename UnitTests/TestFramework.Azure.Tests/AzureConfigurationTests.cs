@@ -2531,6 +2531,25 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public void ServiceBusProcessEvent_PreStep_ResolvesAVariableBackedTimeout()
+    {
+        // Regression guard: CreatePreStep used to resolve the timeout against a null store, which only
+        // worked because the default timeout is a ConstVariable that ignores it.
+        RuntimeContext runtime = RuntimeContext.Create(_ => { });
+        runtime.VariableStore.SetVariable("waitTimeout", TimeSpan.FromSeconds(42));
+
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived(
+            "topic",
+            correlationId: Var.Const("c1"),
+            createTempSubscription: true);
+        receiveEvent.TimeOutOptions.TimeOut = Var.Ref<TimeSpan>("waitTimeout");
+
+        StepGeneric? preStep = ((IHasPreStep)receiveEvent).CreatePreStep(runtime.VariableStore);
+
+        Assert.NotNull(preStep);
+    }
+
+    [Fact]
     public async Task ServiceBusProcessEvent_CompletesByDefault_AndAbandonsNonMatchingOnAQueue()
     {
         FakeServiceBusMessagePump pump = new();

@@ -225,9 +225,15 @@ public class ReadmeSamplesTests
             .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBTopic", new ServiceBusMessage("Test message") { CorrelationId = "topic-1234" }))
             .Build();
 
+        // A real store, not null!: the pre-step resolves the step timeout through it, so passing null
+        // would hide a variable-backed timeout regression.
+        VariableStore variableStore = TestVariableStore.Create();
+        variableStore.SetVariable("sampleTimeout", TimeSpan.FromSeconds(10));
+        receiveEvent.TimeOutOptions.TimeOut = Var.Ref<TimeSpan>("sampleTimeout");
+
         Assert.NotNull(timeline);
-        Assert.NotNull(((IHasPreStep)receiveEvent).CreatePreStep(null!));
-        Assert.NotNull(((IHasCleanupStep)receiveEvent).CreateCleanupStep(null!));
+        Assert.NotNull(((IHasPreStep)receiveEvent).CreatePreStep(variableStore));
+        Assert.NotNull(((IHasCleanupStep)receiveEvent).CreateCleanupStep(variableStore));
     }
 
     [Fact]

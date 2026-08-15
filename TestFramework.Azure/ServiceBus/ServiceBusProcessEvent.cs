@@ -93,7 +93,10 @@ public class ServiceBusProcessEvent(
     StepGeneric? IHasPreStep.CreatePreStep(VariableStore variableStore)
     {
         if (createTempSubscription?.GetValue(variableStore) != true) return null;
-        var timeout = TimeOutOptions.TimeOut.GetValue(null!);
+
+        // The store must be the real one: the default timeout happens to be a ConstVariable that
+        // ignores it, but a variable-backed timeout would dereference null here.
+        var timeout = TimeOutOptions.TimeOut.GetValue(variableStore);
         return new ServiceBusCreateTempSubscriptionStep(
             identifier, TempSubscriptionName, messageId, correlationId, timeout);
     }
