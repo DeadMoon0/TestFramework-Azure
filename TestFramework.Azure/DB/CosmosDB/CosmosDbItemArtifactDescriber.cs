@@ -1,6 +1,7 @@
 ﻿using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
@@ -42,7 +43,9 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
         reference.SetIdentifier(resolver.ResolveId(data.Item), resolver.ResolvePartitionKey(data.Item));
 
         logger.LogInformation($"Ensuring Cosmos container exists: {config.DatabaseName}/{config.ContainerName}");
-        await container.EnsureContainerExistsAsync(data.Item);
+        // ArtifactDescriber.Setup carries no CancellationToken, so the step's real token cannot reach
+        // this call yet; the adapter and REST client now accept one for when Core supplies it.
+        await container.EnsureContainerExistsAsync(data.Item, CancellationToken.None);
 
         logger.LogInformation($"Upserting Cosmos item: {reference.GetId(variableStore)} {reference.GetPartitionKey(variableStore)}");
         await container.UpsertItemAsync(data.Item, reference.GetPartitionKey(variableStore));

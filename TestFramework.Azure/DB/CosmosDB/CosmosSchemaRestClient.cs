@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Runtime;
 
 namespace TestFramework.Azure.DB.CosmosDB;
@@ -44,28 +45,87 @@ internal static class CosmosSchemaRestClient
     /// <summary>
     /// Ensures that the target Cosmos database and container exist.
     /// </summary>
-    /// <param name="connectionString">The Cosmos account connection string.</param>
-    /// <param name="databaseName">The database name to create or validate.</param>
-    /// <param name="containerName">The container name to create or validate.</param>
+    /// <param name="config">The resolved Cosmos container configuration.</param>
     /// <param name="partitionKeyPath">The container partition key path, including the leading slash.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task that completes when both resources are available.</returns>
+    /// <remarks>
+    /// The common case - the container already exists - costs a single GET. Creation only happens
+    /// after that probe comes back empty, and only when it is allowed for the target account.
+    /// </remarks>
     public static async Task EnsureDatabaseAndContainerExistAsync(
-        string connectionString,
-        string databaseName,
-        string containerName,
+        CosmosContainerDbConfig config,
         string partitionKeyPath,
         CancellationToken cancellationToken)
     {
-        (Uri endpoint, string key) = ParseConnectionString(connectionString);
+        string databaseName = config.DatabaseName;
+        string containerName = config.ContainerName;
+
+        (Uri endpoint, string key) = ParseConnectionString(config.ConnectionString);
 
         HttpClient httpClient = SelectHttpClient(endpoint);
+
+        if (await ContainerExistsAsync(httpClient, endpoint, key, databaseName, containerName, cancellationToken).ConfigureAwait(false))
+            return;
+
+        EnsureSchemaCreationAllowed(config, endpoint);
 
         await CreateDatabaseIfNotExistsAsync(httpClient, endpoint, key, databaseName, cancellationToken).ConfigureAwait(false);
         await WaitForDatabaseAsync(httpClient, endpoint, key, databaseName, cancellationToken).ConfigureAwait(false);
 
-        await CreateContainerIfNotExistsAsync(httpClient, endpoint, key, databaseName, containerName, partitionKeyPath, cancellationToken).ConfigureAwait(false);
+        await CreateContainerIfNotExistsAsync(httpClient, endpoint, key, config, partitionKeyPath, cancellationToken).ConfigureAwait(false);
         await WaitForContainerAsync(httpClient, endpoint, key, databaseName, containerName, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Probes the container with a single GET so an existing container costs one round trip.
+    /// </summary>
+    private static async Task<bool> ContainerExistsAsync(HttpClient httpClient, Uri endpoint, string key, string databaseName, string containerName, CancellationToken cancellationToken)
+    {
+        using HttpRequestMessage request = CreateRequest(
+            HttpMethod.Get,
+            endpoint,
+            key,
+            "colls",
+            $"dbs/{databaseName}/colls/{containerName}",
+            $"/dbs/{Uri.EscapeDataString(databaseName)}/colls/{Uri.EscapeDataString(containerName)}");
+
+        using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+        if (response.StatusCode == HttpStatusCode.OK)
+            return true;
+
+        await EnsureNotAuthorizationFailureAsync(response, endpoint, cancellationToken).ConfigureAwait(false);
+        return false;
+    }
+
+    /// <summary>
+    /// Refuses to create schema on anything but a local emulator unless the caller opted in.
+    /// </summary>
+    private static void EnsureSchemaCreationAllowed(CosmosContainerDbConfig config, Uri endpoint)
+    {
+        if (config.AllowSchemaCreation || LocalEndpoints.IsLocalDevelopmentHost(endpoint))
+            return;
+
+        throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
+            $"Cosmos container '{config.DatabaseName}/{config.ContainerName}' does not exist on '{endpoint.Host}', " +
+            $"which is not a local emulator. Create it out of band, or set '{nameof(CosmosContainerDbConfig.AllowSchemaCreation)}' " +
+            $"to true on the Cosmos configuration to let the framework provision it.");
+    }
+
+    /// <summary>
+    /// Turns a rejected master key into an actionable configuration error instead of a retry loop.
+    /// </summary>
+    private static async Task EnsureNotAuthorizationFailureAsync(HttpResponseMessage response, Uri endpoint, CancellationToken cancellationToken)
+    {
+        if (response.StatusCode is not (HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden))
+            return;
+
+        string body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
+            $"Cosmos account '{endpoint.Host}' rejected the configured credentials with status " +
+            $"{(int)response.StatusCode} ({response.StatusCode}). Check 'AccountKey' in the Cosmos connection string " +
+            $"and that the key is permitted to read and create metadata. Body: {body}");
     }
 
     /// <summary>
@@ -84,17 +144,24 @@ internal static class CosmosSchemaRestClient
         if (response.StatusCode is HttpStatusCode.Created or HttpStatusCode.Conflict)
             return;
 
+        await EnsureNotAuthorizationFailureAsync(response, endpoint, cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task CreateContainerIfNotExistsAsync(HttpClient httpClient, Uri endpoint, string key, string databaseName, string containerName, string partitionKeyPath, CancellationToken cancellationToken)
+    private static async Task CreateContainerIfNotExistsAsync(HttpClient httpClient, Uri endpoint, string key, CosmosContainerDbConfig config, string partitionKeyPath, CancellationToken cancellationToken)
     {
+        string databaseName = config.DatabaseName;
         string resourceLink = $"dbs/{databaseName}";
         using HttpRequestMessage request = CreateRequest(HttpMethod.Post, endpoint, key, "colls", resourceLink, $"/dbs/{Uri.EscapeDataString(databaseName)}/colls");
-        request.Headers.Add("x-ms-offer-throughput", "400");
+
+        // Only send throughput when it was asked for: a serverless account rejects the header outright,
+        // and on a provisioned account an unrequested value is billed for the lifetime of the container.
+        if (config.ProvisionedThroughput is int throughput)
+            request.Headers.Add("x-ms-offer-throughput", throughput.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
         request.Content = CreateJsonContent(new
         {
-            id = containerName,
+            id = config.ContainerName,
             partitionKey = new
             {
                 paths = new[] { partitionKeyPath },
@@ -107,6 +174,7 @@ internal static class CosmosSchemaRestClient
         if (response.StatusCode is HttpStatusCode.Created or HttpStatusCode.Conflict)
             return;
 
+        await EnsureNotAuthorizationFailureAsync(response, endpoint, cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
@@ -162,10 +230,18 @@ internal static class CosmosSchemaRestClient
                     continue;
                 }
 
+                // A rejected key never becomes valid by waiting, so it must escape this loop.
+                await EnsureNotAuthorizationFailureAsync(response, endpoint, cancellationToken).ConfigureAwait(false);
                 await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (HttpRequestException exception)
             {
+                lastError = exception;
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
+            }
+            catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                // The HttpClient timeout elapsed rather than the caller cancelling - that is retryable.
                 lastError = exception;
                 await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
             }

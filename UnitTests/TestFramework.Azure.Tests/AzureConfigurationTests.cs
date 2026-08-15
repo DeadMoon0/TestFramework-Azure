@@ -2551,7 +2551,7 @@ public class AzureConfigurationTests
             return ValidateConnectionAsyncHandler?.Invoke(cancellationToken) ?? Task.CompletedTask;
         }
 
-        public Task EnsureContainerExistsAsync<TItem>(TItem item)
+        public Task EnsureContainerExistsAsync<TItem>(TItem item, CancellationToken cancellationToken)
         {
             EnsureContainerExistsCalled = true;
             return Task.CompletedTask;

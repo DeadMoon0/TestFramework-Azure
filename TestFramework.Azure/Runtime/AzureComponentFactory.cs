@@ -72,7 +72,7 @@ internal interface ICosmosContainerAdapter
     Task ValidateAccountReachabilityAsync(CancellationToken cancellationToken);
     Task ValidateAccountConnectionAsync(CancellationToken cancellationToken);
     Task ValidateConnectionAsync(CancellationToken cancellationToken);
-    Task EnsureContainerExistsAsync<TItem>(TItem item);
+    Task EnsureContainerExistsAsync<TItem>(TItem item, CancellationToken cancellationToken);
     Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey);
     Task UpsertItemAsync<TItem>(TItem item, PartitionKey partitionKey);
     Task<CosmosReadResponse> ReadItemAsync(string id, PartitionKey partitionKey);
@@ -155,7 +155,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         {
             CosmosClientOptions options = CosmosClientOptionsResolver.Resolve(serviceProvider, config);
             CosmosClient client = new CosmosClient(config.ConnectionString, options);
-            return new DefaultCosmosContainerAdapter(client, config.ConnectionString, config.DatabaseName, config.ContainerName);
+            return new DefaultCosmosContainerAdapter(client, config);
         }
     }
 
@@ -268,11 +268,11 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         }
     }
 
-    private sealed class DefaultCosmosContainerAdapter(CosmosClient client, string connectionString, string databaseName, string containerName) : ICosmosContainerAdapter
+    private sealed class DefaultCosmosContainerAdapter(CosmosClient client, CosmosContainerDbConfig config) : ICosmosContainerAdapter
     {
         private Container GetContainer()
         {
-            return client.GetDatabase(databaseName).GetContainer(containerName);
+            return client.GetDatabase(config.DatabaseName).GetContainer(config.ContainerName);
         }
 
         public async Task ValidateAccountReachabilityAsync(CancellationToken cancellationToken)
@@ -293,10 +293,10 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
             response.EnsureSuccessStatusCode();
         }
 
-        public async Task EnsureContainerExistsAsync<TItem>(TItem item)
+        public async Task EnsureContainerExistsAsync<TItem>(TItem item, CancellationToken cancellationToken)
         {
             string partitionKeyPath = CosmosModelSchemaResolver.ResolvePartitionKeyPath<TItem>();
-            await CosmosSchemaRestClient.EnsureDatabaseAndContainerExistAsync(connectionString, databaseName, containerName, partitionKeyPath, CancellationToken.None);
+            await CosmosSchemaRestClient.EnsureDatabaseAndContainerExistAsync(config, partitionKeyPath, cancellationToken);
         }
 
         public async Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey)
