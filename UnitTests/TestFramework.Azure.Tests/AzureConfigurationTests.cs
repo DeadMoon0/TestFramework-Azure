@@ -2531,6 +2531,35 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public void ConfigStore_NamesTheTypoAndTheRegisteredIdentifiers()
+    {
+        ConfigStore<FunctionAppConfig> store = ConfigStore<FunctionAppConfig>.Create("orders", new FunctionAppConfig
+        {
+            BaseUrl = "https://example.test/",
+            Code = "secret",
+        });
+        store.AddConfig("billing", new FunctionAppConfig { BaseUrl = "https://example.test/", Code = "secret" });
+
+        TestFramework.Core.Exceptions.FrameworkConfigurationException exception =
+            Assert.Throws<TestFramework.Core.Exceptions.FrameworkConfigurationException>(() => store.GetConfig("Orders"));
+
+        Assert.Contains("'Orders'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(FunctionAppConfig), exception.Message, StringComparison.Ordinal);
+        Assert.Contains("'billing', 'orders'", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConfigStore_SaysSoWhenNothingIsRegistered()
+    {
+        ConfigStore<FunctionAppConfig> store = new();
+
+        TestFramework.Core.Exceptions.FrameworkConfigurationException exception =
+            Assert.Throws<TestFramework.Core.Exceptions.FrameworkConfigurationException>(() => store.GetConfig("orders"));
+
+        Assert.Contains("no configuration of this type has been registered", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ServiceBusProcessEvent_PreStep_ResolvesAVariableBackedTimeout()
     {
         // Regression guard: CreatePreStep used to resolve the timeout against a null store, which only

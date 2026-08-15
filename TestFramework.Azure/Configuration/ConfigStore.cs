@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace TestFramework.Azure.Configuration;
 
@@ -42,11 +43,29 @@ public class ConfigStore<TConfig>
     /// </summary>
     /// <param name="identifier">The logical identifier to resolve.</param>
     /// <returns>The stored configuration instance.</returns>
+    /// <exception cref="TestFramework.Core.Exceptions.FrameworkConfigurationException">
+    /// Thrown when no configuration is registered under <paramref name="identifier"/>. The message
+    /// lists the identifiers that are registered, because a typo here is the most common first-run
+    /// mistake.
+    /// </exception>
     public TConfig GetConfig(string identifier)
     {
         lock (_syncRoot)
         {
-            return _config[identifier];
+            if (_config.TryGetValue(identifier, out TConfig? config))
+            {
+                return config;
+            }
+
+            List<string> registered = new(_config.Keys);
+            registered.Sort(StringComparer.Ordinal);
+
+            string known = registered.Count == 0
+                ? "none - no configuration of this type has been registered"
+                : string.Join(", ", registered.ConvertAll(entry => $"'{entry}'"));
+
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
+                $"No {typeof(TConfig).Name} is registered under the identifier '{identifier}'. Registered identifiers: {known}.");
         }
     }
 
