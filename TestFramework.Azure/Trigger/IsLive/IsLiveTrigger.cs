@@ -145,7 +145,10 @@ internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier,
         if (currentAlivenessLevel == AlivenessLevel.Reachable)
         {
             logger.LogInformation("FunctionApp IsLive '{0}' using reachable probe against '{1}'.", identifier, remoteConnection.BasePath);
-            await remoteConnection.EnsurePingAsync();
+            await remoteConnection.EnsureReachableAsync(
+                serviceProvider.GetAzureComponentFactory().Http.CreateSender(),
+                triggerConfig.ReachabilityProbeTimeout,
+                cancellationToken);
             logger.LogInformation("FunctionApp IsLive '{0}' reachable probe succeeded.", identifier);
             return CreateResult(variableStore);
         }
@@ -192,7 +195,11 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
         if (currentAlivenessLevel == AlivenessLevel.Reachable)
         {
             logger.LogInformation("LogicApp IsLive '{0}' using reachable probe against '{1}' in {2} mode.", identifier, remoteConnection.BasePath, logicAppConfig.HostingMode);
-            await remoteConnection.EnsurePingAsync();
+            FunctionAppTriggerConfig probeConfig = serviceProvider.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
+            await remoteConnection.EnsureReachableAsync(
+                serviceProvider.GetAzureComponentFactory().Http.CreateSender(),
+                probeConfig.ReachabilityProbeTimeout,
+                cancellationToken);
             logger.LogInformation("LogicApp IsLive '{0}' reachable probe succeeded.", identifier);
             return CreateResult(variableStore);
         }

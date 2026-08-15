@@ -801,7 +801,7 @@ mindmap
 | Test blob not cleaned up | Reliability | Cleanup stage calls `BlobClient.DeleteAsync()` for every artifact that was set up |
 | Add new SQL database | Maintainability | Only add a config section entry; optionally register a DbContext |
 | Service Bus test interferes | Testability | Temp subscription with CorrelationId filter isolates the test |
-| Function App offline | Reliability | Ping fails → `FunctionAppPingException` with clear message |
+| Function App offline | Reliability | HTTP reachability probe fails → `FunctionAppPingException` with clear message |
 | InProcess debugging needed | Testability | `InProcessHttp<T>` allows breakpoints inside function logic |
 
 ---

@@ -1746,6 +1746,40 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public async Task FunctionAppIsLiveTrigger_ReachableLevel_UsesHttpHeadProbe_AndAcceptsAnyStatus()
+    {
+        // Azure never answers ICMP, so 'Reachable' is an HTTP probe where any status proves a listener.
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.NotFound));
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            {
+                BaseUrl = "https://example.test/",
+                Code = "secret",
+                AdminCode = null,
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        var trigger = AzureExt.Trigger.IsLive.FunctionApp("func", AlivenessLevel.Reachable);
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.Single(sender.Requests);
+        Assert.Equal(HttpMethod.Head, sender.Request!.Method);
+        Assert.Equal("https://example.test/", sender.Request.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public void FunctionAppTriggerConfig_DoesNotPingByDefault_AndBoundsTheReachabilityProbe()
+    {
+        FunctionAppTriggerConfig config = new();
+
+        Assert.False(config.DoPing);
+        Assert.Equal(TimeSpan.FromSeconds(10), config.ReachabilityProbeTimeout);
+    }
+
+    [Fact]
     public async Task ServiceBusIsLiveTrigger_UsesAdministrationValidation()
     {
         FakeServiceBusAdministrationAdapter administration = new();
