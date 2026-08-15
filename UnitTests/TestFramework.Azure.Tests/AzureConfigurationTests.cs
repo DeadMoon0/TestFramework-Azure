@@ -617,8 +617,8 @@ public class AzureConfigurationTests
         Assert.Equal(HttpStatusCode.InternalServerError, actual.StatusCode);
         Assert.Equal(2, sender.Requests.Count);
         Assert.All(sender.Requests, loggedRequest => Assert.Equal("http://localhost:7071/api/orders", loggedRequest.RequestUri!.ToString()));
-        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("FunctionApp HTTP 'func' -> POST http://localhost:7071/api/orders", StringComparison.Ordinal));
-        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("warmup retry", StringComparison.OrdinalIgnoreCase));
+        Assert.True(await debugger.WaitForLogAsync(entry => entry.Message.Contains("FunctionApp HTTP 'func' -> POST http://localhost:7071/api/orders", StringComparison.Ordinal)), "Expected log entry was not delivered.");
+        Assert.True(await debugger.WaitForLogAsync(entry => entry.Message.Contains("warmup retry", StringComparison.OrdinalIgnoreCase)), "Expected log entry was not delivered.");
     }
 
     [Fact]
@@ -1553,8 +1553,8 @@ public class AzureConfigurationTests
         Assert.Equal("https://example.test/admin/functions/cleanup", sender.Request!.RequestUri!.ToString());
         Assert.Equal("secret", sender.Request.Headers.GetValues("x-functions-key").Single());
         Assert.Equal("{}", await sender.Request.Content!.ReadAsStringAsync());
-        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("FunctionApp managed 'func' -> POST https://example.test/admin/functions/cleanup", StringComparison.Ordinal));
-        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("FunctionApp managed 'func' <- OK", StringComparison.Ordinal));
+        Assert.True(await debugger.WaitForLogAsync(entry => entry.Message.Contains("FunctionApp managed 'func' -> POST https://example.test/admin/functions/cleanup", StringComparison.Ordinal)), "Expected log entry was not delivered.");
+        Assert.True(await debugger.WaitForLogAsync(entry => entry.Message.Contains("FunctionApp managed 'func' <- OK", StringComparison.Ordinal)), "Expected log entry was not delivered.");
     }
 
     [Fact]
@@ -1667,7 +1667,7 @@ public class AzureConfigurationTests
 
         Assert.Equal("https://example.test/admin/host/status", sender.Request!.RequestUri!.ToString());
         Assert.Equal("admin-code", sender.Request.Headers.GetValues("x-functions-key").Single());
-        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("probing host status", StringComparison.OrdinalIgnoreCase));
+        Assert.True(await debugger.WaitForLogAsync(entry => entry.Message.Contains("probing host status", StringComparison.OrdinalIgnoreCase)), "Expected log entry was not delivered.");
     }
 
     [Fact]
@@ -2770,7 +2770,37 @@ public class AzureConfigurationTests
 
     private sealed class RecordingRunDebugger : IRunDebugger
     {
-        public List<DebugLogEntry> LogEntries { get; } = [];
+        private readonly object logGate = new();
+        private readonly List<DebugLogEntry> logEntries = [];
+
+        public IReadOnlyList<DebugLogEntry> LogEntries
+        {
+            get { lock (logGate) { return [.. logEntries]; } }
+        }
+
+        /// <summary>
+        /// Waits until a log entry matching <paramref name="predicate"/> has been delivered.
+        /// </summary>
+        /// <remarks>
+        /// Log delivery is asynchronous: the run session queues entries and a single consumer
+        /// drains them. A test that finishes a timeline run is flushed automatically, but one that
+        /// invokes a step directly never finishes the session, so asserting immediately races the
+        /// drain. Waiting is what makes those assertions deterministic.
+        /// </remarks>
+        public async Task<bool> WaitForLogAsync(Func<DebugLogEntry, bool> predicate, TimeSpan? timeout = null)
+        {
+            DateTime deadline = DateTime.UtcNow.Add(timeout ?? TimeSpan.FromSeconds(5));
+            while (true)
+            {
+                if (LogEntries.Any(predicate))
+                    return true;
+
+                if (DateTime.UtcNow >= deadline)
+                    return false;
+
+                await Task.Delay(15).ConfigureAwait(false);
+            }
+        }
 
         public Task SignalInitTimelineRunAsync(string sessionId, string name, string projectPath, TimelineRunStructure runStructure) => Task.CompletedTask;
 
@@ -2780,7 +2810,8 @@ public class AzureConfigurationTests
 
         public Task SignalLogEntryAsync(string sessionId, DebugLogEntry entry)
         {
-            LogEntries.Add(entry);
+            // Written from the session's drain thread, read from the test thread.
+            lock (logGate) { logEntries.Add(entry); }
             return Task.CompletedTask;
         }
 
