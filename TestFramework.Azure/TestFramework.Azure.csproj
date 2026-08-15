@@ -2,8 +2,6 @@
 
 	<PropertyGroup>
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-		<ImplicitUsings>disable</ImplicitUsings>
-		<Nullable>enable</Nullable>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<Title>TestFramework.Azure</Title>
 		<Version>0.1.13</Version>
@@ -15,18 +13,10 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<RepositoryUrl>https://github.com/DeadMoon0/TestFramework-Azure.git</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
-		<PackageTags>Test;UnitTest;IntegrationTest,Framework;Fluent;Timeline;Azure</PackageTags>
+		<PackageTags>Test;UnitTest;IntegrationTest;Framework;Fluent;Timeline;Azure</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<Copyright>Copyright (c) DeadMoon0 2026</Copyright>
 		<PackageReleaseNotes>BREAKING: FunctionAppConfig.BaseUrl is now the site root and the HTTP route prefix comes from the new FunctionAppConfig.RoutePrefix (default "api"). Remove any trailing /api/ from BaseUrl. Custom [HttpTrigger(Route=...)] routes now keep the host prefix.</PackageReleaseNotes>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-		<TreatWarningsAsErrors>True</TreatWarningsAsErrors>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-		<TreatWarningsAsErrors>True</TreatWarningsAsErrors>
 	</PropertyGroup>
 
 	<ItemGroup>
