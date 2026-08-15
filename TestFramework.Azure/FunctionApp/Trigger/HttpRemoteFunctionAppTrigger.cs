@@ -99,9 +99,7 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
     }
 
     private static bool IsLocalDevelopmentHost(Uri uri)
-        => uri.IsLoopback
-        || string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(uri.Host, "host.docker.internal", StringComparison.OrdinalIgnoreCase);
+        => LocalEndpoints.IsLocalDevelopmentHost(uri);
 
     public override StepInstance<Step<HttpResponseResultContext>, HttpResponseResultContext> GetInstance() =>
         new StepInstance<Step<HttpResponseResultContext>, HttpResponseResultContext>(this);

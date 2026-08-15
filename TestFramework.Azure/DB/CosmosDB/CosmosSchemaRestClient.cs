@@ -10,15 +10,36 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using TestFramework.Azure.Runtime;
 
 namespace TestFramework.Azure.DB.CosmosDB;
 
 /// <summary>
 /// Minimal REST-based helper for creating Cosmos databases and containers when SDK metadata setup is insufficient.
 /// </summary>
-public static class CosmosSchemaRestClient
+internal static class CosmosSchemaRestClient
 {
     private const string ApiVersion = "2018-12-31";
+
+    /// <summary>
+    /// The client used for every real Cosmos account. Certificate validation stays on: these requests
+    /// carry a master-key HMAC signature, and a captured request is replayable full account control.
+    /// </summary>
+    private static readonly HttpClient ValidatingHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(20),
+    };
+
+    /// <summary>
+    /// The client used only for local emulators, which present a self-signed certificate.
+    /// </summary>
+    private static readonly HttpClient EmulatorHttpClient = new(new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
+    })
+    {
+        Timeout = TimeSpan.FromSeconds(20),
+    };
 
     /// <summary>
     /// Ensures that the target Cosmos database and container exist.
@@ -38,7 +59,7 @@ public static class CosmosSchemaRestClient
     {
         (Uri endpoint, string key) = ParseConnectionString(connectionString);
 
-        using HttpClient httpClient = CreateHttpClient();
+        HttpClient httpClient = SelectHttpClient(endpoint);
 
         await CreateDatabaseIfNotExistsAsync(httpClient, endpoint, key, databaseName, cancellationToken).ConfigureAwait(false);
         await WaitForDatabaseAsync(httpClient, endpoint, key, databaseName, cancellationToken).ConfigureAwait(false);
@@ -47,16 +68,12 @@ public static class CosmosSchemaRestClient
         await WaitForContainerAsync(httpClient, endpoint, key, databaseName, containerName, cancellationToken).ConfigureAwait(false);
     }
 
-    private static HttpClient CreateHttpClient()
-    {
-        return new HttpClient(new HttpClientHandler
-        {
-            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
-        })
-        {
-            Timeout = TimeSpan.FromSeconds(20),
-        };
-    }
+    /// <summary>
+    /// Picks the emulator client only for local development endpoints; everything else - including
+    /// every <c>*.documents.azure.com</c> account - gets full certificate validation.
+    /// </summary>
+    private static HttpClient SelectHttpClient(Uri endpoint)
+        => LocalEndpoints.IsLocalDevelopmentHost(endpoint) ? EmulatorHttpClient : ValidatingHttpClient;
 
     private static async Task CreateDatabaseIfNotExistsAsync(HttpClient httpClient, Uri endpoint, string key, string databaseName, CancellationToken cancellationToken)
     {
