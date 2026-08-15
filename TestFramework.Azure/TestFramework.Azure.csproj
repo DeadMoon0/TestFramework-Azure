@@ -23,6 +23,13 @@
 		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
 			<_Parameter1>TestFramework.Azure.Tests</_Parameter1>
 		</AssemblyAttribute>
+		<!-- The container package provisions Cosmos schema against the emulator through
+		     CosmosSchemaRestClient. That helper signs requests with the account master key, so it is
+		     deliberately not public API - but it is a real dependency of a sibling package, which is
+		     why the access is granted here rather than by widening the surface. -->
+		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+			<_Parameter1>TestFramework.Container.Azure</_Parameter1>
+		</AssemblyAttribute>
 	</ItemGroup>
 
 	<ItemGroup>
