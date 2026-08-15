@@ -708,7 +708,7 @@ public class AzureConfigurationTests
 
         Assert.NotNull(result);
         Assert.Equal("http://127.0.0.1:59911/api/OrderProcessor/triggers/manual/invoke?api-version=2022-05-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=abc", sender.Requests[1].RequestUri!.ToString());
-        Assert.Equal("http://127.0.0.1:59911/api/OrderProcessor/triggers/manual/invoke?api-version=2022-05-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=abc", result!.InvokeUri);
+        Assert.Equal("http://127.0.0.1:59911/api/OrderProcessor/triggers/manual/invoke?api-version=2022-05-01&sp=***redacted***&sv=***redacted***&sig=***redacted***", result!.InvokeUri);
         Assert.Equal("run-local-123", result.RunId);
     }
 
@@ -760,7 +760,7 @@ public class AzureConfigurationTests
         Assert.Equal("{\"message\":\"captured\"}", result.ResponseBody);
         Assert.NotNull(result.ResponseHeaders);
         Assert.Equal("true", Assert.Single(result.ResponseHeaders!["x-capture"]));
-        Assert.Equal("http://127.0.0.1:59911/api/OrderProcessor/triggers/manual/invoke?api-version=2022-05-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=abc", result.InvokeUri);
+        Assert.Equal("http://127.0.0.1:59911/api/OrderProcessor/triggers/manual/invoke?api-version=2022-05-01&sp=***redacted***&sv=***redacted***&sig=***redacted***", result.InvokeUri);
     }
 
     [Fact]
@@ -841,7 +841,7 @@ public class AzureConfigurationTests
         Assert.NotNull(result);
         Assert.Equal("https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc", sender.Requests[0].RequestUri!.ToString());
         Assert.Equal("run-consumption-123", result!.RunId);
-        Assert.Equal("https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc", result.InvokeUri);
+        Assert.Equal("https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=***redacted***", result.InvokeUri);
     }
 
     [Fact]
@@ -1059,7 +1059,7 @@ public class AzureConfigurationTests
         Assert.True(run.VariableStore.TryGetVariable<string>("logicTrigger", out string? triggerName));
         Assert.Equal("manual", triggerName);
         Assert.True(run.VariableStore.TryGetVariable<string>("logicInvokeUri", out string? invokeUri));
-        Assert.Equal("https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc", invokeUri);
+        Assert.Equal("https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=***redacted***", invokeUri);
         Assert.True(run.VariableStore.TryGetVariable<string>("logicRunId", out string? runId));
         Assert.Equal("run-trigger-bind-123", runId);
         Assert.True(run.VariableStore.TryGetVariable<LogicAppExecutionResult>("logicExecution", out LogicAppExecutionResult? execution));

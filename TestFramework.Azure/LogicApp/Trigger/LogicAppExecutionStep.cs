@@ -81,6 +81,8 @@ internal sealed class LogicAppExecutionStep(
         return new LogicAppExecutionResult(
             invocation.WorkflowName,
             invocation.TriggerName,
+            // Redacted by LogicAppExecutionResult itself - the SAS token must not reach results, logs,
+            // reports or the DebugUI. The live invoke path uses its own local, unredacted copy.
             invocation.CallbackUrl,
             invocation.RunId,
             invocation.StatusCode,

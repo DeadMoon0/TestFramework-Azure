@@ -33,6 +33,23 @@ public sealed record LogicAppExecutionResult(
     string? OutputsJson,
     string? RawRunJson) : StepResultContext
 {
+    private readonly string? invokeUri = LogicAppUriRedaction.Redact(InvokeUri);
+
+    /// <summary>
+    /// The invoke or management URI used for the interaction, with any shared-access signature
+    /// redacted.
+    /// </summary>
+    /// <remarks>
+    /// Redaction happens here rather than at each call site because this record is rendered into
+    /// logs, reports and the DebugUI by <c>ToString()</c>. Redaction is idempotent, so results built
+    /// from an already-redacted URL are unaffected.
+    /// </remarks>
+    public string? InvokeUri
+    {
+        get => invokeUri;
+        init => invokeUri = LogicAppUriRedaction.Redact(value);
+    }
+
     /// <summary>
     /// Creates an explicit run-tracking context for stateful Logic App polling.
     /// </summary>

@@ -251,7 +251,13 @@ internal static class LogicAppHttpTriggerExecution
     private static HttpResponseMessage CreateObservedRunResponse(string callbackUrl, string runId)
     {
         HttpResponseMessage response = new(HttpStatusCode.Accepted);
-        response.RequestMessage = new HttpRequestMessage(HttpMethod.Post, callbackUrl);
+
+        // RequestMessage is purely cosmetic on this synthesized response, and the callback URL carries
+        // a SAS token, so only the redacted form is attached.
+        string? redactedCallbackUrl = LogicAppUriRedaction.Redact(callbackUrl);
+        if (redactedCallbackUrl is not null)
+            response.RequestMessage = new HttpRequestMessage(HttpMethod.Post, redactedCallbackUrl);
+
         response.Headers.Add("x-ms-workflow-run-id", runId);
         return response;
     }

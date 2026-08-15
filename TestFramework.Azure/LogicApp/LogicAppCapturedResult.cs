@@ -11,7 +11,10 @@ namespace TestFramework.Azure.LogicApp;
 /// </summary>
 /// <param name="WorkflowName">The resolved workflow name.</param>
 /// <param name="TriggerName">The resolved trigger name.</param>
-/// <param name="CallbackUrl">The callback URL that was invoked.</param>
+/// <param name="CallbackUrl">
+/// The callback URL that was invoked, with its shared-access signature redacted. This value is for
+/// diagnostics only and cannot be replayed.
+/// </param>
 /// <param name="RunId">The resolved workflow run identifier, when available.</param>
 /// <param name="StatusCode">The HTTP status returned by the callback invocation.</param>
 /// <param name="Status">The inferred workflow outcome for the captured invocation.</param>
@@ -27,6 +30,17 @@ public sealed record LogicAppCapturedResult(
     string ResponseBody,
     IReadOnlyDictionary<string, string[]> ResponseHeaders) : StepResultContext
 {
+    private readonly string callbackUrl = LogicAppUriRedaction.Redact(CallbackUrl) ?? string.Empty;
+
+    /// <summary>
+    /// The callback URL that was invoked, with its shared-access signature redacted.
+    /// </summary>
+    public string CallbackUrl
+    {
+        get => callbackUrl;
+        init => callbackUrl = LogicAppUriRedaction.Redact(value) ?? string.Empty;
+    }
+
     /// <summary>
     /// Gets the invoked callback URL using the consumer-facing invoke URI terminology.
     /// </summary>

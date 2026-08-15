@@ -280,8 +280,30 @@ public class ReadmeSamplesTests
         LogicAppExecutionResult result = Assert.IsType<LogicAppExecutionResult>(run.Step("logic-call").LastResult.Result);
         Assert.Equal(LogicAppRunStatus.Succeeded, result.RunStatus);
         Assert.Equal("{\"message\":\"captured\"}", result.ResponseBody);
+        // The real invoke must use the unredacted callback URL...
         Assert.Equal(new Uri("https://logic.test/invoke/manual?sig=abc"), sender.Requests[1].RequestUri);
         Assert.Equal("{\"id\":42}", sender.RequestBodies[1]);
+
+        // ...while the result, which is rendered into logs, reports and the DebugUI, must not.
+        Assert.Equal("https://logic.test/invoke/manual?sig=***redacted***", result.InvokeUri);
+        Assert.DoesNotContain("sig=abc", result.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LogicAppUriRedaction_RedactsSignatureParameters_AndLeavesTheRestIntact()
+    {
+        string? redacted = LogicAppUriRedaction.Redact(
+            "https://logic.test/invoke/manual?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=SECRET_TOKEN");
+
+        Assert.Equal(
+            "https://logic.test/invoke/manual?api-version=2016-10-01&sp=***redacted***&sv=***redacted***&sig=***redacted***",
+            redacted);
+
+        // No query string, nothing to redact.
+        Assert.Equal("https://logic.test/invoke/manual", LogicAppUriRedaction.Redact("https://logic.test/invoke/manual"));
+
+        // Idempotent, so results built from an already-redacted URL are unaffected.
+        Assert.Equal(redacted, LogicAppUriRedaction.Redact(redacted));
     }
 
     [Fact]
