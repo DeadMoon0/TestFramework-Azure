@@ -586,10 +586,21 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
     private sealed class DefaultHttpComponentFactory : IHttpComponentFactory
     {
         /// <summary>
-        /// The one HttpClient every Azure HTTP call goes through. The step's CancellationToken is the
-        /// real time budget, so the client itself does not impose one.
+        /// The one HttpClient every Azure HTTP call goes through.
         /// </summary>
-        internal static readonly HttpClient SharedClient = new()
+        /// <remarks>
+        /// The overall timeout stays infinite because the step's CancellationToken is the real budget
+        /// - a long-polling wait must not be cut short by the client. The handler bounds the parts
+        /// that the step token cannot express well: <c>ConnectTimeout</c> so a black-holed host fails
+        /// fast instead of hanging on the TCP handshake, and <c>PooledConnectionLifetime</c> so a
+        /// long-lived test host picks up DNS changes (failovers, swapped slots) instead of pinning a
+        /// stale address for the life of the process.
+        /// </remarks>
+        internal static readonly HttpClient SharedClient = new(new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            ConnectTimeout = TimeSpan.FromSeconds(15),
+        })
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };
