@@ -42,8 +42,8 @@ Azure steps now expose strongly-typed result binders so useful outputs can flow 
 
 ```csharp
 Timeline timeline = Timeline.Create()
-	.Trigger(AzureExt.Trigger.LogicApp.CallAndCapture("workflow"))
-	.GetCallbackUrl("logicCallbackUrl")
+	.Trigger(AzureExt.Trigger.LogicApp.Http("logic").Workflow("workflow").Manual().CallAndCapture())
+	.GetInvokeUri("logicInvokeUri")
 	.GetRunStatus("logicRunStatus")
 	.GetResponseBody("logicResponseBody")
 	.Build();

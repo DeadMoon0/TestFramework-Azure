@@ -44,7 +44,7 @@ internal sealed class RemoteLogicAppBuilder(LogicAppIdentifier appIdentifier)
         return this;
     }
 
-    public Step<LogicAppExecutionResult> Execute()
+    public Step<LogicAppExecutionResult> Call()
     {
         if (_triggerName is null)
             throw new TestFramework.Core.Exceptions.FrameworkStateException("No Logic App trigger was selected. Call Workflow(...).Manual(...) or Timer(...) first.");
@@ -52,13 +52,13 @@ internal sealed class RemoteLogicAppBuilder(LogicAppIdentifier appIdentifier)
         return new LogicAppExecutionStep(appIdentifier, BuildRequest(captureResponse: false));
     }
 
-    public Step<LogicAppExecutionResult> CaptureResponse()
+    public Step<LogicAppExecutionResult> CallAndCapture()
     {
         if (_triggerName is null)
             throw new TestFramework.Core.Exceptions.FrameworkStateException("No Logic App trigger was selected. Call Workflow(...).Manual(...) first.");
 
         if (_triggerMode != LogicAppTriggerExecutionMode.HttpCallback)
-            throw new TestFramework.Core.Exceptions.UnsupportedFrameworkValueException("CaptureResponse() is only supported for Logic App HTTP callback triggers. Use Execute() for timer triggers.");
+            throw new TestFramework.Core.Exceptions.UnsupportedFrameworkValueException("CallAndCapture() is only supported for Logic App HTTP callback triggers. Use Call() for timer triggers.");
 
         return new LogicAppExecutionStep(appIdentifier, BuildRequest(captureResponse: true));
     }

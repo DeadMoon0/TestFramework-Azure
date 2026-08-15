@@ -270,7 +270,7 @@ public class ReadmeSamplesTests
                     .Workflow("StatelessOrders")
                     .Manual()
                     .WithBody(Var.Const("{\"id\":42}"))
-                    .CaptureResponse())
+                    .CallAndCapture())
             .Name("logic-call")
             .Build();
 
@@ -304,6 +304,150 @@ public class ReadmeSamplesTests
 
         // Idempotent, so results built from an already-redacted URL are unaffected.
         Assert.Equal(redacted, LogicAppUriRedaction.Redact(redacted));
+    }
+
+    [Fact]
+    public async Task ConsumptionLogicAppRunTracking_RunsThroughTheDocumentedSnippet()
+    {
+        // Route-aware, because the invoke path may race a run-observation request against the invoke.
+        ConsumptionRunTrackingSender sender = new("run-consumption-123");
+
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("ConsumptionOrders", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                HostingMode = LogicAppHostingMode.Consumption,
+                Consumption = new LogicAppConsumptionConfig
+                {
+                    InvokeUrl = "https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc",
+                    WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
+                },
+            }));
+            services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubConsumptionAuthorizer("test-token"));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new RouteAwareHttpComponentFactory(sender) });
+        });
+
+        Timeline timeline = Timeline.Create()
+            .Trigger(
+                AzureExt.Trigger.LogicApp.Http("ConsumptionOrders")
+                    .Workflow("OrderProcessor")
+                    .Manual()
+                    .WithBody(Var.Const("{\"id\":42}"))
+                    .Call())
+            .Name("logic-call")
+            .GetRunContext("logicRun")
+            .WaitForEvent(
+                AzureExt.Event.LogicApp.RunCompleted(
+                    "ConsumptionOrders",
+                    Var.Ref<LogicAppRunContext>("logicRun")))
+            .Build();
+
+        TimelineRun run = await timeline.SetupRun(runtime.ServiceProvider).RunAsync();
+
+        run.EnsureRanToCompletion();
+        Assert.Contains(sender.RequestUris, uri => uri == "https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc");
+        Assert.Contains(sender.RequestUris, uri => uri!.Contains("/runs/run-consumption-123", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void DocumentedLogicAppVerbs_Compile()
+    {
+        // The docs advertise Call() / CallAndCapture(). This test exists so the documented names
+        // cannot silently drift from the code again.
+        Step<LogicAppExecutionResult> call = AzureExt.Trigger.LogicApp
+            .Http("logic")
+            .Workflow("OrderProcessor")
+            .Manual()
+            .Call();
+
+        Step<LogicAppExecutionResult> callAndCapture = AzureExt.Trigger.LogicApp
+            .Http("logic")
+            .Workflow("OrderProcessor")
+            .Manual()
+            .CallAndCapture();
+
+        Assert.NotNull(call);
+        Assert.NotNull(callAndCapture);
+    }
+
+    [Theory]
+    [InlineData("AzureExt.Trigger.LogicApp.CallAndCapture(")]
+    [InlineData("CallForRunContext")]
+    [InlineData("LogicAppCapturedResult")]
+    [InlineData(".GetCallbackUrl(")]
+    public void PackedReadme_DoesNotAdvertiseApisThatDoNotExist(string inventedApi)
+    {
+        string readme = File.ReadAllText(FindPackedReadme());
+
+        Assert.DoesNotContain(inventedApi, readme, StringComparison.Ordinal);
+    }
+
+    private static string FindPackedReadme()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        for (int depth = 0; directory is not null && depth < 8; depth++)
+        {
+            string candidate = Path.Combine(directory.FullName, "TestFramework.Azure", "README.md");
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Could not locate the packed README next to the TestFramework.Azure project.");
+    }
+
+    /// <summary>
+    /// Answers by route so the invoke request and the run-status polls cannot race a fixed queue.
+    /// </summary>
+    private sealed class ConsumptionRunTrackingSender(string runId) : IHttpRequestSender
+    {
+        private readonly System.Collections.Concurrent.ConcurrentBag<string?> requestUris = [];
+
+        public IReadOnlyCollection<string?> RequestUris => [.. requestUris];
+
+        public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            string uri = request.RequestUri!.ToString();
+            requestUris.Add(uri);
+
+            if (uri.Contains($"/runs/{runId}", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"properties\":{\"status\":\"Succeeded\",\"code\":\"OK\"}}"),
+                });
+            }
+
+            if (uri.Contains("/runs?", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent($"{{\"value\":[{{\"name\":\"{runId}\",\"properties\":{{\"status\":\"Succeeded\",\"code\":\"OK\"}}}}]}}"),
+                });
+            }
+
+            HttpResponseMessage invokeResponse = new(HttpStatusCode.Accepted);
+            invokeResponse.Headers.Add("x-ms-workflow-run-id", runId);
+            return Task.FromResult(invokeResponse);
+        }
+    }
+
+    private sealed class RouteAwareHttpComponentFactory(IHttpRequestSender sender) : IHttpComponentFactory
+    {
+        public IHttpRequestSender CreateSender() => sender;
+    }
+
+    private sealed class StubConsumptionAuthorizer(string token) : ILogicAppConsumptionManagementRequestAuthorizer
+    {
+        public Task AuthorizeAsync(TestFramework.Azure.Identifier.LogicAppIdentifier identifier, LogicAppConfig config, HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            return Task.CompletedTask;
+        }
     }
 
     [Fact]

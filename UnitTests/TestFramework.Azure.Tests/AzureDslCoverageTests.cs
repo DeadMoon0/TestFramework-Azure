@@ -54,9 +54,9 @@ public class AzureDslCoverageTests
         object runCompleted = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-1"));
         object runSucceeded = AzureExt.Event.LogicApp.RunReachedStatus("logic", Var.Const("run-1"), LogicAppRunStatus.Succeeded);
         object runCompletedWithExecution = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const(new LogicAppExecutionResult("OrderProcessor", "manual", null, "run-1", HttpStatusCode.Accepted, null, null, null, null, null, null)));
-        object capture = AzureExt.Trigger.LogicApp.Http("logic").Workflow("OrderProcessor").Manual().CaptureResponse();
-        object timer = AzureExt.Trigger.LogicApp.Http("logic").Workflow("NightlyJob").Timer().Execute();
-        object timerExecution = AzureExt.Trigger.LogicApp.Http("logic").Workflow("NightlyJob").Timer().Execute();
+        object capture = AzureExt.Trigger.LogicApp.Http("logic").Workflow("OrderProcessor").Manual().CallAndCapture();
+        object timer = AzureExt.Trigger.LogicApp.Http("logic").Workflow("NightlyJob").Timer().Call();
+        object timerExecution = AzureExt.Trigger.LogicApp.Http("logic").Workflow("NightlyJob").Timer().Call();
 
         Assert.NotNull(triggerBuilder);
         Assert.NotNull(runCompleted);

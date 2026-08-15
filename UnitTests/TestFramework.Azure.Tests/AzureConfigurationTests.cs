@@ -652,7 +652,7 @@ public class AzureConfigurationTests
             .Manual()
             .WithBody(Var.Const("payload"))
             .WithHeader(Var.Const("x-test"), Var.Const("1"))
-            .Execute();
+            .Call();
 
         LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -702,7 +702,7 @@ public class AzureConfigurationTests
             .Workflow("OrderProcessor")
             .Manual()
             .WithBody(Var.Const("payload"))
-            .Execute();
+            .Call();
 
         LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -747,7 +747,7 @@ public class AzureConfigurationTests
             .Workflow("OrderProcessor")
             .Manual()
             .WithBody(Var.Const("payload"))
-            .CaptureResponse();
+            .CallAndCapture();
 
         LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -795,7 +795,7 @@ public class AzureConfigurationTests
             .Http("logic")
             .Workflow("OrderProcessor")
             .Manual()
-            .CaptureResponse();
+            .CallAndCapture();
 
         LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -834,7 +834,7 @@ public class AzureConfigurationTests
             .Workflow("OrderProcessor")
             .Manual()
             .WithBody(Var.Const("payload"))
-            .Execute();
+            .Call();
 
         LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -869,7 +869,7 @@ public class AzureConfigurationTests
             .Workflow("OrderProcessor")
             .Manual()
             .WithBody(Var.Const("payload"))
-            .Execute();
+            .Call();
 
         using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(1));
         LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, cancellation.Token);
@@ -907,7 +907,7 @@ public class AzureConfigurationTests
             .Http("logic")
             .Workflow("NightlyJob")
             .Timer()
-            .Execute();
+            .Call();
 
         LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -944,7 +944,7 @@ public class AzureConfigurationTests
             .Http("logic")
             .Workflow("NightlyJob")
             .Timer()
-            .Execute();
+            .Call();
 
         LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1001,7 +1001,7 @@ public class AzureConfigurationTests
                         .Http("logic")
                         .Workflow("NightlyJob")
                         .Timer()
-                    .Execute();
+                    .Call();
 
                 LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
@@ -1042,7 +1042,7 @@ public class AzureConfigurationTests
                 .Workflow("OrderProcessor")
                 .Manual()
                 .WithBody(Var.Const("payload"))
-                .Execute())
+                .Call())
             .GetWorkflowName("logicWorkflow")
             .GetTriggerName("logicTrigger")
             .GetInvokeUri("logicInvokeUri")
@@ -1101,7 +1101,7 @@ public class AzureConfigurationTests
                 .Workflow("OrderProcessor")
                 .Manual()
                 .WithBody(Var.Const("payload"))
-                .CaptureResponse())
+                .CallAndCapture())
             .GetWorkflowName("logicWorkflow")
             .GetTriggerName("logicTrigger")
             .GetInvokeUri("logicInvokeUri")

@@ -116,7 +116,7 @@
 
     Logic App pattern:
     - stateful workflow: trigger with `Call()`, keep the returned `RunId`, then wait with `AzureExt.Event.LogicApp.RunCompleted(...)`
-    - stateless workflow: trigger with `CallAndCapture()` and assert against the returned `LogicAppCapturedResult`
+    - stateless workflow: trigger with `CallAndCapture()` and assert against the returned `LogicAppExecutionResult`
     - do not recommend `RunCompleted(...)` for stateless workflows
 
     Service Bus pattern:
