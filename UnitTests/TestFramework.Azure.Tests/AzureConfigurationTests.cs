@@ -406,6 +406,41 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public async Task HttpRemoteFunctionAppTrigger_CanSendTheSameRequestTwice()
+    {
+        // Regression guard: the HttpRequestMessage disposes its Content, so sharing the
+        // CommonHttpRequest's HttpContent across sends made every second send fail.
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.Accepted));
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            {
+                BaseUrl = "https://example.test/api/",
+                Code = "secret",
+                AdminCode = null,
+            }));
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        TriggerHttpRouting routing = new("orders", HttpMethod.Post, Var.Const(new Dictionary<string, string>()));
+        CommonHttpRequest request = new();
+        request.Content = new StringContent("body", Encoding.UTF8, "text/plain");
+
+        HttpRemoteFunctionAppTrigger trigger = new("func", Var.Const(routing), Var.Const(request));
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.Equal(2, sender.Requests.Count);
+        foreach (HttpRequestMessage observed in sender.Requests)
+        {
+            Assert.Equal("body", await observed.Content!.ReadAsStringAsync());
+            Assert.Equal("text/plain", observed.Content.Headers.ContentType!.MediaType);
+        }
+    }
+
+    [Fact]
     public async Task FunctionAppHttpResponse_BindsFullResponseResult_IntoTimelineVariables()
     {
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.Accepted)

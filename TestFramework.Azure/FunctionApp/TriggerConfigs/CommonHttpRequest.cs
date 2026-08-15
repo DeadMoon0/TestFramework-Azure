@@ -1,5 +1,8 @@
-﻿using System.Net.Http;
+﻿using System.Collections.Generic;
+using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Threading;
+using System.Threading.Tasks;
 using TestFramework.Core;
 
 namespace TestFramework.Azure.FunctionApp.TriggerConfigs;
@@ -31,13 +34,39 @@ public class CommonHttpRequest : IFreezable
     /// </summary>
     public HttpContent? Content { get => _content; set { ((IFreezable)this).EnsureNotFrozen(); _content = value; } }
 
-    internal void ApplyToHttpRequestMessage(HttpRequestMessage message)
+    /// <summary>
+    /// Copies the headers and a fresh copy of the body onto <paramref name="message"/>.
+    /// </summary>
+    /// <remarks>
+    /// The body is deliberately copied rather than shared. A <see cref="HttpRequestMessage"/> disposes
+    /// its <see cref="HttpRequestMessage.Content"/>, so handing the same <see cref="HttpContent"/> to a
+    /// second message - a step retry, or simply running a built timeline twice - would send a disposed
+    /// stream. This requires re-readable content: everything the builders produce (StringContent,
+    /// ByteArrayContent) is, while a user-supplied one-shot StreamContent is not and will now fail with
+    /// a clear stream error instead of an ObjectDisposedException on the second send.
+    /// </remarks>
+    /// <param name="message">The message to configure.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    internal async Task ApplyToHttpRequestMessageAsync(HttpRequestMessage message, CancellationToken cancellationToken)
     {
         foreach (var header in Headers)
         {
             message.Headers.Add(header.Key, header.Value);
         }
 
-        message.Content = Content;
+        if (Content is null)
+        {
+            return;
+        }
+
+        byte[] body = await Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        ByteArrayContent copy = new(body);
+
+        foreach (KeyValuePair<string, IEnumerable<string>> header in Content.Headers)
+        {
+            copy.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+
+        message.Content = copy;
     }
 }

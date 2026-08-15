@@ -79,7 +79,7 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
 
         while (true)
         {
-            using HttpRequestMessage message = CreateRequestMessage(fullTriggerUri, method, request, functionConfig);
+            using HttpRequestMessage message = await CreateRequestMessageAsync(fullTriggerUri, method, request, functionConfig, cancellationToken).ConfigureAwait(false);
             HttpResponseMessage response = await sender.SendAsync(message, cancellationToken).ConfigureAwait(false);
             if (!shouldRetryNotFound || response.StatusCode != HttpStatusCode.NotFound || DateTime.UtcNow >= retryDeadline)
                 return response;
@@ -90,10 +90,10 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         }
     }
 
-    private static HttpRequestMessage CreateRequestMessage(Uri fullTriggerUri, HttpMethod method, CommonHttpRequest request, FunctionAppConfig functionConfig)
+    private static async Task<HttpRequestMessage> CreateRequestMessageAsync(Uri fullTriggerUri, HttpMethod method, CommonHttpRequest request, FunctionAppConfig functionConfig, CancellationToken cancellationToken)
     {
         HttpRequestMessage message = new(method, fullTriggerUri);
-        request.ApplyToHttpRequestMessage(message);
+        await request.ApplyToHttpRequestMessageAsync(message, cancellationToken).ConfigureAwait(false);
         message.Headers.Add("x-functions-key", functionConfig.Code);
         return message;
     }

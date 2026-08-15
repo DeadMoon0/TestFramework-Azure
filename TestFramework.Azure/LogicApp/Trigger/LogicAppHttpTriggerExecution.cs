@@ -56,7 +56,7 @@ internal static class LogicAppHttpTriggerExecution
         }
 
         using HttpRequestMessage invokeRequest = new(HttpMethod.Post, callbackUrl);
-        resolvedRequest.ApplyToHttpRequestMessage(invokeRequest);
+        await resolvedRequest.ApplyToHttpRequestMessageAsync(invokeRequest, cancellationToken);
 
         DateTimeOffset observationStart = DateTimeOffset.UtcNow;
         using HttpResponseMessage invokeResponse = includeResponseBody || !config.SupportsManagementOperations
