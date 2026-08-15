@@ -136,34 +136,48 @@ internal static class AzureComponentFactoryServiceProviderExtensions
 internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 {
     public ICosmosComponentFactory Cosmos { get; }
-    public IBlobComponentFactory Blob { get; } = new DefaultBlobComponentFactory();
-    public ITableComponentFactory Table { get; } = new DefaultTableComponentFactory();
-    public IServiceBusComponentFactory ServiceBus { get; } = new DefaultServiceBusComponentFactory();
+    public IBlobComponentFactory Blob { get; }
+    public ITableComponentFactory Table { get; }
+    public IServiceBusComponentFactory ServiceBus { get; }
     public IHttpComponentFactory Http { get; } = new DefaultHttpComponentFactory();
 
     private readonly IServiceProvider _serviceProvider;
 
     internal DefaultAzureComponentFactory(IServiceProvider serviceProvider)
+        : this(serviceProvider, serviceProvider.GetService<AzureClientCache>() ?? new AzureClientCache())
     {
-        _serviceProvider = serviceProvider;
-        Cosmos = new DefaultCosmosComponentFactory(_serviceProvider);
     }
 
-    private sealed class DefaultCosmosComponentFactory(IServiceProvider serviceProvider) : ICosmosComponentFactory
+    internal DefaultAzureComponentFactory(IServiceProvider serviceProvider, AzureClientCache clientCache)
+    {
+        _serviceProvider = serviceProvider;
+        Cosmos = new DefaultCosmosComponentFactory(_serviceProvider, clientCache);
+        Blob = new DefaultBlobComponentFactory(clientCache);
+        Table = new DefaultTableComponentFactory(clientCache);
+        ServiceBus = new DefaultServiceBusComponentFactory(clientCache);
+    }
+
+    private sealed class DefaultCosmosComponentFactory(IServiceProvider serviceProvider, AzureClientCache clientCache) : ICosmosComponentFactory
     {
         public ICosmosContainerAdapter CreateContainer(CosmosContainerDbConfig config)
         {
-            CosmosClientOptions options = CosmosClientOptionsResolver.Resolve(serviceProvider, config);
-            CosmosClient client = new CosmosClient(config.ConnectionString, options);
+            // Keyed by the whole config record: CosmosClient is a documented singleton, and the
+            // options provider may return different options for different configurations.
+            CosmosClient client = clientCache.GetOrAdd(config, () =>
+            {
+                CosmosClientOptions options = CosmosClientOptionsResolver.Resolve(serviceProvider, config);
+                return new CosmosClient(config.ConnectionString, options);
+            });
+
             return new DefaultCosmosContainerAdapter(client, config);
         }
     }
 
-    private sealed class DefaultBlobComponentFactory : IBlobComponentFactory
+    private sealed class DefaultBlobComponentFactory(AzureClientCache clientCache) : IBlobComponentFactory
     {
         public IBlobContainerAdapter CreateContainer(StorageAccountConfig config)
         {
-            BlobServiceClient client = new BlobServiceClient(config.ConnectionString);
+            BlobServiceClient client = clientCache.GetOrAdd(config.ConnectionString, () => new BlobServiceClient(config.ConnectionString));
             BlobContainerClient container = client.GetBlobContainerClient(config.BlobContainerNameRequired);
             return new DefaultBlobContainerAdapter(client, container);
         }
@@ -209,11 +223,11 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         }
     }
 
-    private sealed class DefaultTableComponentFactory : ITableComponentFactory
+    private sealed class DefaultTableComponentFactory(AzureClientCache clientCache) : ITableComponentFactory
     {
         public ITableAdapter CreateTable(StorageAccountConfig config, string tableName)
         {
-            TableServiceClient serviceClient = new TableServiceClient(config.ConnectionString);
+            TableServiceClient serviceClient = clientCache.GetOrAdd(config.ConnectionString, () => new TableServiceClient(config.ConnectionString));
             TableClient tableClient = serviceClient.GetTableClient(tableName);
             return new DefaultTableAdapter(serviceClient, tableClient);
         }
@@ -277,9 +291,8 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
         public async Task ValidateAccountReachabilityAsync(CancellationToken cancellationToken)
         {
-            using HttpClient httpClient = new HttpClient();
             using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, client.Endpoint);
-            using HttpResponseMessage _ = await httpClient.SendAsync(request, cancellationToken);
+            using HttpResponseMessage _ = await DefaultHttpComponentFactory.SharedClient.SendAsync(request, cancellationToken);
         }
 
         public async Task ValidateAccountConnectionAsync(CancellationToken cancellationToken)
@@ -338,33 +351,38 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         }
     }
 
-    private sealed class DefaultServiceBusComponentFactory : IServiceBusComponentFactory
+    private sealed class DefaultServiceBusComponentFactory(AzureClientCache clientCache) : IServiceBusComponentFactory
     {
+        // The ServiceBusClient owns the AMQP connection and is shared across every step in the run.
+        // The senders, processors and pumps built from it stay per-operation and are still disposed.
+        private ServiceBusClient GetClient(ServiceBusConfig config)
+            => clientCache.GetOrAdd(config.ConnectionString, () => new ServiceBusClient(config.ConnectionString));
+
         public IServiceBusSenderAdapter CreateSender(ServiceBusConfig config)
         {
-            return new DefaultServiceBusSenderAdapter(config);
+            return new DefaultServiceBusSenderAdapter(GetClient(config), config);
         }
 
         public IServiceBusMessagePump CreateMessagePump(ServiceBusConfig config, string? subscriptionName)
         {
-            return new DefaultServiceBusMessagePump(config, subscriptionName);
+            return new DefaultServiceBusMessagePump(GetClient(config), config, subscriptionName);
         }
 
         public IServiceBusAdministrationAdapter CreateAdministration(ServiceBusConfig config)
         {
-            return new DefaultServiceBusAdministrationAdapter(config);
+            return new DefaultServiceBusAdministrationAdapter(
+                clientCache.GetOrAdd(config.ConnectionString, () => new ServiceBusAdministrationClient(config.ConnectionString)),
+                config);
         }
     }
 
     private sealed class DefaultServiceBusSenderAdapter : IServiceBusSenderAdapter
     {
-        private readonly ServiceBusClient _client;
         private readonly ServiceBusSender _sender;
 
-        public DefaultServiceBusSenderAdapter(ServiceBusConfig config)
+        public DefaultServiceBusSenderAdapter(ServiceBusClient client, ServiceBusConfig config)
         {
-            _client = new ServiceBusClient(config.ConnectionString);
-            _sender = _client.CreateSender(config.EntityName);
+            _sender = client.CreateSender(config.EntityName);
         }
 
         public Task SendMessageAsync(ServiceBusMessage message, CancellationToken cancellationToken)
@@ -374,31 +392,30 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
         public async ValueTask DisposeAsync()
         {
+            // Only the sender is ours. The ServiceBusClient is shared and owned by AzureClientCache -
+            // disposing it here would break every later Service Bus step in the same run.
             await _sender.DisposeAsync();
-            await _client.DisposeAsync();
         }
     }
 
     private sealed class DefaultServiceBusMessagePump : IServiceBusMessagePump
     {
-        private readonly ServiceBusClient _client;
         private readonly ServiceBusProcessor? _processor;
         private readonly ServiceBusSessionProcessor? _sessionProcessor;
 
-        public DefaultServiceBusMessagePump(ServiceBusConfig config, string? subscriptionName)
+        public DefaultServiceBusMessagePump(ServiceBusClient client, ServiceBusConfig config, string? subscriptionName)
         {
-            _client = new ServiceBusClient(config.ConnectionString);
             if (config.RequiredSession)
             {
                 _sessionProcessor = config.IsTopic
-                    ? _client.CreateSessionProcessor(config.TopicName, subscriptionName, new ServiceBusSessionProcessorOptions { AutoCompleteMessages = false })
-                    : _client.CreateSessionProcessor(config.EntityName, new ServiceBusSessionProcessorOptions { AutoCompleteMessages = false });
+                    ? client.CreateSessionProcessor(config.TopicName, subscriptionName, new ServiceBusSessionProcessorOptions { AutoCompleteMessages = false })
+                    : client.CreateSessionProcessor(config.EntityName, new ServiceBusSessionProcessorOptions { AutoCompleteMessages = false });
             }
             else
             {
                 _processor = config.IsTopic
-                    ? _client.CreateProcessor(config.TopicName, subscriptionName, new ServiceBusProcessorOptions { AutoCompleteMessages = false })
-                    : _client.CreateProcessor(config.EntityName, new ServiceBusProcessorOptions { AutoCompleteMessages = false });
+                    ? client.CreateProcessor(config.TopicName, subscriptionName, new ServiceBusProcessorOptions { AutoCompleteMessages = false })
+                    : client.CreateProcessor(config.EntityName, new ServiceBusProcessorOptions { AutoCompleteMessages = false });
             }
         }
 
@@ -465,7 +482,8 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
             {
                 await _processor.DisposeAsync();
             }
-            await _client.DisposeAsync();
+
+            // The ServiceBusClient is shared and owned by AzureClientCache - see the sender adapter.
         }
     }
 
@@ -474,10 +492,10 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         private readonly ServiceBusAdministrationClient _client;
         private readonly ServiceBusConfig _config;
 
-        public DefaultServiceBusAdministrationAdapter(ServiceBusConfig config)
+        public DefaultServiceBusAdministrationAdapter(ServiceBusAdministrationClient client, ServiceBusConfig config)
         {
             _config = config;
-            _client = new ServiceBusAdministrationClient(config.ConnectionString);
+            _client = client;
         }
 
         public Task ValidateNamespaceConnectionAsync(CancellationToken cancellationToken)
@@ -511,7 +529,11 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
     private sealed class DefaultHttpComponentFactory : IHttpComponentFactory
     {
-        private static readonly HttpClient SharedClient = new()
+        /// <summary>
+        /// The one HttpClient every Azure HTTP call goes through. The step's CancellationToken is the
+        /// real time budget, so the client itself does not impose one.
+        /// </summary>
+        internal static readonly HttpClient SharedClient = new()
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };

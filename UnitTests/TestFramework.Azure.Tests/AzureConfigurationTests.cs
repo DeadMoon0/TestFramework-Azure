@@ -221,6 +221,77 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public async Task ServiceBusClient_IsSharedAndSurvivesPerOperationDisposal()
+    {
+        // Regression guard: the ServiceBusClient is cached and shared, so a per-operation sender or
+        // pump must never dispose it. If it does, the second Service Bus step of a run gets an
+        // ObjectDisposedException out of CreateSender/CreateProcessor.
+        await using AzureClientCache clientCache = new();
+        ServiceCollection services = new();
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        DefaultAzureComponentFactory factory = new(provider, clientCache);
+
+        ServiceBusConfig config = new()
+        {
+            ConnectionString = "Endpoint=sb://localhost/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=U0FTX0tFWV9WQUxVRQ==;UseDevelopmentEmulator=true;",
+            QueueName = "orders",
+            TopicName = null,
+            SubscriptionName = null,
+            RequiredSession = false,
+        };
+
+        Exception? failure = await Record.ExceptionAsync(async () =>
+        {
+            IServiceBusSenderAdapter firstSender = factory.ServiceBus.CreateSender(config);
+            await firstSender.DisposeAsync();
+
+            IServiceBusSenderAdapter secondSender = factory.ServiceBus.CreateSender(config);
+            await secondSender.DisposeAsync();
+
+            IServiceBusMessagePump firstPump = factory.ServiceBus.CreateMessagePump(config, null);
+            await firstPump.DisposeAsync();
+
+            IServiceBusMessagePump secondPump = factory.ServiceBus.CreateMessagePump(config, null);
+            await secondPump.DisposeAsync();
+        });
+
+        Assert.Null(failure);
+    }
+
+    [Fact]
+    public async Task TwoServiceBusSendSteps_RunInOneTimeline()
+    {
+        FakeServiceBusSender sender = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("bus", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = "orders",
+                TopicName = null,
+                SubscriptionName = null,
+                RequiredSession = false,
+            }));
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender) });
+        });
+
+        ServiceBusMessage first = new("first") { MessageId = "first" };
+        ServiceBusMessage second = new("second") { MessageId = "second" };
+
+        TimelineRun run = await Timeline.Create()
+            .Trigger(AzureExt.Trigger.ServiceBus.Send("bus", Var.Const(first)))
+            .Name("send-first")
+            .Trigger(AzureExt.Trigger.ServiceBus.Send("bus", Var.Const(second)))
+            .Name("send-second")
+            .Build()
+            .SetupRun(runtime.ServiceProvider)
+            .RunAsync();
+
+        run.EnsureRanToCompletion();
+        Assert.Equal(["first", "second"], sender.MessagesSent.ConvertAll(message => message.MessageId));
+    }
+
+    [Fact]
     public async Task ServiceBusSendTrigger_BindsUsefulOutputs_IntoTimelineVariables()
     {
         FakeServiceBusSender sender = new();
@@ -2742,9 +2813,12 @@ public class AzureConfigurationTests
     {
         public ServiceBusMessage? MessageSent { get; private set; }
 
+        public List<ServiceBusMessage> MessagesSent { get; } = [];
+
         public Task SendMessageAsync(ServiceBusMessage message, CancellationToken cancellationToken)
         {
             MessageSent = message;
+            MessagesSent.Add(message);
             return Task.CompletedTask;
         }
 

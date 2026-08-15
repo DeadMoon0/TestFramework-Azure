@@ -25,6 +25,10 @@ public static class AzureServiceCollectionExtension
         provider ??= new DefaultConfigProvider();
         ConfigLoader loader = new ConfigLoader(provider);
         loader.LoadAllConfigs(configuration, serviceCollection);
+
+        // Azure SDK clients are connection multiplexers, so they are created once and owned by the
+        // container, which disposes them when the service provider goes away.
+        serviceCollection.AddSingleton<AzureClientCache>();
         return serviceCollection;
     }
 
