@@ -44,8 +44,11 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
         RemoteConnection remoteConnection = new RemoteConnection(new Uri(functionConfig.BaseUrl));
         if (config.DoPing) await remoteConnection.EnsurePingAsync();
         Uri fullTriggerUri = new Uri(remoteConnection.BasePath, $"{AdminFunctionsUri}/{_trigger.Name}");
-        HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Post, fullTriggerUri);
-        message.Headers.Add("x-functions-key", functionConfig.Code);
+        using HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Post, fullTriggerUri);
+
+        // The admin endpoint authenticates with the MASTER key, not a function key. Fall back to Code
+        // only because a locally hosted host accepts anything.
+        message.Headers.Add("x-functions-key", functionConfig.AdminCode ?? functionConfig.Code);
         message.Content = new StringContent("{}", new System.Net.Http.Headers.MediaTypeHeaderValue(MediaTypeNames.Application.Json));
         IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
         logger.LogInformation("FunctionApp managed '{0}' -> POST {1} (function: {2})", appIdentifier, fullTriggerUri, _trigger.Name);
@@ -54,6 +57,15 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
             ? null
             : await response.Content.ReadAsStringAsync(cancellationToken);
         logger.LogInformation("FunctionApp managed '{0}' <- {1}", appIdentifier, response.StatusCode);
+
+        if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
+                $"The Function App admin endpoint '{fullTriggerUri}' rejected the key with " +
+                $"{(int)response.StatusCode} ({response.StatusCode}). This endpoint requires the host master key: " +
+                $"set 'AdminCode' on the '{appIdentifier}' Function App configuration.");
+        }
+
         response.EnsureSuccessStatusCode();
         return new ManagedResult()
         {

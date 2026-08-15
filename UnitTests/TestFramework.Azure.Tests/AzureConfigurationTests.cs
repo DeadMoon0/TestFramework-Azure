@@ -1554,6 +1554,54 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public async Task ManagedRemoteFunctionAppTrigger_PrefersAdminCode_ForTheAdminEndpoint()
+    {
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            {
+                BaseUrl = "https://example.test/api/",
+                Code = "function-key",
+                AdminCode = "master-key",
+            }));
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        ManagedRemoteFunctionAppTrigger trigger = new("func", Var.Const(new TriggerRouting("cleanup")));
+
+        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+
+        Assert.Equal("master-key", sender.Request!.Headers.GetValues("x-functions-key").Single());
+    }
+
+    [Fact]
+    public async Task ManagedRemoteFunctionAppTrigger_ExplainsThatTheAdminEndpointNeedsTheMasterKey()
+    {
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            {
+                BaseUrl = "https://example.test/api/",
+                Code = "function-key",
+                AdminCode = null,
+            }));
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        ManagedRemoteFunctionAppTrigger trigger = new("func", Var.Const(new TriggerRouting("cleanup")));
+
+        TestFramework.Core.Exceptions.FrameworkConfigurationException exception =
+            await Assert.ThrowsAsync<TestFramework.Core.Exceptions.FrameworkConfigurationException>(
+                () => trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+
+        Assert.Contains("AdminCode", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ManagedRemoteFunctionAppTrigger_BindsFullManagedResult_IntoTimelineVariables()
     {
         HttpResponseMessage response = new(HttpStatusCode.Accepted)
