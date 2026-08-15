@@ -16,7 +16,12 @@
 		<PackageTags>Test;UnitTest;IntegrationTest;Framework;Fluent;Timeline;Azure</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<Copyright>Copyright (c) DeadMoon0 2026</Copyright>
-		<PackageReleaseNotes>BREAKING: FunctionAppConfig.BaseUrl is now the site root and the HTTP route prefix comes from the new FunctionAppConfig.RoutePrefix (default "api"). Remove any trailing /api/ from BaseUrl. Custom [HttpTrigger(Route=...)] routes now keep the host prefix.</PackageReleaseNotes>
+		<PackageReleaseNotes>BREAKING: FunctionAppConfig.BaseUrl is now the site root and the HTTP route prefix comes from the new FunctionAppConfig.RoutePrefix (default "api"). Remove any trailing /api/ from BaseUrl. Custom [HttpTrigger(Route=...)] routes now keep the host prefix.
+Defaults that changed:
+- DoPing is now false. Azure endpoints do not answer ICMP, so the old default made a remote call fail or wait out the ping timeout before it even started. Reachability is now an HTTP probe, which also makes AlivenessLevel.Reachable succeed against real Azure for the first time.
+- A Service Bus message matched by a wait is now completed. It used to be left on the entity, where a later run could match it again. Pass completeMessage: false to keep the old behaviour. Non-matching messages are abandoned immediately instead of holding their lock.
+Renamed, with [Obsolete] bridges so existing code still compiles: the Logic App builder's Execute() is now Call() and CaptureResponse() is now CallAndCapture(), matching the Function App builder and the documentation.
+Also: SAS signatures are redacted from Logic App callback URLs before they reach step results, variables or logs; the Cosmos schema client validates TLS against real accounts and only relaxes it for a local emulator; creating a missing Cosmos database or container against a non-emulator account now requires AllowSchemaCreation, and the throughput is configurable instead of a hardcoded 400 RU; Azure SDK clients are cached and disposed instead of built per operation; and a mistyped identifier reports the registered ones instead of throwing KeyNotFoundException.</PackageReleaseNotes>
 	</PropertyGroup>
 
 	<ItemGroup>
