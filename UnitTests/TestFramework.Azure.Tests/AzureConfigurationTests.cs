@@ -380,7 +380,7 @@ public class AzureConfigurationTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
-                BaseUrl = "https://example.test/api/",
+                BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
             }));
@@ -415,7 +415,7 @@ public class AzureConfigurationTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
-                BaseUrl = "https://example.test/api/",
+                BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
             }));
@@ -453,7 +453,7 @@ public class AzureConfigurationTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
-                BaseUrl = "https://example.test/api/",
+                BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
             }));
@@ -489,7 +489,7 @@ public class AzureConfigurationTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
-                BaseUrl = "https://example.test/api/",
+                BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
             }));
@@ -602,7 +602,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         }, debugger);
 
-        TriggerHttpRouting routing = new("api/orders", HttpMethod.Post, Var.Const(new Dictionary<string, string>()));
+        TriggerHttpRouting routing = new("orders", HttpMethod.Post, Var.Const(new Dictionary<string, string>()));
         CommonHttpRequest request = new();
 
         HttpRemoteFunctionAppTrigger trigger = new("func", Var.Const(routing), Var.Const(request));
@@ -1531,7 +1531,7 @@ public class AzureConfigurationTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
-                BaseUrl = "https://example.test/api/",
+                BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
             }));
@@ -1546,10 +1546,10 @@ public class AzureConfigurationTests
         Assert.NotNull(result);
         Assert.Equal(HttpStatusCode.OK, result!.StatusCode);
         Assert.Equal("managed", result.Body);
-        Assert.Equal("https://example.test/api/admin/functions/cleanup", sender.Request!.RequestUri!.ToString());
+        Assert.Equal("https://example.test/admin/functions/cleanup", sender.Request!.RequestUri!.ToString());
         Assert.Equal("secret", sender.Request.Headers.GetValues("x-functions-key").Single());
         Assert.Equal("{}", await sender.Request.Content!.ReadAsStringAsync());
-        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("FunctionApp managed 'func' -> POST https://example.test/api/admin/functions/cleanup", StringComparison.Ordinal));
+        Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("FunctionApp managed 'func' -> POST https://example.test/admin/functions/cleanup", StringComparison.Ordinal));
         Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("FunctionApp managed 'func' <- OK", StringComparison.Ordinal));
     }
 
@@ -1561,7 +1561,7 @@ public class AzureConfigurationTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
-                BaseUrl = "https://example.test/api/",
+                BaseUrl = "https://example.test/",
                 Code = "function-key",
                 AdminCode = "master-key",
             }));
@@ -1584,7 +1584,7 @@ public class AzureConfigurationTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
-                BaseUrl = "https://example.test/api/",
+                BaseUrl = "https://example.test/",
                 Code = "function-key",
                 AdminCode = null,
             }));
@@ -1613,7 +1613,7 @@ public class AzureConfigurationTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
-                BaseUrl = "https://example.test/api/",
+                BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
             }));
@@ -1649,7 +1649,7 @@ public class AzureConfigurationTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
-                BaseUrl = "https://example.test/api/",
+                BaseUrl = "https://example.test/",
                 Code = "function-code",
                 AdminCode = "admin-code",
             }));
@@ -1661,7 +1661,7 @@ public class AzureConfigurationTests
 
         await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
 
-        Assert.Equal("https://example.test/api/admin/host/status", sender.Request!.RequestUri!.ToString());
+        Assert.Equal("https://example.test/admin/host/status", sender.Request!.RequestUri!.ToString());
         Assert.Equal("admin-code", sender.Request.Headers.GetValues("x-functions-key").Single());
         Assert.Contains(debugger.LogEntries, entry => entry.Message.Contains("probing host status", StringComparison.OrdinalIgnoreCase));
     }
@@ -1675,7 +1675,7 @@ public class AzureConfigurationTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
             {
-                BaseUrl = "https://example.test/api/",
+                BaseUrl = "https://example.test/",
                 Code = "function-code",
                 AdminCode = "admin-code",
             }));

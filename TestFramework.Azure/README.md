@@ -88,17 +88,23 @@ Supported record types:
 
 | Section | Record type | Required fields | Optional fields | Used by |
 |---------|-------------|-----------------|-----------------|---------|
-| `FunctionApp:{identifier}` | `FunctionAppConfig` | `BaseUrl`, `Code` | `AdminCode` | Remote Function App HTTP triggers and Function App liveness checks |
+| `FunctionApp:{identifier}` | `FunctionAppConfig` | `BaseUrl`, `Code` | `AdminCode`, `RoutePrefix` | Remote Function App HTTP triggers and Function App liveness checks |
 | `LogicApp:{identifier}` | `LogicAppConfig` | no single global required field | `HostingMode`, `WorkflowName`, nested `Standard` and `Consumption` settings | Logic App request triggers, timer triggers, run events, and Logic App liveness checks |
 | `CosmosDb:{identifier}` | `CosmosContainerDbConfig` | `ConnectionString`, `DatabaseName`, `ContainerName` | None | Cosmos artifacts, query finders, and Cosmos liveness checks |
 | `ServiceBus:{identifier}` | `ServiceBusConfig` | `ConnectionString` plus either `QueueName` or `TopicName` | `SubscriptionName`, `RequiredSession` | Service Bus send triggers and message-received events |
 | `StorageAccount:{identifier}` | `StorageAccountConfig` | `ConnectionString` | `QueueContainerName`, `BlobContainerName`, `TableContainerName` | Blob artifacts, table artifacts, and storage liveness checks |
 | `SqlDatabase:{identifier}` | `SqlDatabaseConfig` | `ConnectionString`, `DatabaseName` | `ContextType` | SQL row artifacts, SQL query finders, and SQL liveness checks |
 
+> **Breaking change:** `FunctionAppConfig.BaseUrl` is now strictly the site root and the `api/` prefix
+> comes from the new `RoutePrefix` property. If your `BaseUrl` currently ends in `/api/`, drop that
+> segment - otherwise every HTTP call resolves to `/api/api/...`. A custom `[HttpTrigger(Route = ...)]`
+> now keeps the host prefix instead of losing it.
+
 Configuration expectations:
 
-- `FunctionAppConfig.BaseUrl` should be the host root, usually ending at the site root rather than a specific function route.
-- `FunctionAppConfig.Code` is the normal trigger key; `AdminCode` is only needed when host-status checks require a different admin-level key.
+- `FunctionAppConfig.BaseUrl` is the site root. Do not include the `api/` route prefix in it - host endpoints such as `admin/host/status` are resolved against this value directly.
+- `FunctionAppConfig.RoutePrefix` defaults to `api` and mirrors `extensions.http.routePrefix` in `host.json`. It is applied exactly once, to every HTTP route the builders produce. Set it to `""` for a host configured with an empty route prefix.
+- `FunctionAppConfig.Code` is the normal trigger key; `AdminCode` is the host master key, required by the `admin/...` endpoints the managed trigger and host-status checks use.
 - `LogicAppConfig.HostingMode` defaults to `Standard`.
 - `LogicAppConfig.Standard` contains the Standard-only values: `BaseUrl`, `Code`, and `AdminCode`.
 - `LogicAppConfig.Consumption` contains the Consumption-only values: `InvokeUrl` and `WorkflowResourceId`.

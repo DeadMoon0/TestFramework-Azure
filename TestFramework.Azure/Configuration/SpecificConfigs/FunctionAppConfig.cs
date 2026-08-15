@@ -10,9 +10,25 @@
 public record FunctionAppConfig
 {
     /// <summary>
-    /// Absolute Function App host URL, for example <c>https://my-app.azurewebsites.net/</c>.
+    /// Absolute Function App SITE ROOT, for example <c>https://my-app.azurewebsites.net/</c>.
     /// </summary>
+    /// <remarks>
+    /// This is the host root, not the API root: the HTTP route prefix belongs in
+    /// <see cref="RoutePrefix"/>, and host-level endpoints such as <c>admin/host/status</c> are
+    /// resolved against this value directly.
+    /// </remarks>
     public required string BaseUrl { get; init; }
+
+    /// <summary>
+    /// The host's HTTP route prefix, matching <c>extensions.http.routePrefix</c> in <c>host.json</c>.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to the Functions host default of <c>api</c>. Set it to an empty string for a host
+    /// configured with <c>"routePrefix": ""</c>. Every HTTP route the builders produce - a custom
+    /// <c>[HttpTrigger(Route = ...)]</c>, a plain function name, or an explicit sub-path - is relative
+    /// to this prefix, so the prefix is applied exactly once, here.
+    /// </remarks>
+    public string RoutePrefix { get; init; } = "api";
 
     /// <summary>
     /// Function key used for normal trigger invocations.

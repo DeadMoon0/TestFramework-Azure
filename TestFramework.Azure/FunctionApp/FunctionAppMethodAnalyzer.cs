@@ -34,7 +34,10 @@ internal static class FunctionAppMethodAnalyzer
                 ? new HttpMethod(methods[0])
                 : HttpMethod.Get;
 
-            string path = route ?? $"api/{functionAttr.Name}";
+            // Routes are emitted RELATIVE to the host's route prefix. The prefix is applied once, by
+            // the trigger, from FunctionAppConfig.RoutePrefix - a custom Route must not lose it, and a
+            // missing Route must not hardcode it.
+            string path = route ?? functionAttr.Name;
 
             return new TriggerHttpRouting(path, httpMethod, null!);
         }

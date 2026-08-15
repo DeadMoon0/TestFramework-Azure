@@ -42,7 +42,7 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         FunctionAppConfig functionConfig = serviceProvider.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig(appIdentifier);
         RemoteConnection remoteConnection = new RemoteConnection(new Uri(functionConfig.BaseUrl));
         if (config.DoPing) await remoteConnection.EnsurePingAsync();
-        Uri fullTriggerUri = new Uri(remoteConnection.BasePath, _trigger.Path);
+        Uri fullTriggerUri = BuildTriggerUri(remoteConnection.BasePath, functionConfig.RoutePrefix, _trigger.Path);
         IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
         logger.LogInformation("FunctionApp HTTP '{0}' -> {1} {2}", appIdentifier, _trigger.Method, fullTriggerUri);
 
@@ -96,6 +96,26 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         await request.ApplyToHttpRequestMessageAsync(message, cancellationToken).ConfigureAwait(false);
         message.Headers.Add("x-functions-key", functionConfig.Code);
         return message;
+    }
+
+    /// <summary>
+    /// Combines the site root, the host route prefix and the route the builder produced.
+    /// </summary>
+    /// <remarks>
+    /// This is the one place the <c>api/</c> prefix is applied. Routes arriving here are always
+    /// relative to the prefix, whether they came from a custom <c>[HttpTrigger(Route = ...)]</c>,
+    /// a bare function name or an explicit sub-path.
+    /// </remarks>
+    internal static Uri BuildTriggerUri(Uri siteRoot, string? routePrefix, string relativePath)
+    {
+        Uri root = siteRoot.AbsoluteUri.EndsWith("/", StringComparison.Ordinal)
+            ? siteRoot
+            : new Uri(siteRoot.AbsoluteUri + "/");
+
+        string path = (relativePath ?? string.Empty).TrimStart('/');
+        string prefix = (routePrefix ?? string.Empty).Trim('/');
+
+        return new Uri(root, prefix.Length == 0 ? path : $"{prefix}/{path}");
     }
 
     private static bool IsLocalDevelopmentHost(Uri uri)

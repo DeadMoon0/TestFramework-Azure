@@ -123,10 +123,9 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
             if (string.IsNullOrWhiteSpace(resolvedFunctionName))
                 throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("Function App function name cannot be blank.");
 
-            string trimmedName = resolvedFunctionName.Trim();
-            string normalized = trimmedName.StartsWith("api/", StringComparison.OrdinalIgnoreCase)
-                ? trimmedName
-                : $"api/{trimmedName.TrimStart('/')}";
+            // Relative to the host route prefix, which HttpRemoteFunctionAppTrigger applies from
+            // FunctionAppConfig.RoutePrefix.
+            string normalized = resolvedFunctionName.Trim().TrimStart('/');
             return new TriggerHttpRouting(normalized, method.GetRequiredValue(store), null!);
         }
 

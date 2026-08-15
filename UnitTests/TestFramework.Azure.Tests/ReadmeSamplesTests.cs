@@ -96,7 +96,7 @@ public class ReadmeSamplesTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
             {
-                BaseUrl = "https://functions.test/api/",
+                BaseUrl = "https://functions.test/",
                 Code = "function-key",
             }));
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
@@ -114,6 +114,59 @@ public class ReadmeSamplesTests
     }
 
     [Fact]
+    public async Task FunctionAppHttpCall_FunctionWithoutRoute_GetsTheHostPrefixExactlyOnce()
+    {
+        // Regression guard for the /api/api/Run collision: the analyzer emits the route relative to
+        // the host prefix, and only the trigger prepends FunctionAppConfig.RoutePrefix.
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
+            {
+                BaseUrl = "https://functions.test/",
+                Code = "function-key",
+            }));
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        TimelineRun run = await Timeline.Create()
+            .Trigger(AzureExt.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<ReadmeRoutelessHttpFunction>(nameof(ReadmeRoutelessHttpFunction.Run)).Call())
+            .Build()
+            .SetupRun(runtime.ServiceProvider)
+            .RunAsync();
+
+        run.EnsureRanToCompletion();
+        Assert.Equal(new Uri("https://functions.test/api/Run"), sender.Request!.RequestUri);
+    }
+
+    [Fact]
+    public async Task FunctionAppHttpCall_EmptyRoutePrefix_CallsTheSiteRootDirectly()
+    {
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
+            {
+                BaseUrl = "https://functions.test/",
+                Code = "function-key",
+                RoutePrefix = string.Empty,
+            }));
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        TimelineRun run = await Timeline.Create()
+            .Trigger(AzureExt.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<ReadmeHttpFunction>(nameof(ReadmeHttpFunction.Run)).Call())
+            .Build()
+            .SetupRun(runtime.ServiceProvider)
+            .RunAsync();
+
+        run.EnsureRanToCompletion();
+        Assert.Equal(new Uri("https://functions.test/orders"), sender.Request!.RequestUri);
+    }
+
+    [Fact]
     public async Task FunctionAppHttpCall_ExplicitEndpointBodyAndHeaders_ComposesExpectedRequest()
     {
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
@@ -121,7 +174,7 @@ public class ReadmeSamplesTests
         {
             services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
             {
-                BaseUrl = "https://functions.test/api/",
+                BaseUrl = "https://functions.test/",
                 Code = "function-key",
             }));
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
@@ -269,6 +322,14 @@ public class ReadmeSamplesTests
     {
         [Function("Run")]
         public void Run([HttpTrigger(AuthorizationLevel.Function, "post", Route = "orders")] object request)
+        {
+        }
+    }
+
+    private sealed class ReadmeRoutelessHttpFunction
+    {
+        [Function("Run")]
+        public void Run([HttpTrigger(AuthorizationLevel.Function, "post")] object request)
         {
         }
     }
