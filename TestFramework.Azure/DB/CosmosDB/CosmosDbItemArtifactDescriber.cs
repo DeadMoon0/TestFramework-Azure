@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Runtime;
+using Newtonsoft.Json.Linq;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Variables;
@@ -18,6 +19,36 @@ namespace TestFramework.Azure.DB.CosmosDB;
 /// <typeparam name="TItem">The item type.</typeparam>
 public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>>
 {
+    /// <summary>
+    /// The canonical key mirrored from <c>TestFramework.Core.Debugger.DebugValueSchemaKeys.CosmosItem</c>.
+    /// </summary>
+    /// <remarks>
+    /// A literal rather than a reference because this package builds against the published Core;
+    /// <c>ArtifactSchemaKeyTests</c> pins it to the canonical value so the two cannot drift.
+    /// </remarks>
+    internal const string SchemaKey = "tf.artifact.cosmos.item";
+
+    /// <summary>
+    /// Identifies this artifact's debug shape, so a consumer renders it as a Cosmos DB item instead of
+    /// falling back to a generic view keyed on the CLR type name.
+    /// </summary>
+    public override string DebugValueSchemaKey => SchemaKey;
+
+    /// <inheritdoc />
+    public override JToken? CreateDebugValueCustomPayload(ArtifactInstanceGeneric instance)
+    {
+        ArgumentNullException.ThrowIfNull(instance);
+
+        if (instance.Reference is not CosmosDbItemArtifactReference<TItem>)
+            return null;
+
+        return new JObject
+        {
+            ["key"] = instance.Identifier.Identifier,
+            ["itemType"] = typeof(TItem).Name
+        };
+    }
+
     /// <summary>
     /// Removes the referenced item from Cosmos during artifact cleanup.
     /// </summary>

@@ -1,10 +1,11 @@
-using Azure.Data.Tables;
+﻿using Azure.Data.Tables;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Runtime;
+using Newtonsoft.Json.Linq;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Variables;
@@ -18,6 +19,36 @@ namespace TestFramework.Azure.StorageAccount.Table;
 public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>
     where T : class, ITableEntity
 {
+    /// <summary>
+    /// The canonical key mirrored from <c>TestFramework.Core.Debugger.DebugValueSchemaKeys.TableEntity</c>.
+    /// </summary>
+    /// <remarks>
+    /// A literal rather than a reference because this package builds against the published Core;
+    /// <c>ArtifactSchemaKeyTests</c> pins it to the canonical value so the two cannot drift.
+    /// </remarks>
+    internal const string SchemaKey = "tf.artifact.table.entity";
+
+    /// <summary>
+    /// Identifies this artifact's debug shape, so a consumer renders it as a table entity instead of
+    /// falling back to a generic view keyed on the CLR type name.
+    /// </summary>
+    public override string DebugValueSchemaKey => SchemaKey;
+
+    /// <inheritdoc />
+    public override JToken? CreateDebugValueCustomPayload(ArtifactInstanceGeneric instance)
+    {
+        ArgumentNullException.ThrowIfNull(instance);
+
+        if (instance.Reference is not TableStorageEntityArtifactReference<T>)
+            return null;
+
+        return new JObject
+        {
+            ["key"] = instance.Identifier.Identifier,
+            ["itemType"] = typeof(T).Name
+        };
+    }
+
     /// <summary>
     /// Upserts the referenced entity during artifact setup.
     /// </summary>
