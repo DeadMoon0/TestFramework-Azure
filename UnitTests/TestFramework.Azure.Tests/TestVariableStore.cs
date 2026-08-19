@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -29,7 +29,9 @@ internal static class TestVariableStore
         object debuggingSession = debuggingRunSessionType
             .GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .Single()
-            .Invoke([new SilentRunDebugger()]);
+            // Reflection does not apply default values, so the caller-info arguments are passed
+            // explicitly.
+            .Invoke([new SilentRunDebugger(), null, 0]);
 
         ScopedLogger logger = (ScopedLogger)typeof(ScopedLogger)
             .GetMethod("CreateWithDebuggerSession", BindingFlags.Static | BindingFlags.NonPublic)!
@@ -45,9 +47,9 @@ internal static class TestVariableStore
 
     private sealed class SilentRunDebugger : IRunDebugger
     {
-        public Task SignalInitTimelineRunAsync(string sessionId, string name, string projectPath, TimelineRunStructure runStructure) => Task.CompletedTask;
+        public Task SignalInitTimelineRunAsync(string sessionId, string name, string projectPath, TimelineRunStructure runStructure, TestIdentity? identity = null) => Task.CompletedTask;
 
-        public Task SignalEntityTransitionAsync(string sessionId, DebugEntityKind entityKind, string? stage, int? stepId, DebugLifecycleState state, DebugLifecycleState? previousState = null, DebugLifecycleState? outcomeState = null) => Task.CompletedTask;
+        public Task SignalEntityTransitionAsync(string sessionId, DebugEntityKind entityKind, string? stage, int? stepId, DebugLifecycleState state, DebugLifecycleState? previousState = null, DebugLifecycleState? outcomeState = null, DebugFailureDetail? failure = null) => Task.CompletedTask;
 
         public Task SignalValueUpdateAsync(string sessionId, string name, DebugValueKind valueKind, string? stage, int? stepId, DebugValueEnvelope value) => Task.CompletedTask;
 

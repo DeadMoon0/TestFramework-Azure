@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -617,8 +617,8 @@ public class AzureConfigurationTests
         Assert.Equal(HttpStatusCode.InternalServerError, actual.StatusCode);
         Assert.Equal(2, sender.Requests.Count);
         Assert.All(sender.Requests, loggedRequest => Assert.Equal("http://localhost:7071/api/orders", loggedRequest.RequestUri!.ToString()));
-        Assert.True(await debugger.WaitForLogAsync(entry => entry.Message.Contains("FunctionApp HTTP 'func' -> POST http://localhost:7071/api/orders", StringComparison.Ordinal)), "Expected log entry was not delivered.");
-        Assert.True(await debugger.WaitForLogAsync(entry => entry.Message.Contains("warmup retry", StringComparison.OrdinalIgnoreCase)), "Expected log entry was not delivered.");
+        Assert.True(await debugger.WaitForLogAsync(entry => DebugLogTemplate.Render(entry).Contains("FunctionApp HTTP 'func' -> POST http://localhost:7071/api/orders", StringComparison.Ordinal)), $"Expected log entry was not delivered. Delivered: {debugger.Delivered}");
+        Assert.True(await debugger.WaitForLogAsync(entry => DebugLogTemplate.Render(entry).Contains("warmup retry", StringComparison.OrdinalIgnoreCase)), $"Expected log entry was not delivered. Delivered: {debugger.Delivered}");
     }
 
     [Fact]
@@ -1553,8 +1553,8 @@ public class AzureConfigurationTests
         Assert.Equal("https://example.test/admin/functions/cleanup", sender.Request!.RequestUri!.ToString());
         Assert.Equal("secret", sender.Request.Headers.GetValues("x-functions-key").Single());
         Assert.Equal("{}", await sender.Request.Content!.ReadAsStringAsync());
-        Assert.True(await debugger.WaitForLogAsync(entry => entry.Message.Contains("FunctionApp managed 'func' -> POST https://example.test/admin/functions/cleanup", StringComparison.Ordinal)), "Expected log entry was not delivered.");
-        Assert.True(await debugger.WaitForLogAsync(entry => entry.Message.Contains("FunctionApp managed 'func' <- OK", StringComparison.Ordinal)), "Expected log entry was not delivered.");
+        Assert.True(await debugger.WaitForLogAsync(entry => DebugLogTemplate.Render(entry).Contains("FunctionApp managed 'func' -> POST https://example.test/admin/functions/cleanup", StringComparison.Ordinal)), $"Expected log entry was not delivered. Delivered: {debugger.Delivered}");
+        Assert.True(await debugger.WaitForLogAsync(entry => DebugLogTemplate.Render(entry).Contains("FunctionApp managed 'func' <- OK", StringComparison.Ordinal)), $"Expected log entry was not delivered. Delivered: {debugger.Delivered}");
     }
 
     [Fact]
@@ -1667,7 +1667,7 @@ public class AzureConfigurationTests
 
         Assert.Equal("https://example.test/admin/host/status", sender.Request!.RequestUri!.ToString());
         Assert.Equal("admin-code", sender.Request.Headers.GetValues("x-functions-key").Single());
-        Assert.True(await debugger.WaitForLogAsync(entry => entry.Message.Contains("probing host status", StringComparison.OrdinalIgnoreCase)), "Expected log entry was not delivered.");
+        Assert.True(await debugger.WaitForLogAsync(entry => DebugLogTemplate.Render(entry).Contains("probing host status", StringComparison.OrdinalIgnoreCase)), $"Expected log entry was not delivered. Delivered: {debugger.Delivered}");
     }
 
     [Fact]
@@ -2744,7 +2744,10 @@ public class AzureConfigurationTests
             object debuggingSession = debuggingRunSessionType
                 .GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
                 .Single()
-                .Invoke([activeDebugger]);
+                // Every parameter spelled out: reflection does not apply a constructor's default
+                // values, so the caller-info arguments have to be supplied even though calling
+                // code never passes them.
+                .Invoke([activeDebugger, null, 0]);
 
             Logger = (ScopedLogger)typeof(ScopedLogger)
                 .GetMethod("CreateWithDebuggerSession", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!
@@ -2787,6 +2790,9 @@ public class AzureConfigurationTests
         /// invokes a step directly never finishes the session, so asserting immediately races the
         /// drain. Waiting is what makes those assertions deterministic.
         /// </remarks>
+        /// <summary>What was delivered by the time a wait gave up, so a failure can be read.</summary>
+        public string Delivered { get; private set; } = string.Empty;
+
         public async Task<bool> WaitForLogAsync(Func<DebugLogEntry, bool> predicate, TimeSpan? timeout = null)
         {
             DateTime deadline = DateTime.UtcNow.Add(timeout ?? TimeSpan.FromSeconds(5));
@@ -2796,15 +2802,18 @@ public class AzureConfigurationTests
                     return true;
 
                 if (DateTime.UtcNow >= deadline)
+                {
+                    Delivered = string.Join(" | ", LogEntries.Select(DebugLogTemplate.Render));
                     return false;
+                }
 
                 await Task.Delay(15).ConfigureAwait(false);
             }
         }
 
-        public Task SignalInitTimelineRunAsync(string sessionId, string name, string projectPath, TimelineRunStructure runStructure) => Task.CompletedTask;
+        public Task SignalInitTimelineRunAsync(string sessionId, string name, string projectPath, TimelineRunStructure runStructure, TestIdentity? identity = null) => Task.CompletedTask;
 
-        public Task SignalEntityTransitionAsync(string sessionId, DebugEntityKind entityKind, string? stage, int? stepId, DebugLifecycleState state, DebugLifecycleState? previousState = null, DebugLifecycleState? outcomeState = null) => Task.CompletedTask;
+        public Task SignalEntityTransitionAsync(string sessionId, DebugEntityKind entityKind, string? stage, int? stepId, DebugLifecycleState state, DebugLifecycleState? previousState = null, DebugLifecycleState? outcomeState = null, DebugFailureDetail? failure = null) => Task.CompletedTask;
 
         public Task SignalValueUpdateAsync(string sessionId, string name, DebugValueKind valueKind, string? stage, int? stepId, DebugValueEnvelope value) => Task.CompletedTask;
 
@@ -2824,9 +2833,9 @@ public class AzureConfigurationTests
 
     private sealed class NullRunDebugger : IRunDebugger
     {
-        public Task SignalInitTimelineRunAsync(string sessionId, string name, string projectPath, TimelineRunStructure runStructure) => Task.CompletedTask;
+        public Task SignalInitTimelineRunAsync(string sessionId, string name, string projectPath, TimelineRunStructure runStructure, TestIdentity? identity = null) => Task.CompletedTask;
 
-        public Task SignalEntityTransitionAsync(string sessionId, DebugEntityKind entityKind, string? stage, int? stepId, DebugLifecycleState state, DebugLifecycleState? previousState = null, DebugLifecycleState? outcomeState = null) => Task.CompletedTask;
+        public Task SignalEntityTransitionAsync(string sessionId, DebugEntityKind entityKind, string? stage, int? stepId, DebugLifecycleState state, DebugLifecycleState? previousState = null, DebugLifecycleState? outcomeState = null, DebugFailureDetail? failure = null) => Task.CompletedTask;
 
         public Task SignalValueUpdateAsync(string sessionId, string name, DebugValueKind valueKind, string? stage, int? stepId, DebugValueEnvelope value) => Task.CompletedTask;
 
