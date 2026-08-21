@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Linq;
@@ -38,7 +38,10 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
 
         DbIdentifier = dbIdentifier;
         _primaryKeyValues = primaryKeyValues;
-        CanDeconstruct = false;
+
+        // A primary key is required above, so this reference can always address the row it deletes.
+        // Whether it may delete it is the timeline's call, through MarkReadonly().
+        CanDeconstruct = true;
     }
 
     /// <summary>
@@ -49,7 +52,6 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
         _pinnedPKValues = _primaryKeyValues
             .Select(v => v.GetRequiredValue(variableStore))
             .ToArray();
-        CanDeconstruct = true;
     }
 
     /// <summary>
@@ -76,7 +78,6 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
     internal void PinWithValues(string[] values)
     {
         _pinnedPKValues = values;
-        CanDeconstruct = true;
     }
 
     /// <summary>
