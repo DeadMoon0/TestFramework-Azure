@@ -1,0 +1,82 @@
+﻿using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
+using TestFramework.Azure.Configuration.SpecificConfigs;
+using TestFramework.Config.Configuration;
+using TestFramework.Core.Environment.Graph;
+
+namespace TestFramework.Azure.Configuration;
+
+/// <summary>
+/// The storage account section, as the run's resource graph sees it.
+/// </summary>
+/// <remarks>
+/// <para>
+/// A configured storage account is a resource somebody declared, and this says which values of the graph's an entry
+/// actually holds. What it buys is that a reader asks the run where something is and never learns whether a
+/// person wrote it down or something published it while starting.
+/// </para>
+/// <para>
+/// Reading delegates to the package's own provider rather than binding the section again here: two readers for
+/// one section is two sets of validation rules, and the second one written is the one that quietly accepts
+/// what the first refuses.
+/// </para>
+/// One account, up to three containers - a blob, a queue and a table container are all things an entry may
+/// name and none of them is required, which is what the optional values on the kind say.
+/// </remarks>
+/// <param name="provider">Reads an entry, including whatever validation the caller configured.</param>
+internal sealed class StorageAccountShape(IConfigProvider provider) : ConfigShape<StorageAccountConfig>
+{
+    /// <inheritdoc />
+    public override string Section => DefaultConfigProvider.StorageAccountSelector;
+
+    /// <inheritdoc />
+    public override ResourceKind Kind => AzureEnvironmentResourceKinds.StorageKind;
+
+    /// <inheritdoc />
+    public override IReadOnlyList<string> Identifiers(IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        return provider.LoadAllStorageAccountIdentifier(configuration);
+    }
+
+    /// <inheritdoc />
+    public override StorageAccountConfig Read(IConfiguration configuration, string identifier)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        return provider.LoadStorageAccountConfig(configuration, identifier);
+    }
+
+    /// <inheritdoc />
+    public override IReadOnlyDictionary<ValueKey, string> Values(StorageAccountConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+
+        Dictionary<ValueKey, string> values = [];
+
+        if (config.ConnectionString is { Length: > 0 } connectionString)
+        {
+            values[new ValueKey(ValueNames.ConnectionString, ResourceVantage.Host)] = connectionString;
+            values[new ValueKey(ValueNames.ConnectionString, ResourceVantage.Network)] = connectionString;
+        }
+
+        if (config.QueueContainerName is { Length: > 0 } queueContainer)
+        {
+            values[new ValueKey(AzureEnvironmentResourceKinds.QueueNameValue)] = queueContainer;
+        }
+
+        if (config.BlobContainerName is { Length: > 0 } blobContainer)
+        {
+            values[new ValueKey(AzureEnvironmentResourceKinds.BlobContainerNameValue)] = blobContainer;
+        }
+
+        if (config.TableContainerName is { Length: > 0 } tableContainer)
+        {
+            values[new ValueKey(AzureEnvironmentResourceKinds.TableContainerNameValue)] = tableContainer;
+        }
+
+        return values;
+    }
+}

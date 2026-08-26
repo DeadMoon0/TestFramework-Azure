@@ -1,0 +1,243 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using TestFramework.Azure.Extensions;
+using TestFramework.Core.Environment.Graph;
+using TestFramework.Core.Steps;
+using TestFramework.Core.Steps.Options;
+using TestFramework.Core.Timelines;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace TestFramework.Azure.Tests;
+
+/// <summary>
+/// Azure's configured resources as the run's resource graph sees them.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Six sections, six kinds, one question. A step that needs a Service Bus connection string or a Cosmos
+/// container name asks the run rather than resolving somebody's configuration record, and the answer is the
+/// same shape whether a person wrote the value down or something published it while starting.
+/// </para>
+/// <para>
+/// Each section is read by the package's own provider, so the store the steps use and the graph the run
+/// exposes cannot come to different conclusions about what the file said.
+/// </para>
+/// </remarks>
+public class AzureResourceGraphTests(ITestOutputHelper output)
+{
+    [Fact]
+    public async Task AFunctionAppPublishesItsAddressAndRoutePrefix()
+    {
+        Assert.Equal(
+            "http://localhost:7071/",
+            await Read(
+                AzureEnvironmentResourceKinds.FunctionApp,
+                "orders-fn",
+                ValueNames.BaseUrl,
+                ("FunctionApp:orders-fn:BaseUrl", "http://localhost:7071/"),
+                ("FunctionApp:orders-fn:Code", "secret-key")));
+
+        Assert.Equal(
+            "api",
+            await Read(
+                AzureEnvironmentResourceKinds.FunctionApp,
+                "orders-fn",
+                AzureEnvironmentResourceKinds.RoutePrefixValue,
+                ("FunctionApp:orders-fn:BaseUrl", "http://localhost:7071/"),
+                ("FunctionApp:orders-fn:Code", "secret-key")));
+    }
+
+    [Fact]
+    public async Task AFunctionKeyIsNotAResourceValue()
+    {
+        // The line every kind here draws: a coordinate says where something is and travels with the resource;
+        // a credential says who you are and stays in the typed configuration the steps already read. Asking
+        // the graph for it fails rather than quietly answering.
+        await Assert.ThrowsAsync<Core.Exceptions.TimelineRunFailedException>(
+            () => Read(
+                AzureEnvironmentResourceKinds.FunctionApp,
+                "orders-fn",
+                "Code",
+                ("FunctionApp:orders-fn:BaseUrl", "http://localhost:7071/"),
+                ("FunctionApp:orders-fn:Code", "secret-key")));
+    }
+
+    [Fact]
+    public async Task AServiceBusPublishesItsConnectionAndTheEntitiesItNames()
+    {
+        (string Key, string Value)[] configured =
+        [
+            ("ServiceBus:orders-bus:ConnectionString", "Endpoint=sb://localhost;SharedAccessKeyName=x;SharedAccessKey=y"),
+            ("ServiceBus:orders-bus:TopicName", "orders"),
+            ("ServiceBus:orders-bus:SubscriptionName", "orders-worker"),
+        ];
+
+        Assert.Equal(
+            "Endpoint=sb://localhost;SharedAccessKeyName=x;SharedAccessKey=y",
+            await Read(AzureEnvironmentResourceKinds.ServiceBus, "orders-bus", ValueNames.ConnectionString, configured));
+
+        Assert.Equal(
+            "orders",
+            await Read(AzureEnvironmentResourceKinds.ServiceBus, "orders-bus", AzureEnvironmentResourceKinds.TopicNameValue, configured));
+
+        Assert.Equal(
+            "orders-worker",
+            await Read(AzureEnvironmentResourceKinds.ServiceBus, "orders-bus", AzureEnvironmentResourceKinds.SubscriptionNameValue, configured));
+    }
+
+    [Fact]
+    public async Task AStorageAccountPublishesTheContainersItNames()
+    {
+        (string Key, string Value)[] configured =
+        [
+            ("StorageAccount:files:ConnectionString", "UseDevelopmentStorage=true"),
+            ("StorageAccount:files:BlobContainerName", "documents"),
+        ];
+
+        Assert.Equal(
+            "UseDevelopmentStorage=true",
+            await Read(AzureEnvironmentResourceKinds.Storage, "files", ValueNames.ConnectionString, configured));
+
+        Assert.Equal(
+            "documents",
+            await Read(AzureEnvironmentResourceKinds.Storage, "files", AzureEnvironmentResourceKinds.BlobContainerNameValue, configured));
+    }
+
+    [Fact]
+    public async Task ACosmosContainerPublishesAllThreeThingsNeededToReachAnItem()
+    {
+        (string Key, string Value)[] configured =
+        [
+            ("CosmosDb:orders:ConnectionString", "AccountEndpoint=https://localhost:8081/;AccountKey=key"),
+            ("CosmosDb:orders:DatabaseName", "shop"),
+            ("CosmosDb:orders:ContainerName", "orders"),
+        ];
+
+        Assert.Equal("shop", await Read(AzureEnvironmentResourceKinds.Cosmos, "orders", AzureEnvironmentResourceKinds.DatabaseNameValue, configured));
+        Assert.Equal("orders", await Read(AzureEnvironmentResourceKinds.Cosmos, "orders", AzureEnvironmentResourceKinds.ContainerNameValue, configured));
+    }
+
+    [Fact]
+    public async Task ASqlDatabasePublishesItsConnectionAndName()
+    {
+        (string Key, string Value)[] configured =
+        [
+            ("SqlDatabase:orders-db:ConnectionString", "Server=localhost;Database=orders;Integrated Security=true"),
+            ("SqlDatabase:orders-db:DatabaseName", "orders"),
+        ];
+
+        Assert.Equal(
+            "Server=localhost;Database=orders;Integrated Security=true",
+            await Read(AzureEnvironmentResourceKinds.Sql, "orders-db", ValueNames.ConnectionString, configured));
+
+        Assert.Equal("orders", await Read(AzureEnvironmentResourceKinds.Sql, "orders-db", AzureEnvironmentResourceKinds.DatabaseNameValue, configured));
+    }
+
+    [Fact]
+    public async Task AStandardLogicAppPublishesItsHostAddress()
+        => Assert.Equal(
+            "https://orders.azurewebsites.net/",
+            await Read(
+                AzureEnvironmentResourceKinds.LogicApp,
+                "orders-flow",
+                ValueNames.BaseUrl,
+                ("LogicApp:orders-flow:HostingMode", "Standard"),
+                ("LogicApp:orders-flow:Standard:BaseUrl", "https://orders.azurewebsites.net/")));
+
+    [Fact]
+    public async Task AConsumptionLogicAppPublishesItsInvokeUrlUnderTheSameName()
+        // The reader asked where the Logic App is, not which hosting mode somebody chose - so both modes
+        // answer the same question rather than making everybody branch.
+        => Assert.Equal(
+            "https://invoke.example/workflow",
+            await Read(
+                AzureEnvironmentResourceKinds.LogicApp,
+                "orders-flow",
+                ValueNames.BaseUrl,
+                ("LogicApp:orders-flow:HostingMode", "Consumption"),
+                ("LogicApp:orders-flow:Consumption:InvokeUrl", "https://invoke.example/workflow")));
+
+    [Fact]
+    public async Task AWrittenCoordinateAnswersFromBothViewpoints()
+    {
+        // Whoever wrote one address wrote the address the thing answers on. Something that starts later and
+        // really does have two publishes both and overrides these.
+        Assert.Equal(
+            "UseDevelopmentStorage=true",
+            await Read(
+                AzureEnvironmentResourceKinds.Storage,
+                "files",
+                ValueNames.ConnectionString,
+                ResourceVantage.Network,
+                ("StorageAccount:files:ConnectionString", "UseDevelopmentStorage=true")));
+    }
+
+    private Task<string?> Read(string kind, string identifier, string valueName, params (string Key, string Value)[] configured)
+        => Read(kind, identifier, valueName, ResourceVantage.Host, configured);
+
+    private async Task<string?> Read(
+        string kind,
+        string identifier,
+        string valueName,
+        ResourceVantage vantage,
+        params (string Key, string Value)[] configured)
+    {
+        Timeline timeline = Timeline.Create()
+            .Trigger(new ReadsValueStep(kind, identifier, valueName, vantage)).Name("reads")
+            .Build();
+
+        TimelineRun run = await timeline.SetupRun(Configured(configured), output).RunAsync();
+
+        run.EnsureRanToCompletion();
+
+        return run.VariableStore.GetVariable<string>("value");
+    }
+
+    private static IServiceProvider Configured(params (string Key, string Value)[] values)
+    {
+        List<KeyValuePair<string, string?>> entries = [];
+
+        foreach ((string key, string value) in values)
+        {
+            entries.Add(new KeyValuePair<string, string?>(key, value));
+        }
+
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(entries).Build();
+
+        ServiceCollection services = new ServiceCollection();
+        services.AddSingleton(configuration);
+        services.LoadAzureConfigs(configuration);
+
+        return services.BuildServiceProvider();
+    }
+
+    /// <summary>Asks the run about a resource, rather than asking a configuration store.</summary>
+    private sealed class ReadsValueStep(string kind, string identifier, string valueName, ResourceVantage vantage)
+        : Step<EmptyStepResultContext>
+    {
+        public override string Name => "Reads a resource value";
+
+        public override string Description => "Reads a configured resource's value from the run's resources.";
+
+        public override bool DoesReturn => false;
+
+        public override Step<EmptyStepResultContext> Clone() => new ReadsValueStep(kind, identifier, valueName, vantage).WithClonedOptions(this);
+
+        public override StepInstance<Step<EmptyStepResultContext>, EmptyStepResultContext> GetInstance() => new(this);
+
+        public override void DeclareIO(StepIOContract contract)
+        {
+        }
+
+        public override Task<EmptyStepResultContext?> Execute(RunContext context)
+        {
+            context.Variables.SetVariable("value", context.Values.Require(ValueRef.For(kind, identifier, valueName), vantage));
+
+            return Task.FromResult<EmptyStepResultContext?>(EmptyStepResultContext.Instance);
+        }
+    }
+}

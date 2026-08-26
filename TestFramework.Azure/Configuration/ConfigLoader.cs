@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TestFramework.Config.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 
 namespace TestFramework.Azure.Configuration;
@@ -32,6 +33,10 @@ internal class ConfigLoader(IConfigProvider configProvider)
         {
             store.AddConfig(key, configProvider.LoadLogicAppConfig(configuration, key));
         }
+
+        // The same entries as resources the run's graph knows about, so anything asking where this is gets one
+        // answer whether a person wrote it down or something published it while starting.
+        serviceCollection.AddConfigShape(new LogicAppShape(configProvider));
     }
 
     internal void LoadFunctionAppConfigs(IConfiguration configuration, IServiceCollection serviceCollection)
@@ -41,6 +46,10 @@ internal class ConfigLoader(IConfigProvider configProvider)
         {
             store.AddConfig(key, configProvider.LoadFunctionAppConfig(configuration, key));
         }
+
+        // The same entries as resources the run's graph knows about, so anything asking where this is gets one
+        // answer whether a person wrote it down or something published it while starting.
+        serviceCollection.AddConfigShape(new FunctionAppShape(configProvider));
     }
 
     internal void LoadCosmosDbConfigs(IConfiguration configuration, IServiceCollection serviceCollection)
@@ -50,6 +59,10 @@ internal class ConfigLoader(IConfigProvider configProvider)
         {
             store.AddConfig(key, configProvider.LoadCosmosDbConfig(configuration, key));
         }
+
+        // The same entries as resources the run's graph knows about, so anything asking where this is gets one
+        // answer whether a person wrote it down or something published it while starting.
+        serviceCollection.AddConfigShape(new CosmosDbShape(configProvider));
     }
 
     internal void LoadServiceBusConfigs(IConfiguration configuration, IServiceCollection serviceCollection)
@@ -59,6 +72,10 @@ internal class ConfigLoader(IConfigProvider configProvider)
         {
             store.AddConfig(key, configProvider.LoadServiceBusConfig(configuration, key));
         }
+
+        // The same entries as resources the run's graph knows about, so anything asking where this is gets one
+        // answer whether a person wrote it down or something published it while starting.
+        serviceCollection.AddConfigShape(new ServiceBusShape(configProvider));
     }
 
     internal void LoadStorageAccountConfigs(IConfiguration configuration, IServiceCollection serviceCollection)
@@ -68,6 +85,10 @@ internal class ConfigLoader(IConfigProvider configProvider)
         {
             store.AddConfig(key, configProvider.LoadStorageAccountConfig(configuration, key));
         }
+
+        // The same entries as resources the run's graph knows about, so anything asking where this is gets one
+        // answer whether a person wrote it down or something published it while starting.
+        serviceCollection.AddConfigShape(new StorageAccountShape(configProvider));
     }
 
     internal void LoadSqlDatabaseConfigs(IConfiguration configuration, IServiceCollection serviceCollection)
@@ -77,5 +98,9 @@ internal class ConfigLoader(IConfigProvider configProvider)
         {
             store.AddConfig(key, configProvider.LoadSqlDatabaseConfig(configuration, key));
         }
+
+        // The same entries as resources the run's graph knows about, so anything asking where this is gets one
+        // answer whether a person wrote it down or something published it while starting.
+        serviceCollection.AddConfigShape(new SqlDatabaseShape(configProvider));
     }
 }
