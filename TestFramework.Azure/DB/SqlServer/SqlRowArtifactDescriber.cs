@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using TestFramework.Core.Steps;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
@@ -67,58 +68,58 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
     /// <summary>
     /// Ensures the referenced row exists during artifact setup.
     /// </summary>
-    public override async Task Setup(IServiceProvider serviceProvider, SqlRowArtifactData<TRow> data, SqlRowArtifactReference<TRow> reference, VariableStore variableStore, ScopedLogger logger)
+    public override async Task Setup(RunContext context, SqlRowArtifactData<TRow> data, SqlRowArtifactReference<TRow> reference)
     {
-        ISqlDbContextResolver resolver = serviceProvider.GetRequiredService<ISqlDbContextResolver>();
-        DbContext context = resolver.Resolve(reference.DbIdentifier);
-        await resolver.EnsureReadyAsync(context, reference.DbIdentifier, logger);
+        ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
+        DbContext dbContext = resolver.Resolve(reference.DbIdentifier);
+        await resolver.EnsureReadyAsync(dbContext, reference.DbIdentifier, context.Logger);
 
-        object[] keyValues = reference.GetTypedKeyValues(context, variableStore);
+        object[] keyValues = reference.GetTypedKeyValues(dbContext, context.Variables);
 
-        TRow? existing = await context.Set<TRow>().FindAsync(keyValues);
+        TRow? existing = await dbContext.Set<TRow>().FindAsync(keyValues);
         if (existing is not null)
         {
             // Detach before attaching the new version to avoid tracking conflict
-            context.Entry(existing).State = EntityState.Detached;
-            context.Set<TRow>().Update(data.Row);
-            logger.LogInformation($"Updating existing SQL row '{typeof(TRow).Name}' ({FormatKeys(keyValues)}).");
+            dbContext.Entry(existing).State = EntityState.Detached;
+            dbContext.Set<TRow>().Update(data.Row);
+            context.Logger.LogInformation($"Updating existing SQL row '{typeof(TRow).Name}' ({FormatKeys(keyValues)}).");
         }
         else
         {
-            context.Set<TRow>().Add(data.Row);
-            logger.LogInformation($"Inserting new SQL row '{typeof(TRow).Name}' ({FormatKeys(keyValues)}).");
+            dbContext.Set<TRow>().Add(data.Row);
+            context.Logger.LogInformation($"Inserting new SQL row '{typeof(TRow).Name}' ({FormatKeys(keyValues)}).");
         }
 
-        await context.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
 
         // Detach after save so the entity is not tracked between test stages
-        context.Entry(data.Row).State = EntityState.Detached;
+        dbContext.Entry(data.Row).State = EntityState.Detached;
 
-        logger.LogInformation($"SQL row '{typeof(TRow).Name}' upserted. DB: {reference.DbIdentifier}, Key: ({FormatKeys(keyValues)}).");
+        context.Logger.LogInformation($"SQL row '{typeof(TRow).Name}' upserted. DB: {reference.DbIdentifier}, Key: ({FormatKeys(keyValues)}).");
     }
 
     /// <summary>
     /// Removes the referenced row during artifact cleanup.
     /// </summary>
-    public override async Task Deconstruct(IServiceProvider serviceProvider, SqlRowArtifactReference<TRow> reference, VariableStore variableStore, ScopedLogger logger)
+    public override async Task Deconstruct(RunContext context, SqlRowArtifactReference<TRow> reference)
     {
-        ISqlDbContextResolver resolver = serviceProvider.GetRequiredService<ISqlDbContextResolver>();
-        DbContext context = resolver.Resolve(reference.DbIdentifier);
-        await resolver.EnsureReadyAsync(context, reference.DbIdentifier, logger);
+        ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
+        DbContext dbContext = resolver.Resolve(reference.DbIdentifier);
+        await resolver.EnsureReadyAsync(dbContext, reference.DbIdentifier, context.Logger);
 
-        object[] keyValues = reference.GetTypedKeyValues(context, variableStore);
+        object[] keyValues = reference.GetTypedKeyValues(dbContext, context.Variables);
 
-        TRow? row = await context.Set<TRow>().FindAsync(keyValues);
+        TRow? row = await dbContext.Set<TRow>().FindAsync(keyValues);
         if (row is null)
         {
-            logger.LogInformation($"SQL row '{typeof(TRow).Name}' ({FormatKeys(keyValues)}) not found during cleanup — already deleted.");
+            context.Logger.LogInformation($"SQL row '{typeof(TRow).Name}' ({FormatKeys(keyValues)}) not found during cleanup — already deleted.");
             return;
         }
 
-        context.Set<TRow>().Remove(row);
-        await context.SaveChangesAsync();
+        dbContext.Set<TRow>().Remove(row);
+        await dbContext.SaveChangesAsync();
 
-        logger.LogInformation($"SQL row '{typeof(TRow).Name}' deleted. DB: {reference.DbIdentifier}, Key: ({FormatKeys(keyValues)}).");
+        context.Logger.LogInformation($"SQL row '{typeof(TRow).Name}' deleted. DB: {reference.DbIdentifier}, Key: ({FormatKeys(keyValues)}).");
     }
 
     /// <summary>

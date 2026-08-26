@@ -1,3 +1,4 @@
+﻿using Newtonsoft.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,7 +9,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.FunctionApp.InProcessProxies;
@@ -44,21 +44,16 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
             contract.Inputs.Add(new StepIOEntry(request.Identifier!.Identifier, StepIOKind.Variable, true, typeof(CommonHttpRequest)));
     }
 
-    public override async Task<HttpResponseResultContext?> Execute(
-        IServiceProvider serviceProvider,
-        VariableStore variableStore,
-        ArtifactStore artifactStore,
-        ScopedLogger logger,
-        CancellationToken cancellationToken)
+    public override async Task<HttpResponseResultContext?> Execute(RunContext context)
     {
-        CommonHttpRequest commonRequest = request.GetRequiredValue(variableStore);
+        CommonHttpRequest commonRequest = request.GetRequiredValue(context.Variables);
 
-        DefaultHttpContext httpContext = new() { RequestServices = serviceProvider };
+        DefaultHttpContext httpContext = new() { RequestServices = context.Services };
         HttpRequest httpRequest = httpContext.Request;
 
         if (commonRequest.Content is not null)
         {
-            byte[] bytes = await commonRequest.Content.ReadAsByteArrayAsync(cancellationToken);
+            byte[] bytes = await commonRequest.Content.ReadAsByteArrayAsync(context.Deadline.Token);
             httpRequest.Body = new MemoryStream(bytes);
             httpRequest.ContentLength = bytes.Length;
             string? contentType = commonRequest.Content.Headers.ContentType?.ToString();
@@ -80,12 +75,12 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
             }
         }
 
-        TFunction functionInstance = serviceProvider.GetRequiredService<TFunction>();
-        FunctionAppHttpInProcessCallProxy proxy = new(httpRequest, serviceProvider, variableStore);
+        TFunction functionInstance = context.Services.GetRequiredService<TFunction>();
+        FunctionAppHttpInProcessCallProxy proxy = new(httpRequest, context.Services, context.Variables);
         IActionResult? result = await action(functionInstance, proxy);
 
         using HttpResponseMessage response = ConvertToHttpResponseMessage(result);
-        return await HttpResponseResultContext.FromHttpResponseAsync(response, cancellationToken).ConfigureAwait(false);
+        return await HttpResponseResultContext.FromHttpResponseAsync(response, context.Deadline.Token).ConfigureAwait(false);
     }
 
     private static HttpResponseMessage ConvertToHttpResponseMessage(IActionResult? result)
@@ -112,7 +107,7 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
         if (result is JsonResult json)
         {
             HttpResponseMessage response = new((HttpStatusCode)(json.StatusCode ?? 200));
-            string body = JsonSerializer.Serialize(json.Value);
+            string body = JsonConvert.SerializeObject(json.Value);
             response.Content = new StringContent(body, Encoding.UTF8, "application/json");
             return response;
         }

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using Newtonsoft.Json;
 using TestFramework.Core.Artifacts;
 
 namespace TestFramework.Azure.DB.SqlServer;
@@ -21,7 +21,7 @@ public class SqlRowArtifactData<TRow>(TRow row) : ArtifactData<SqlRowArtifactDat
     /// <returns>A string representation of the artifact data.</returns>
     public override string ToString()
     {
-        try { return $"SQL Row<{typeof(TRow).Name}>: {JsonSerializer.Serialize(Row)}"; }
+        try { return $"SQL Row<{typeof(TRow).Name}>: {JsonConvert.SerializeObject(Row)}"; }
         catch { return $"SQL Row<{typeof(TRow).Name}>"; }
     }
 }

@@ -1,4 +1,5 @@
-﻿using Azure.Storage.Blobs;
+﻿using TestFramework.Core.Steps;
+using Azure.Storage.Blobs;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Linq;
@@ -31,20 +32,20 @@ public class StorageAccountBlobArtifactReference(StorageAccountIdentifier identi
     /// <summary>
     /// Pins the reference to a concrete blob path.
     /// </summary>
-    public override void OnPinReference(VariableStore variableStore, ScopedLogger logger)
+    public override void OnPinReference(RunContext context)
     {
-        this.pinnedPath = path.GetRequiredValue(variableStore);
+        this.pinnedPath = path.GetRequiredValue(context.Variables);
         CanDeconstruct = true;
     }
 
     /// <summary>
     /// Resolves the reference into concrete blob artifact data.
     /// </summary>
-    public override async Task<ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference>> ResolveToDataAsync(IServiceProvider serviceProvider, ArtifactVersionIdentifier versionIdentifier, VariableStore variableStore, ScopedLogger logger)
+    public override async Task<ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
-        StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(Identifier);
-        IBlobContainerAdapter container = serviceProvider.GetAzureComponentFactory().Blob.CreateContainer(config);
-        BlobReadResponse blob = await container.ReadBlobAsync(GetPath(variableStore));
+        StorageAccountConfig config = context.Services.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(Identifier);
+        IBlobContainerAdapter container = context.Services.GetAzureComponentFactory().Blob.CreateContainer(config);
+        BlobReadResponse blob = await container.ReadBlobAsync(GetPath(context.Variables));
         if (!blob.Found) return new ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference> { Found = false };
         return new ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference>
         {
@@ -68,7 +69,6 @@ public class StorageAccountBlobArtifactReference(StorageAccountIdentifier identi
     /// <summary>
     /// Gets the blob path, using the pinned value when the reference has been pinned.
     /// </summary>
-    /// <param name="variableStore">The variable store used to resolve the path.</param>
     /// <returns>The blob path.</returns>
     public string GetPath(VariableStore variableStore)
     {

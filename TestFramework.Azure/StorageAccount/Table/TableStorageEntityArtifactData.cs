@@ -1,5 +1,5 @@
+﻿using Newtonsoft.Json;
 using Azure.Data.Tables;
-using System.Text.Json;
 using TestFramework.Core.Artifacts;
 
 namespace TestFramework.Azure.StorageAccount.Table;
@@ -22,7 +22,7 @@ public class TableStorageEntityArtifactData<T>(T entity) : ArtifactData<TableSto
     /// <returns>A string representation of the artifact data.</returns>
     public override string ToString()
     {
-        try { return $"Table Entity<{typeof(T).Name}>: {Entity.PartitionKey}/{Entity.RowKey} {JsonSerializer.Serialize(Entity)}"; }
+        try { return $"Table Entity<{typeof(T).Name}>: {Entity.PartitionKey}/{Entity.RowKey} {JsonConvert.SerializeObject(Entity)}"; }
         catch { return $"Table Entity<{typeof(T).Name}>: {Entity.PartitionKey}/{Entity.RowKey}"; }
     }
 }

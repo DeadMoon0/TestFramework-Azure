@@ -1,8 +1,10 @@
+﻿using TestFramework.Core.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -91,15 +93,16 @@ internal static class LogicAppManagementTrigger
     {
         runId = null;
 
-        using JsonDocument document = JsonDocument.Parse(payload);
-        JsonElement runsRoot = document.RootElement;
-        if (runsRoot.ValueKind == JsonValueKind.Object && runsRoot.TryGetProperty("value", out JsonElement valueElement))
+        // Through the engine's parse: this payload is Azure's, and a startTime read as a string has to
+        // still be a string when it is read. JToken.Parse would have turned it into a date.
+        JToken runsRoot = WireJson.Parse(payload);
+        if (runsRoot is JObject envelope && envelope["value"] is { } valueElement)
             runsRoot = valueElement;
 
-        if (runsRoot.ValueKind != JsonValueKind.Array)
+        if (runsRoot is not JArray runs)
             return false;
 
-        foreach (JsonElement run in runsRoot.EnumerateArray().Reverse())
+        foreach (JToken run in runs.Reverse())
         {
             if (!TryGetRunTriggerName(run, out string? currentTriggerName)
                 || !string.Equals(currentTriggerName, triggerName, StringComparison.OrdinalIgnoreCase)
@@ -117,55 +120,38 @@ internal static class LogicAppManagementTrigger
         return false;
     }
 
-    private static bool TryGetRunTriggerName(JsonElement run, out string? resolvedTriggerName)
+    private static bool TryGetRunTriggerName(JToken run, out string? resolvedTriggerName)
     {
-        resolvedTriggerName = null;
-        if (!run.TryGetProperty("properties", out JsonElement propertiesElement)
-            || !propertiesElement.TryGetProperty("trigger", out JsonElement triggerElement)
-            || !triggerElement.TryGetProperty("name", out JsonElement nameElement))
-        {
-            return false;
-        }
+        resolvedTriggerName = run["properties"]?["trigger"]?["name"]?.Value<string>();
 
-        resolvedTriggerName = nameElement.GetString();
         return !string.IsNullOrWhiteSpace(resolvedTriggerName);
     }
 
-    private static bool TryGetRunStartTime(JsonElement run, out DateTimeOffset startTime)
+    private static bool TryGetRunStartTime(JToken run, out DateTimeOffset startTime)
     {
         startTime = DateTimeOffset.MinValue;
-        if (!run.TryGetProperty("properties", out JsonElement propertiesElement))
+
+        JToken? properties = run["properties"];
+        if (properties is null)
             return false;
 
-        if (propertiesElement.TryGetProperty("startTime", out JsonElement startTimeElement)
-            && DateTimeOffset.TryParse(startTimeElement.GetString(), out startTime))
-        {
-            return true;
-        }
-
-        if (propertiesElement.TryGetProperty("trigger", out JsonElement triggerElement)
-            && triggerElement.TryGetProperty("startTime", out JsonElement triggerStartTimeElement)
-            && DateTimeOffset.TryParse(triggerStartTimeElement.GetString(), out startTime))
-        {
-            return true;
-        }
-
-        return false;
+        // The run's own start time, else the trigger's - a run that has not started reports only the
+        // latter.
+        return DateTimeOffset.TryParse(properties["startTime"]?.Value<string>(), out startTime)
+            || DateTimeOffset.TryParse(properties["trigger"]?["startTime"]?.Value<string>(), out startTime);
     }
 
-    private static string? TryGetRunId(JsonElement run)
+    private static string? TryGetRunId(JToken run)
     {
-        if (run.TryGetProperty("name", out JsonElement nameElement))
-            return nameElement.GetString();
+        if (run["name"]?.Value<string>() is { } name)
+            return name;
 
-        if (run.TryGetProperty("id", out JsonElement idElement))
+        // An id is the full resource path; the run is its last segment.
+        if (run["id"]?.Value<string>() is { } id && !string.IsNullOrWhiteSpace(id))
         {
-            string? id = idElement.GetString();
-            if (!string.IsNullOrWhiteSpace(id))
-            {
-                string[] parts = id.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                return parts.LastOrDefault();
-            }
+            string[] parts = id.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            return parts.LastOrDefault();
         }
 
         return null;

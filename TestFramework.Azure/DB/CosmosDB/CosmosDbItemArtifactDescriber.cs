@@ -1,4 +1,5 @@
-﻿using Microsoft.Azure.Cosmos;
+﻿using TestFramework.Core.Steps;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading;
@@ -52,36 +53,36 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
     /// <summary>
     /// Removes the referenced item from Cosmos during artifact cleanup.
     /// </summary>
-    public override async Task Deconstruct(IServiceProvider serviceProvider, CosmosDbItemArtifactReference<TItem> reference, VariableStore variableStore, ScopedLogger logger)
+    public override async Task Deconstruct(RunContext context, CosmosDbItemArtifactReference<TItem> reference)
     {
-        CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(reference.DbIdentifier);
-        ICosmosContainerAdapter container = serviceProvider.GetAzureComponentFactory().Cosmos.CreateContainer(config);
+        CosmosContainerDbConfig config = context.Services.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(reference.DbIdentifier);
+        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(config);
 
-        await container.DeleteItemAsync<TItem>(reference.GetId(variableStore), reference.GetPartitionKey(variableStore));
+        await container.DeleteItemAsync<TItem>(reference.GetId(context.Variables), reference.GetPartitionKey(context.Variables));
 
-        logger.LogInformation($"Deleted item from Cosmos DB: {reference.GetId(variableStore)} {reference.GetPartitionKey(variableStore)}");
+        context.Logger.LogInformation($"Deleted item from Cosmos DB: {reference.GetId(context.Variables)} {reference.GetPartitionKey(context.Variables)}");
     }
 
     /// <summary>
     /// Ensures the referenced Cosmos item exists during artifact setup.
     /// </summary>
-    public override async Task Setup(IServiceProvider serviceProvider, CosmosDbItemArtifactData<TItem> data, CosmosDbItemArtifactReference<TItem> reference, VariableStore variableStore, ScopedLogger logger)
+    public override async Task Setup(RunContext context, CosmosDbItemArtifactData<TItem> data, CosmosDbItemArtifactReference<TItem> reference)
     {
-        CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(reference.DbIdentifier);
-        ICosmosContainerAdapter container = serviceProvider.GetAzureComponentFactory().Cosmos.CreateContainer(config);
+        CosmosContainerDbConfig config = context.Services.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(reference.DbIdentifier);
+        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(config);
 
-        ICosmosDbIdentifierResolver resolver = serviceProvider.GetService<ICosmosDbIdentifierResolver>() ?? new DefaultCosmosDbIdentifierResolver();
+        ICosmosDbIdentifierResolver resolver = context.Services.GetService<ICosmosDbIdentifierResolver>() ?? new DefaultCosmosDbIdentifierResolver();
         reference.SetIdentifier(resolver.ResolveId(data.Item), resolver.ResolvePartitionKey(data.Item));
 
-        logger.LogInformation($"Ensuring Cosmos container exists: {config.DatabaseName}/{config.ContainerName}");
+        context.Logger.LogInformation($"Ensuring Cosmos container exists: {config.DatabaseName}/{config.ContainerName}");
         // ArtifactDescriber.Setup carries no CancellationToken, so the step's real token cannot reach
         // this call yet; the adapter and REST client now accept one for when Core supplies it.
         await container.EnsureContainerExistsAsync(data.Item, CancellationToken.None);
 
-        logger.LogInformation($"Upserting Cosmos item: {reference.GetId(variableStore)} {reference.GetPartitionKey(variableStore)}");
-        await container.UpsertItemAsync(data.Item, reference.GetPartitionKey(variableStore));
+        context.Logger.LogInformation($"Upserting Cosmos item: {reference.GetId(context.Variables)} {reference.GetPartitionKey(context.Variables)}");
+        await container.UpsertItemAsync(data.Item, reference.GetPartitionKey(context.Variables));
 
-        logger.LogInformation($"Upserted item to Cosmos DB: {reference.GetId(variableStore)} {reference.GetPartitionKey(variableStore)}");
+        context.Logger.LogInformation($"Upserted item to Cosmos DB: {reference.GetId(context.Variables)} {reference.GetPartitionKey(context.Variables)}");
     }
 
     /// <summary>

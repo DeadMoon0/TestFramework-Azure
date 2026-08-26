@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+﻿using Newtonsoft.Json;
 using TestFramework.Core.Artifacts;
 
 namespace TestFramework.Azure.DB.CosmosDB;
@@ -20,7 +20,7 @@ public class CosmosDbItemArtifactData<TItem>(TItem item) : ArtifactData<CosmosDb
     /// <returns>A string representation of the artifact data.</returns>
     public override string ToString()
     {
-        try { return $"Cosmos DB Item<{typeof(TItem).Name}>: {JsonSerializer.Serialize(Item)}"; }
+        try { return $"Cosmos DB Item<{typeof(TItem).Name}>: {JsonConvert.SerializeObject(Item)}"; }
         catch { return $"Cosmos DB Item<{typeof(TItem).Name}>"; }
     }
 }

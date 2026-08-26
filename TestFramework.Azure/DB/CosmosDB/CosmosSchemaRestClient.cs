@@ -1,3 +1,4 @@
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
@@ -7,7 +8,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration.SpecificConfigs;
@@ -265,7 +265,7 @@ internal static class CosmosSchemaRestClient
 
     private static StringContent CreateJsonContent<T>(T payload)
     {
-        return new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        return new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)

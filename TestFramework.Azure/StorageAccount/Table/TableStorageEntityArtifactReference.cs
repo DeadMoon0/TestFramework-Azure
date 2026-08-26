@@ -1,4 +1,5 @@
-﻿using Azure;
+﻿using TestFramework.Core.Steps;
+using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -57,22 +58,21 @@ public class TableStorageEntityArtifactReference<T>
     /// <summary>
     /// Pins the reference to concrete table coordinates.
     /// </summary>
-    public override void OnPinReference(VariableStore variableStore, ScopedLogger logger)
+    public override void OnPinReference(RunContext context)
     {
-        _pinnedTable = _tableName.GetRequiredValue(variableStore);
-        _pinnedPartitionKey = _partitionKey.GetRequiredValue(variableStore);
-        _pinnedRowKey = _rowKey.GetRequiredValue(variableStore);
+        _pinnedTable = _tableName.GetRequiredValue(context.Variables);
+        _pinnedPartitionKey = _partitionKey.GetRequiredValue(context.Variables);
+        _pinnedRowKey = _rowKey.GetRequiredValue(context.Variables);
     }
 
     /// <summary>
     /// Resolves the reference into concrete table entity artifact data.
     /// </summary>
-    public override async Task<ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>> ResolveToDataAsync(
-        IServiceProvider serviceProvider, ArtifactVersionIdentifier versionIdentifier, VariableStore variableStore, ScopedLogger logger)
+    public override async Task<ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
-        StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(Identifier);
-        ITableAdapter tableClient = serviceProvider.GetAzureComponentFactory().Table.CreateTable(config, GetTableName(variableStore));
-        TableReadResponse<T> response = await tableClient.GetEntityAsync<T>(GetPartitionKey(variableStore), GetRowKey(variableStore));
+        StorageAccountConfig config = context.Services.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(Identifier);
+        ITableAdapter tableClient = context.Services.GetAzureComponentFactory().Table.CreateTable(config, GetTableName(context.Variables));
+        TableReadResponse<T> response = await tableClient.GetEntityAsync<T>(GetPartitionKey(context.Variables), GetRowKey(context.Variables));
         if (response.Found)
         {
             return new ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>
@@ -104,21 +104,18 @@ public class TableStorageEntityArtifactReference<T>
             /// <summary>
             /// Gets the resolved table name.
             /// </summary>
-            /// <param name="variableStore">The variable store used to resolve the value.</param>
             /// <returns>The table name.</returns>
     public string GetTableName(VariableStore variableStore) => IsPinned ? _pinnedTable : _tableName.GetRequiredValue(variableStore);
 
             /// <summary>
             /// Gets the resolved partition key.
             /// </summary>
-            /// <param name="variableStore">The variable store used to resolve the value.</param>
             /// <returns>The partition key.</returns>
     public string GetPartitionKey(VariableStore variableStore) => IsPinned ? _pinnedPartitionKey : _partitionKey.GetRequiredValue(variableStore);
 
             /// <summary>
             /// Gets the resolved row key.
             /// </summary>
-            /// <param name="variableStore">The variable store used to resolve the value.</param>
             /// <returns>The row key.</returns>
     public string GetRowKey(VariableStore variableStore) => IsPinned ? _pinnedRowKey : _rowKey.GetRequiredValue(variableStore);
 

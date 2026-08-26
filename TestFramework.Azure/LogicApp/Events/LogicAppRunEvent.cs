@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
@@ -82,7 +82,6 @@ public sealed class LogicAppRunEvent(
     /// <summary>
     /// Declares the environment requirement for the configured Logic App host.
     /// </summary>
-    /// <param name="variableStore">The variable store for the current run.</param>
     /// <returns>The required Azure environment resources.</returns>
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
         => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.LogicApp, identifier)];
@@ -90,27 +89,22 @@ public sealed class LogicAppRunEvent(
     /// <summary>
     /// Polls the Logic App management API for the targeted run.
     /// </summary>
-    /// <param name="serviceProvider">The service provider used to resolve Azure services.</param>
-    /// <param name="variableStore">The variable store used to resolve workflow and run identifiers.</param>
-    /// <param name="artifactStore">The artifact store for the current run.</param>
-    /// <param name="logger">The event logger.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The matching run details, or <see langword="null"/> while polling should continue.</returns>
-    public override async Task<LogicAppExecutionResult?> DoEventPolling(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<LogicAppExecutionResult?> DoEventPolling(RunContext context)
     {
-        LogicAppConfig config = serviceProvider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
+        LogicAppConfig config = context.Services.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
         config.EnsureSupportsManagement("observe Logic App workflow runs");
-        string resolvedWorkflowName = LogicAppRoutes.ResolveWorkflowName(config, workflowName?.GetValue(variableStore));
-        string resolvedRunId = runId.GetRequiredValue(variableStore);
-        LogicAppRunStatus? expected = expectedStatus?.GetValue(variableStore);
-        EnsureWorkflowModeSupportsRunPolling(serviceProvider, resolvedWorkflowName);
-        IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
+        string resolvedWorkflowName = LogicAppRoutes.ResolveWorkflowName(config, workflowName?.GetValue(context.Variables));
+        string resolvedRunId = runId.GetRequiredValue(context.Variables);
+        LogicAppRunStatus? expected = expectedStatus?.GetValue(context.Variables);
+        EnsureWorkflowModeSupportsRunPolling(context.Services, resolvedWorkflowName);
+        IHttpRequestSender sender = context.Services.GetAzureComponentFactory().Http.CreateSender();
 
         while (true)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            context.Deadline.Token.ThrowIfCancellationRequested();
 
-            LogicAppRunDetails? details = await TryReadRunDetailsAsync(serviceProvider, sender, config, resolvedWorkflowName, resolvedRunId, cancellationToken);
+            LogicAppRunDetails? details = await TryReadRunDetailsAsync(context.Services, sender, config, resolvedWorkflowName, resolvedRunId, context.Deadline.Token);
             if (details is not null)
             {
                 LogicAppExecutionResult? resolved = ResolvePollingResult(details, expected);
@@ -118,7 +112,7 @@ public sealed class LogicAppRunEvent(
                     return resolved;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(1), context.Deadline.Token);
         }
     }
 

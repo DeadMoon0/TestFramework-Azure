@@ -35,12 +35,12 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
         return new ManagedRemoteFunctionAppTrigger(appIdentifier, trigger).WithClonedOptions(this);
     }
 
-    public override async Task<ManagedResult?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<ManagedResult?> Execute(RunContext context)
     {
-        var _trigger = trigger.GetRequiredValue(variableStore);
+        var _trigger = trigger.GetRequiredValue(context.Variables);
 
-        FunctionAppTriggerConfig config = serviceProvider.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
-        FunctionAppConfig functionConfig = serviceProvider.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig(appIdentifier);
+        FunctionAppTriggerConfig config = context.Services.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
+        FunctionAppConfig functionConfig = context.Services.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig(appIdentifier);
         RemoteConnection remoteConnection = new RemoteConnection(new Uri(functionConfig.BaseUrl));
         if (config.DoPing) await remoteConnection.EnsurePingAsync();
         Uri fullTriggerUri = new Uri(remoteConnection.BasePath, $"{AdminFunctionsUri}/{_trigger.Name}");
@@ -50,13 +50,13 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
         // only because a locally hosted host accepts anything.
         message.Headers.Add("x-functions-key", functionConfig.AdminCode ?? functionConfig.Code);
         message.Content = new StringContent("{}", new System.Net.Http.Headers.MediaTypeHeaderValue(MediaTypeNames.Application.Json));
-        IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
-        logger.LogInformation("FunctionApp managed '{0}' -> POST {1} (function: {2})", appIdentifier, fullTriggerUri, _trigger.Name);
-        using HttpResponseMessage response = await sender.SendAsync(message, cancellationToken);
+        IHttpRequestSender sender = context.Services.GetAzureComponentFactory().Http.CreateSender();
+        context.Logger.LogInformation("FunctionApp managed '{0}' -> POST {1} (function: {2})", appIdentifier, fullTriggerUri, _trigger.Name);
+        using HttpResponseMessage response = await sender.SendAsync(message, context.Deadline.Token);
         string? responseBody = response.Content is null
             ? null
-            : await response.Content.ReadAsStringAsync(cancellationToken);
-        logger.LogInformation("FunctionApp managed '{0}' <- {1}", appIdentifier, response.StatusCode);
+            : await response.Content.ReadAsStringAsync(context.Deadline.Token);
+        context.Logger.LogInformation("FunctionApp managed '{0}' <- {1}", appIdentifier, response.StatusCode);
 
         if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
         {

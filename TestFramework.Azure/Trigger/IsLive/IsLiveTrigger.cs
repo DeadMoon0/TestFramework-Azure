@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -136,38 +136,38 @@ internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier,
 
     public override Step<AzureIsLiveResult> Clone() => new FunctionAppIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<AzureIsLiveResult?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
-        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
-        FunctionAppTriggerConfig triggerConfig = serviceProvider.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
-        FunctionAppConfig functionConfig = serviceProvider.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig(identifier);
+        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
+        FunctionAppTriggerConfig triggerConfig = context.Services.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
+        FunctionAppConfig functionConfig = context.Services.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig(identifier);
         RemoteConnection remoteConnection = new(new Uri(functionConfig.BaseUrl));
         if (currentAlivenessLevel == AlivenessLevel.Reachable)
         {
-            logger.LogInformation("FunctionApp IsLive '{0}' using reachable probe against '{1}'.", identifier, remoteConnection.BasePath);
+            context.Logger.LogInformation("FunctionApp IsLive '{0}' using reachable probe against '{1}'.", identifier, remoteConnection.BasePath);
             await remoteConnection.EnsureReachableAsync(
-                serviceProvider.GetAzureComponentFactory().Http.CreateSender(),
+                context.Services.GetAzureComponentFactory().Http.CreateSender(),
                 triggerConfig.ReachabilityProbeTimeout,
-                cancellationToken);
-            logger.LogInformation("FunctionApp IsLive '{0}' reachable probe succeeded.", identifier);
-            return CreateResult(variableStore);
+                context.Deadline.Token);
+            context.Logger.LogInformation("FunctionApp IsLive '{0}' reachable probe succeeded.", identifier);
+            return CreateResult(context.Variables);
         }
 
         if (triggerConfig.DoPing)
         {
-            logger.LogInformation("FunctionApp IsLive '{0}' pre-pinging '{1}' before authenticated host-status probe.", identifier, remoteConnection.BasePath);
+            context.Logger.LogInformation("FunctionApp IsLive '{0}' pre-pinging '{1}' before authenticated host-status probe.", identifier, remoteConnection.BasePath);
             await remoteConnection.EnsurePingAsync();
         }
 
         using HttpRequestMessage request = new(HttpMethod.Get, new Uri(remoteConnection.BasePath, HostStatusUri));
         request.Headers.Add("x-functions-key", functionConfig.AdminCode ?? functionConfig.Code);
-        logger.LogInformation("FunctionApp IsLive '{0}' probing host status at '{1}'.", identifier, request.RequestUri?.ToString() ?? "(unknown)");
+        context.Logger.LogInformation("FunctionApp IsLive '{0}' probing host status at '{1}'.", identifier, request.RequestUri?.ToString() ?? "(unknown)");
 
-        IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
-        using HttpResponseMessage response = await sender.SendAsync(request, cancellationToken);
+        IHttpRequestSender sender = context.Services.GetAzureComponentFactory().Http.CreateSender();
+        using HttpResponseMessage response = await sender.SendAsync(request, context.Deadline.Token);
         response.EnsureSuccessStatusCode();
-        logger.LogInformation("FunctionApp IsLive '{0}' returned status {1}.", identifier, response.StatusCode);
-        return CreateResult(variableStore, response.StatusCode);
+        context.Logger.LogInformation("FunctionApp IsLive '{0}' returned status {1}.", identifier, response.StatusCode);
+        return CreateResult(context.Variables, response.StatusCode);
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
@@ -184,24 +184,24 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
 
     public override Step<AzureIsLiveResult> Clone() => new LogicAppIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<AzureIsLiveResult?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
-        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
-        LogicAppConfig logicAppConfig = serviceProvider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
+        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
+        LogicAppConfig logicAppConfig = context.Services.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
         Uri probeBaseUri = logicAppConfig.HostingMode == LogicAppHostingMode.Standard
             ? new Uri(LogicAppRoutes.RequireStandardBaseUrl(logicAppConfig))
             : LogicAppRoutes.BuildIsLiveProbeUri(logicAppConfig, logicAppConfig.WorkflowName);
         RemoteConnection remoteConnection = new(probeBaseUri);
         if (currentAlivenessLevel == AlivenessLevel.Reachable)
         {
-            logger.LogInformation("LogicApp IsLive '{0}' using reachable probe against '{1}' in {2} mode.", identifier, remoteConnection.BasePath, logicAppConfig.HostingMode);
-            FunctionAppTriggerConfig probeConfig = serviceProvider.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
+            context.Logger.LogInformation("LogicApp IsLive '{0}' using reachable probe against '{1}' in {2} mode.", identifier, remoteConnection.BasePath, logicAppConfig.HostingMode);
+            FunctionAppTriggerConfig probeConfig = context.Services.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
             await remoteConnection.EnsureReachableAsync(
-                serviceProvider.GetAzureComponentFactory().Http.CreateSender(),
+                context.Services.GetAzureComponentFactory().Http.CreateSender(),
                 probeConfig.ReachabilityProbeTimeout,
-                cancellationToken);
-            logger.LogInformation("LogicApp IsLive '{0}' reachable probe succeeded.", identifier);
-            return CreateResult(variableStore);
+                context.Deadline.Token);
+            context.Logger.LogInformation("LogicApp IsLive '{0}' reachable probe succeeded.", identifier);
+            return CreateResult(context.Variables);
         }
 
         using HttpRequestMessage request = logicAppConfig.HostingMode == LogicAppHostingMode.Standard
@@ -215,12 +215,12 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
         }
         else if (LogicAppRoutes.HasConsumptionManagementResourceId(logicAppConfig))
         {
-            await LogicAppRoutes.AuthorizeManagementRequestAsync(serviceProvider, identifier, logicAppConfig, request, cancellationToken);
+            await LogicAppRoutes.AuthorizeManagementRequestAsync(context.Services, identifier, logicAppConfig, request, context.Deadline.Token);
         }
 
-        IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
-        logger.LogInformation("LogicApp IsLive '{0}' probing '{1}' in {2} mode.", identifier, request.RequestUri?.ToString() ?? "(unknown)", logicAppConfig.HostingMode);
-        using HttpResponseMessage response = await sender.SendAsync(request, cancellationToken);
+        IHttpRequestSender sender = context.Services.GetAzureComponentFactory().Http.CreateSender();
+        context.Logger.LogInformation("LogicApp IsLive '{0}' probing '{1}' in {2} mode.", identifier, request.RequestUri?.ToString() ?? "(unknown)", logicAppConfig.HostingMode);
+        using HttpResponseMessage response = await sender.SendAsync(request, context.Deadline.Token);
         if (logicAppConfig.HostingMode == LogicAppHostingMode.Consumption)
         {
             if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
@@ -231,13 +231,13 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
             if ((int)response.StatusCode >= 500)
                 response.EnsureSuccessStatusCode();
 
-            logger.LogInformation("LogicApp IsLive '{0}' returned status {1}.", identifier, response.StatusCode);
-            return CreateResult(variableStore, response.StatusCode);
+            context.Logger.LogInformation("LogicApp IsLive '{0}' returned status {1}.", identifier, response.StatusCode);
+            return CreateResult(context.Variables, response.StatusCode);
         }
 
         response.EnsureSuccessStatusCode();
-        logger.LogInformation("LogicApp IsLive '{0}' returned status {1}.", identifier, response.StatusCode);
-        return CreateResult(variableStore, response.StatusCode);
+        context.Logger.LogInformation("LogicApp IsLive '{0}' returned status {1}.", identifier, response.StatusCode);
+        return CreateResult(context.Variables, response.StatusCode);
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
@@ -252,19 +252,19 @@ internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, V
 
     public override Step<AzureIsLiveResult> Clone() => new ServiceBusIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<AzureIsLiveResult?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
-        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
-        ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
-        IServiceBusAdministrationAdapter admin = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
+        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
+        ServiceBusConfig config = context.Services.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
+        IServiceBusAdministrationAdapter admin = context.Services.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
         if (currentAlivenessLevel == AlivenessLevel.Resource)
         {
-            await admin.ValidateConnectionAsync(cancellationToken);
-            return CreateResult(variableStore);
+            await admin.ValidateConnectionAsync(context.Deadline.Token);
+            return CreateResult(context.Variables);
         }
 
-        await admin.ValidateNamespaceConnectionAsync(cancellationToken);
-        return CreateResult(variableStore);
+        await admin.ValidateNamespaceConnectionAsync(context.Deadline.Token);
+        return CreateResult(context.Variables);
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
@@ -279,19 +279,19 @@ internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifi
 
     public override Step<AzureIsLiveResult> Clone() => new BlobStorageIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<AzureIsLiveResult?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
-        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
-        StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(identifier);
-        IBlobContainerAdapter container = serviceProvider.GetAzureComponentFactory().Blob.CreateContainer(config);
+        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
+        StorageAccountConfig config = context.Services.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(identifier);
+        IBlobContainerAdapter container = context.Services.GetAzureComponentFactory().Blob.CreateContainer(config);
         if (currentAlivenessLevel == AlivenessLevel.Resource)
         {
-            await container.ValidateConnectionAsync(cancellationToken);
-            return CreateResult(variableStore);
+            await container.ValidateConnectionAsync(context.Deadline.Token);
+            return CreateResult(context.Variables);
         }
 
-        await container.ValidateServiceConnectionAsync(cancellationToken);
-        return CreateResult(variableStore);
+        await container.ValidateServiceConnectionAsync(context.Deadline.Token);
+        return CreateResult(context.Variables);
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
@@ -306,19 +306,19 @@ internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identif
 
     public override Step<AzureIsLiveResult> Clone() => new TableStorageIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<AzureIsLiveResult?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
-        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
-        StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(identifier);
-        ITableAdapter table = serviceProvider.GetAzureComponentFactory().Table.CreateTable(config, config.TableContainerNameRequired);
+        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
+        StorageAccountConfig config = context.Services.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(identifier);
+        ITableAdapter table = context.Services.GetAzureComponentFactory().Table.CreateTable(config, config.TableContainerNameRequired);
         if (currentAlivenessLevel == AlivenessLevel.Resource)
         {
-            await table.ValidateConnectionAsync(cancellationToken);
-            return CreateResult(variableStore);
+            await table.ValidateConnectionAsync(context.Deadline.Token);
+            return CreateResult(context.Variables);
         }
 
-        await table.ValidateServiceConnectionAsync(cancellationToken);
-        return CreateResult(variableStore);
+        await table.ValidateServiceConnectionAsync(context.Deadline.Token);
+        return CreateResult(context.Variables);
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
@@ -333,36 +333,36 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
 
     public override Step<AzureIsLiveResult> Clone() => new CosmosContainerIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<AzureIsLiveResult?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
-        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(variableStore);
-        CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(identifier);
-        TimeSpan timeout = TimeOutOptions.TimeOut.GetValue(variableStore);
+        AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
+        CosmosContainerDbConfig config = context.Services.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(identifier);
+        TimeSpan timeout = TimeOutOptions.TimeOut.GetValue(context.Variables);
         if (timeout <= TimeSpan.Zero)
         {
             throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Cosmos IsLive timeout for '{identifier}' must be greater than zero.");
         }
 
-        ICosmosContainerAdapter container = serviceProvider.GetAzureComponentFactory().Cosmos.CreateContainer(config);
+        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(config);
 
         return currentAlivenessLevel switch
         {
             AlivenessLevel.Reachable => await ExecuteWithTimeoutAsync(
-                variableStore,
+                context.Variables,
                 timeout,
-                cancellationToken,
+                context.Deadline.Token,
                 token => container.ValidateAccountReachabilityAsync(token),
                 $"Cosmos account endpoint for '{identifier}' did not respond within {timeout}. Configure the timeline step timeout, for example with .WithTimeOut(...), for slower local or emulator environments."),
             AlivenessLevel.Authenticated => await ExecuteWithTimeoutAsync(
-                variableStore,
+                context.Variables,
                 timeout,
-                cancellationToken,
+                context.Deadline.Token,
                 token => container.ValidateAccountConnectionAsync(token),
                 $"Cosmos account for '{identifier}' did not authenticate within {timeout}. Configure the timeline step timeout, for example with .WithTimeOut(...), for slower local or emulator environments."),
             _ => await ExecuteWithTimeoutAsync(
-                variableStore,
+                context.Variables,
                 timeout,
-                cancellationToken,
+                context.Deadline.Token,
                 token => container.ValidateConnectionAsync(token),
                 $"Cosmos container '{identifier}' did not respond within {timeout}. Configure the timeline step timeout, for example with .WithTimeOut(...), for slower local or emulator environments."),
         };
@@ -401,16 +401,16 @@ internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier,
 
     public override Step<AzureIsLiveResult> Clone() => new SqlDatabaseIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
-    public override async Task<AzureIsLiveResult?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
-        ISqlDbContextResolver resolver = serviceProvider.GetRequiredService<ISqlDbContextResolver>();
-        DbContext context = resolver.Resolve(identifier);
-        if (!await context.Database.CanConnectAsync(cancellationToken))
+        ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
+        DbContext dbContext = resolver.Resolve(identifier);
+        if (!await dbContext.Database.CanConnectAsync(context.Deadline.Token))
         {
             throw new TestFramework.Core.Exceptions.FrameworkStateException($"Could not connect to SQL database '{identifier}'.");
         }
 
-        return CreateResult(variableStore);
+        return CreateResult(context.Variables);
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)

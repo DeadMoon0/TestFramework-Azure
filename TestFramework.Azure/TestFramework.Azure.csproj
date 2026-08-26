@@ -4,7 +4,7 @@
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<Title>TestFramework.Azure</Title>
-		<Version>0.3.0</Version>
+		<Version>0.4.0</Version>
 		<Authors>DeadMoon0</Authors>
 		<Product>TestFramework</Product>
 		<Description>Interact with Azure infrastructure inside of a TestFramework Timeline.</Description>
@@ -29,9 +29,6 @@ What to change: a timeline that discovers Azure SQL rows and relies on them surv
 		     CosmosSchemaRestClient. That helper signs requests with the account master key, so it is
 		     deliberately not public API - but it is a real dependency of a sibling package, which is
 		     why the access is granted here rather than by widening the surface. -->
-		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-			<_Parameter1>TestFramework.Container.Azure</_Parameter1>
-		</AssemblyAttribute>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -47,8 +44,8 @@ What to change: a timeline that discovers Azure SQL rows and relies on them surv
 		<PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.1.0" />
 		<PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" Version="4.3.1" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-		<PackageReference Include="TestFramework.Config" Version="0.2.1" />
-		<PackageReference Include="TestFramework.Core" Version="0.3.0" />
+		<PackageReference Include="TestFramework.Config" Version="0.3.0" />
+		<PackageReference Include="TestFramework.Core" Version="0.4.0" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using TestFramework.Core.Steps;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Linq;
@@ -47,10 +48,10 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
     /// <summary>
     /// Pins the reference to concrete primary key values.
     /// </summary>
-    public override void OnPinReference(VariableStore variableStore, ScopedLogger logger)
+    public override void OnPinReference(RunContext context)
     {
         _pinnedPKValues = _primaryKeyValues
-            .Select(v => v.GetRequiredValue(variableStore))
+            .Select(v => v.GetRequiredValue(context.Variables))
             .ToArray();
     }
 
@@ -83,15 +84,14 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
     /// <summary>
     /// Resolves the reference into concrete artifact data.
     /// </summary>
-    public override async Task<ArtifactResolveResult<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>>> ResolveToDataAsync(
-        IServiceProvider serviceProvider, ArtifactVersionIdentifier versionIdentifier, VariableStore variableStore, ScopedLogger logger)
+    public override async Task<ArtifactResolveResult<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
-        ISqlDbContextResolver resolver = serviceProvider.GetRequiredService<ISqlDbContextResolver>();
-        DbContext context = resolver.Resolve(DbIdentifier);
-        await resolver.EnsureReadyAsync(context, DbIdentifier, logger);
+        ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
+        DbContext dbContext = resolver.Resolve(DbIdentifier);
+        await resolver.EnsureReadyAsync(dbContext, DbIdentifier, context.Logger);
 
-        object[] keyValues = GetTypedKeyValues(context, variableStore);
-        TRow? row = await context.Set<TRow>().FindAsync(keyValues);
+        object[] keyValues = GetTypedKeyValues(dbContext, context.Variables);
+        TRow? row = await dbContext.Set<TRow>().FindAsync(keyValues);
 
         if (row is null)
             return new ArtifactResolveResult<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>> { Found = false };
@@ -107,11 +107,11 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
     /// Converts string PK values to the types expected by EF Core's key definition.
     /// Validates that the provided count matches the EF Core composite key count.
     /// </summary>
-    internal object[] GetTypedKeyValues(DbContext context, VariableStore variableStore)
+    internal object[] GetTypedKeyValues(DbContext dbContext, VariableStore variableStore)
     {
         string[] rawValues = GetPrimaryKeyValues(variableStore);
 
-        var entityType = context.Model.FindEntityType(typeof(TRow))
+        var entityType = dbContext.Model.FindEntityType(typeof(TRow))
             ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Entity type '{typeof(TRow).Name}' is not registered in the DbContext.");
 
         var keyProperties = entityType.FindPrimaryKey()?.Properties

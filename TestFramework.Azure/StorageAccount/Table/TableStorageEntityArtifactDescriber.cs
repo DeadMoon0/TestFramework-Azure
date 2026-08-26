@@ -1,4 +1,5 @@
-﻿using Azure.Data.Tables;
+﻿using TestFramework.Core.Steps;
+using Azure.Data.Tables;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
@@ -52,26 +53,26 @@ public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableSto
     /// <summary>
     /// Upserts the referenced entity during artifact setup.
     /// </summary>
-    public override async Task Setup(IServiceProvider serviceProvider, TableStorageEntityArtifactData<T> data, TableStorageEntityArtifactReference<T> reference, VariableStore variableStore, ScopedLogger logger)
+    public override async Task Setup(RunContext context, TableStorageEntityArtifactData<T> data, TableStorageEntityArtifactReference<T> reference)
     {
-        StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
-        ITableAdapter tableClient = serviceProvider.GetAzureComponentFactory().Table.CreateTable(config, reference.GetTableName(variableStore));
+        StorageAccountConfig config = context.Services.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
+        ITableAdapter tableClient = context.Services.GetAzureComponentFactory().Table.CreateTable(config, reference.GetTableName(context.Variables));
         await tableClient.CreateIfNotExistsAsync();
         await tableClient.UpsertEntityAsync(data.Entity);
 
-        logger.LogInformation($"Table entity {reference.GetPartitionKey(variableStore)}/{reference.GetRowKey(variableStore)} upserted.");
+        context.Logger.LogInformation($"Table entity {reference.GetPartitionKey(context.Variables)}/{reference.GetRowKey(context.Variables)} upserted.");
     }
 
     /// <summary>
     /// Deletes the referenced entity during artifact cleanup.
     /// </summary>
-    public override async Task Deconstruct(IServiceProvider serviceProvider, TableStorageEntityArtifactReference<T> reference, VariableStore variableStore, ScopedLogger logger)
+    public override async Task Deconstruct(RunContext context, TableStorageEntityArtifactReference<T> reference)
     {
-        StorageAccountConfig config = serviceProvider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
-        ITableAdapter tableClient = serviceProvider.GetAzureComponentFactory().Table.CreateTable(config, reference.GetTableName(variableStore));
-        await tableClient.DeleteEntityAsync(reference.GetPartitionKey(variableStore), reference.GetRowKey(variableStore));
+        StorageAccountConfig config = context.Services.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(reference.Identifier);
+        ITableAdapter tableClient = context.Services.GetAzureComponentFactory().Table.CreateTable(config, reference.GetTableName(context.Variables));
+        await tableClient.DeleteEntityAsync(reference.GetPartitionKey(context.Variables), reference.GetRowKey(context.Variables));
 
-        logger.LogInformation($"Table entity {reference.GetPartitionKey(variableStore)}/{reference.GetRowKey(variableStore)} deleted.");
+        context.Logger.LogInformation($"Table entity {reference.GetPartitionKey(context.Variables)}/{reference.GetRowKey(context.Variables)} deleted.");
     }
 
     /// <summary>

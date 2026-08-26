@@ -59,27 +59,21 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
     /// <summary>
     /// Sends the configured Service Bus message.
     /// </summary>
-    /// <param name="serviceProvider">The service provider used to resolve Azure services.</param>
-    /// <param name="variableStore">The variable store used to resolve the message.</param>
-    /// <param name="artifactStore">The artifact store for the current run.</param>
-    /// <param name="logger">The step logger.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task that completes when the message has been sent.</returns>
-    public override async Task<ServiceBusSentMessageContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore,
-        ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<ServiceBusSentMessageContext?> Execute(RunContext context)
     {
-        ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
-        await using IServiceBusSenderAdapter sender = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateSender(config);
+        ServiceBusConfig config = context.Services.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
+        await using IServiceBusSenderAdapter sender = context.Services.GetAzureComponentFactory().ServiceBus.CreateSender(config);
 
-        ServiceBusMessage _message = message.GetRequiredValue(variableStore);
+        ServiceBusMessage _message = message.GetRequiredValue(context.Variables);
         if (config.RequiredSession && _message.SessionId is null)
         {
             _message.SessionId = Guid.NewGuid().ToString();
         }
 
-        await sender.SendMessageAsync(_message, cancellationToken);
+        await sender.SendMessageAsync(_message, context.Deadline.Token);
 
-        logger.LogInformation("Sent message to Service Bus: {0}", _message);
+        context.Logger.LogInformation("Sent message to Service Bus: {0}", _message);
 
         return new ServiceBusSentMessageContext(_message);
     }
@@ -93,7 +87,6 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
     /// <summary>
     /// Declares the environment requirement for the configured Service Bus resource.
     /// </summary>
-    /// <param name="variableStore">The variable store for the current run.</param>
     /// <returns>The required Azure environment resources.</returns>
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
         => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.ServiceBus, identifier)];

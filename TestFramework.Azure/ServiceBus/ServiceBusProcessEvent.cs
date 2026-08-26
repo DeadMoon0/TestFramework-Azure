@@ -1,4 +1,4 @@
-using Azure.Messaging.ServiceBus;
+﻿using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -111,7 +111,6 @@ public class ServiceBusProcessEvent(
     /// <summary>
     /// Declares the environment requirement for the configured Service Bus resource.
     /// </summary>
-    /// <param name="variableStore">The variable store for the current run.</param>
     /// <returns>The required Azure environment resources.</returns>
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
         => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.ServiceBus, identifier)];
@@ -121,17 +120,11 @@ public class ServiceBusProcessEvent(
     /// <summary>
     /// Polls Service Bus until a matching message is received.
     /// </summary>
-    /// <param name="serviceProvider">The service provider used to resolve Azure services.</param>
-    /// <param name="variableStore">The variable store used to resolve filters.</param>
-    /// <param name="artifactStore">The artifact store for the current run.</param>
-    /// <param name="logger">The event logger.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The matching Service Bus message, or <see langword="null"/> when none is found.</returns>
-    public override async Task<ServiceBusReceivedMessageContext?> DoEventPolling(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore,
-        ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<ServiceBusReceivedMessageContext?> DoEventPolling(RunContext context)
     {
-        ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
-        bool useTempSubscription = createTempSubscription?.GetValue(variableStore) == true;
+        ServiceBusConfig config = context.Services.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
+        bool useTempSubscription = createTempSubscription?.GetValue(context.Variables) == true;
 
         ServiceBusConfigReceiveMode receiveMode = config.GetReceiveMode(useTempSubscription);
         string? subscriptionName = receiveMode switch
@@ -146,18 +139,18 @@ public class ServiceBusProcessEvent(
         // construction. The shared modes see other runs' traffic and must release those locks.
         bool abandonNonMatching = receiveMode is ServiceBusConfigReceiveMode.Queue or ServiceBusConfigReceiveMode.TopicSubscription;
 
-        await using IServiceBusMessagePump pump = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateMessagePump(config, subscriptionName);
+        await using IServiceBusMessagePump pump = context.Services.GetAzureComponentFactory().ServiceBus.CreateMessagePump(config, subscriptionName);
         ServiceBusReceivedMessage? message = await pump.ReceiveMessageAsync(
             new ServiceBusReceiveRequest(
-                messageId?.GetValue(variableStore),
-                correlationId?.GetValue(variableStore),
-                predicate?.GetValue(variableStore),
+                messageId?.GetValue(context.Variables),
+                correlationId?.GetValue(context.Variables),
+                predicate?.GetValue(context.Variables),
                 // Unspecified means complete: a matched-but-uncompleted message returns to the entity
                 // and can satisfy a LATER run's wait, which is a cross-run false pass.
-                completeMessage?.GetValue(variableStore) ?? true,
+                completeMessage?.GetValue(context.Variables) ?? true,
                 abandonNonMatching,
-                warning => logger.LogWarning("ServiceBus '{0}': {1}", identifier, warning)),
-            cancellationToken);
+                warning => context.Logger.LogWarning("ServiceBus '{0}': {1}", identifier, warning)),
+            context.Deadline.Token);
 
         return message is null ? null : new ServiceBusReceivedMessageContext(message);
     }

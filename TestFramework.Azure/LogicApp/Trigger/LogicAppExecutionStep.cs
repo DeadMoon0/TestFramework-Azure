@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading;
@@ -38,12 +38,12 @@ internal sealed class LogicAppExecutionStep(
 
     public override Step<LogicAppExecutionResult> Clone() => new LogicAppExecutionStep(identifier, request).WithClonedOptions(this);
 
-    public override async Task<LogicAppExecutionResult?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<LogicAppExecutionResult?> Execute(RunContext context)
     {
         return request.TriggerMode switch
         {
-            LogicAppTriggerExecutionMode.HttpCallback => await ExecuteHttpAsync(serviceProvider, variableStore, cancellationToken),
-            LogicAppTriggerExecutionMode.ManagementRun => await LogicAppManagementTrigger.ExecuteAsync(serviceProvider, variableStore, identifier, request.WorkflowName, request.TriggerName, cancellationToken),
+            LogicAppTriggerExecutionMode.HttpCallback => await ExecuteHttpAsync(context.Services, context.Variables, context.Deadline.Token),
+            LogicAppTriggerExecutionMode.ManagementRun => await LogicAppManagementTrigger.ExecuteAsync(context.Services, context.Variables, identifier, request.WorkflowName, request.TriggerName, context.Deadline.Token),
             _ => throw new TestFramework.Core.Exceptions.UnsupportedFrameworkValueException($"Unsupported Logic App trigger mode '{request.TriggerMode}'.")
         };
     }

@@ -1,4 +1,4 @@
-using Azure.Messaging.ServiceBus.Administration;
+﻿using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading;
@@ -40,10 +40,9 @@ internal class ServiceBusCreateTempSubscriptionStep(
             contract.Inputs.Add(new StepIOEntry(correlationId.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
     }
 
-    public override async Task<EmptyStepResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore,
-        ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<EmptyStepResultContext?> Execute(RunContext context)
     {
-        ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
+        ServiceBusConfig config = context.Services.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
 
         if (!config.IsTopic)
             throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
@@ -61,8 +60,8 @@ internal class ServiceBusCreateTempSubscriptionStep(
 
         // Build a server-side filter from the qualifiers that are known at pre-process time.
         // predicate stays in-process only — no server-side equivalent.
-        var correlationIdValue = correlationId?.GetValue(variableStore);
-        var messageIdValue = messageId?.GetValue(variableStore);
+        var correlationIdValue = correlationId?.GetValue(context.Variables);
+        var messageIdValue = messageId?.GetValue(context.Variables);
 
         CreateRuleOptions? ruleOptions = null;
         if (correlationIdValue is not null || messageIdValue is not null)
@@ -73,11 +72,11 @@ internal class ServiceBusCreateTempSubscriptionStep(
             ruleOptions = new CreateRuleOptions("TempFilter", filter);
         }
 
-        IServiceBusAdministrationAdapter adminClient = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
+        IServiceBusAdministrationAdapter adminClient = context.Services.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
 
-        await adminClient.CreateSubscriptionAsync(subOptions, ruleOptions, cancellationToken);
+        await adminClient.CreateSubscriptionAsync(subOptions, ruleOptions, context.Deadline.Token);
 
-        logger.LogInformation(
+        context.Logger.LogInformation(
             $"Created temp subscription '{tempSubscriptionName}' on topic '{config.TopicName}' (TTL {ttl}).");
 
         return null;

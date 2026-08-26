@@ -1,3 +1,4 @@
+﻿using TestFramework.Core.Steps;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -27,42 +28,40 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
     /// <summary>
     /// Finds the first matching SQL row.
     /// </summary>
-    public override async Task<ArtifactFinderResult?> FindAsync(
-        IServiceProvider serviceProvider, VariableStore variableStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<ArtifactFinderResult?> FindAsync(RunContext context)
     {
-        ISqlDbContextResolver resolver = serviceProvider.GetRequiredService<ISqlDbContextResolver>();
-        DbContext context = resolver.Resolve(dbIdentifier);
-        await resolver.EnsureReadyAsync(context, dbIdentifier, logger);
+        ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
+        DbContext dbContext = resolver.Resolve(dbIdentifier);
+        await resolver.EnsureReadyAsync(dbContext, dbIdentifier, context.Logger);
 
-        TRow? entity = await queryModifier(context.Set<TRow>()).FirstOrDefaultAsync(cancellationToken);
+        TRow? entity = await queryModifier(dbContext.Set<TRow>()).FirstOrDefaultAsync(context.Deadline.Token);
         if (entity is null) return null;
 
-        SqlRowArtifactReference<TRow> reference = BuildReference(context, entity);
+        SqlRowArtifactReference<TRow> reference = BuildReference(dbContext, entity);
         return new ArtifactFinderResult(reference);
     }
 
     /// <summary>
     /// Finds all matching SQL rows.
     /// </summary>
-    public override async Task<ArtifactFinderResultMulti> FindMultiAsync(
-        IServiceProvider serviceProvider, VariableStore variableStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<ArtifactFinderResultMulti> FindMultiAsync(RunContext context)
     {
-        ISqlDbContextResolver resolver = serviceProvider.GetRequiredService<ISqlDbContextResolver>();
-        DbContext context = resolver.Resolve(dbIdentifier);
-        await resolver.EnsureReadyAsync(context, dbIdentifier, logger);
+        ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
+        DbContext dbContext = resolver.Resolve(dbIdentifier);
+        await resolver.EnsureReadyAsync(dbContext, dbIdentifier, context.Logger);
 
-        List<TRow> entities = await queryModifier(context.Set<TRow>()).ToListAsync(cancellationToken);
+        List<TRow> entities = await queryModifier(dbContext.Set<TRow>()).ToListAsync(context.Deadline.Token);
 
         List<ArtifactFinderResult> results = entities
-            .Select(entity => new ArtifactFinderResult(BuildReference(context, entity)))
+            .Select(entity => new ArtifactFinderResult(BuildReference(dbContext, entity)))
             .ToList();
 
         return new ArtifactFinderResultMulti(results.ToArray());
     }
 
-    private SqlRowArtifactReference<TRow> BuildReference(DbContext context, TRow entity)
+    private SqlRowArtifactReference<TRow> BuildReference(DbContext dbContext, TRow entity)
     {
-        var entityType = context.Model.FindEntityType(typeof(TRow))
+        var entityType = dbContext.Model.FindEntityType(typeof(TRow))
             ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Entity type '{typeof(TRow).Name}' is not registered in the DbContext.");
 
         var keyProperties = entityType.FindPrimaryKey()?.Properties

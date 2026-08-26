@@ -1,4 +1,4 @@
-using Azure.Messaging.ServiceBus;
+﻿using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -30,22 +30,21 @@ internal class ServiceBusDeleteTempSubscriptionStep(
 
     public override void DeclareIO(StepIOContract contract) { }
 
-    public override async Task<EmptyStepResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore,
-        ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<EmptyStepResultContext?> Execute(RunContext context)
     {
-        ServiceBusConfig config = serviceProvider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
+        ServiceBusConfig config = context.Services.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
 
-        IServiceBusAdministrationAdapter adminClient = serviceProvider.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
+        IServiceBusAdministrationAdapter adminClient = context.Services.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
         try
         {
             string topicName = config.TopicName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("A topic name is required for deleting a temporary subscription.");
-            await adminClient.DeleteSubscriptionAsync(topicName, tempSubscriptionName, cancellationToken);
-            logger.LogInformation($"Deleted temp subscription '{tempSubscriptionName}' from topic '{topicName}'.");
+            await adminClient.DeleteSubscriptionAsync(topicName, tempSubscriptionName, context.Deadline.Token);
+            context.Logger.LogInformation($"Deleted temp subscription '{tempSubscriptionName}' from topic '{topicName}'.");
         }
         catch (ServiceBusException ex) when (ex.Reason == ServiceBusFailureReason.MessagingEntityNotFound)
         {
             // Already gone — nothing to do.
-            logger.LogInformation($"Temp subscription '{tempSubscriptionName}' was already deleted.");
+            context.Logger.LogInformation($"Temp subscription '{tempSubscriptionName}' was already deleted.");
         }
 
         return null;

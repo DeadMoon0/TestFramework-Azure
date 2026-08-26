@@ -33,18 +33,18 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         return new HttpRemoteFunctionAppTrigger(appIdentifier, trigger, request).WithClonedOptions(this);
     }
 
-    public override async Task<HttpResponseResultContext?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+    public override async Task<HttpResponseResultContext?> Execute(RunContext context)
     {
-        var _trigger = trigger.GetRequiredValue(variableStore);
-        var _request = request.GetRequiredValue(variableStore);
+        var _trigger = trigger.GetRequiredValue(context.Variables);
+        var _request = request.GetRequiredValue(context.Variables);
 
-        FunctionAppTriggerConfig config = serviceProvider.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
-        FunctionAppConfig functionConfig = serviceProvider.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig(appIdentifier);
+        FunctionAppTriggerConfig config = context.Services.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
+        FunctionAppConfig functionConfig = context.Services.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig(appIdentifier);
         RemoteConnection remoteConnection = new RemoteConnection(new Uri(functionConfig.BaseUrl));
         if (config.DoPing) await remoteConnection.EnsurePingAsync();
         Uri fullTriggerUri = BuildTriggerUri(remoteConnection.BasePath, functionConfig.RoutePrefix, _trigger.Path);
-        IHttpRequestSender sender = serviceProvider.GetAzureComponentFactory().Http.CreateSender();
-        logger.LogInformation("FunctionApp HTTP '{0}' -> {1} {2}", appIdentifier, _trigger.Method, fullTriggerUri);
+        IHttpRequestSender sender = context.Services.GetAzureComponentFactory().Http.CreateSender();
+        context.Logger.LogInformation("FunctionApp HTTP '{0}' -> {1} {2}", appIdentifier, _trigger.Method, fullTriggerUri);
 
         using HttpResponseMessage response = await SendWithLocalWarmupRetryAsync(
             sender,
@@ -53,12 +53,12 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
             _request,
             functionConfig,
             config,
-            logger,
-            cancellationToken).ConfigureAwait(false);
+            context.Logger,
+            context.Deadline.Token).ConfigureAwait(false);
 
-        logger.LogInformation("FunctionApp HTTP '{0}' <- {1}", appIdentifier, response.StatusCode);
+        context.Logger.LogInformation("FunctionApp HTTP '{0}' <- {1}", appIdentifier, response.StatusCode);
 
-        return await HttpResponseResultContext.FromHttpResponseAsync(response, cancellationToken).ConfigureAwait(false);
+        return await HttpResponseResultContext.FromHttpResponseAsync(response, context.Deadline.Token).ConfigureAwait(false);
     }
 
     private static async Task<HttpResponseMessage> SendWithLocalWarmupRetryAsync(

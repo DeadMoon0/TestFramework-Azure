@@ -1,4 +1,5 @@
-﻿using Microsoft.Azure.Cosmos;
+﻿using TestFramework.Core.Steps;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System;
@@ -51,21 +52,21 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
     /// <summary>
     /// Pins the reference to concrete id and partition key values.
     /// </summary>
-    public override void OnPinReference(VariableStore variableStore, ScopedLogger logger)
+    public override void OnPinReference(RunContext context)
     {
-        pinnedId = this._id?.GetRequiredValue(variableStore) ?? "";
-        pinnedPartitionKey = this._partitionKey?.GetRequiredValue(variableStore, "PartitionKey is required.") ?? PartitionKey.Null;
+        pinnedId = this._id?.GetRequiredValue(context.Variables) ?? "";
+        pinnedPartitionKey = this._partitionKey?.GetRequiredValue(context.Variables, "PartitionKey is required.") ?? PartitionKey.Null;
     }
 
     /// <summary>
     /// Resolves the reference into concrete artifact data.
     /// </summary>
-    public override async Task<ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>>> ResolveToDataAsync(IServiceProvider serviceProvider, ArtifactVersionIdentifier versionIdentifier, VariableStore variableStore, ScopedLogger logger)
+    public override async Task<ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
-        CosmosContainerDbConfig config = serviceProvider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(DbIdentifier);
-        ICosmosContainerAdapter container = serviceProvider.GetAzureComponentFactory().Cosmos.CreateContainer(config);
+        CosmosContainerDbConfig config = context.Services.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(DbIdentifier);
+        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(config);
 
-        CosmosReadResponse itemResp = await container.ReadItemAsync(GetId(variableStore), GetPartitionKey(variableStore));
+        CosmosReadResponse itemResp = await container.ReadItemAsync(GetId(context.Variables), GetPartitionKey(context.Variables));
         if (!itemResp.Found)
             return new ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>> { Found = false };
 

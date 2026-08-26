@@ -218,7 +218,7 @@ public class AzureConfigurationTests
         ServiceBusMessage message = new("payload");
         ServiceBusSendTrigger trigger = new("bus", Var.Const(message));
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.Same(message, sender.MessageSent);
         Assert.False(string.IsNullOrWhiteSpace(message.SessionId));
@@ -399,7 +399,7 @@ public class AzureConfigurationTests
 
         HttpRemoteFunctionAppTrigger trigger = new("func", Var.Const(routing), Var.Const(request));
 
-        var actual = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        var actual = await trigger.Execute(runtime.Context);
 
         Assert.NotNull(actual);
         Assert.Equal(HttpStatusCode.Accepted, actual!.StatusCode);
@@ -433,8 +433,8 @@ public class AzureConfigurationTests
 
         HttpRemoteFunctionAppTrigger trigger = new("func", Var.Const(routing), Var.Const(request));
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
+        await trigger.Execute(runtime.Context);
 
         Assert.Equal(2, sender.Requests.Count);
         foreach (HttpRequestMessage observed in sender.Requests)
@@ -509,7 +509,7 @@ public class AzureConfigurationTests
             .WithHeader(Var.Const("x-test"), Var.Const("1"))
             .Call();
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.Equal("https://example.test/api/orders", sender.Requests.Single().RequestUri!.ToString());
         Assert.Equal("1", sender.Requests.Single().Headers.GetValues("x-test").Single());
@@ -538,7 +538,7 @@ public class AzureConfigurationTests
             .SelectFunction("HttpEchoTest", HttpMethod.Post)
             .Call();
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.Equal("https://example.test/api/HttpEchoTest", sender.Requests.Single().RequestUri!.ToString());
     }
@@ -575,7 +575,7 @@ public class AzureConfigurationTests
             .Call();
 
         FrameworkConfigurationException exception = await Assert.ThrowsAsync<FrameworkConfigurationException>(() =>
-            trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+            trigger.Execute(runtime.Context));
 
         Assert.Contains("cannot be blank", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(sender.Requests);
@@ -611,7 +611,7 @@ public class AzureConfigurationTests
 
         HttpRemoteFunctionAppTrigger trigger = new("func", Var.Const(routing), Var.Const(request));
 
-        var actual = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        var actual = await trigger.Execute(runtime.Context);
 
         Assert.NotNull(actual);
         Assert.Equal(HttpStatusCode.InternalServerError, actual.StatusCode);
@@ -658,7 +658,7 @@ public class AzureConfigurationTests
             .WithHeader(Var.Const("x-test"), Var.Const("1"))
             .Call();
 
-        LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? result = await trigger.Execute(runtime.Context);
 
         Assert.NotNull(result);
         Assert.Equal("OrderProcessor", result!.WorkflowName);
@@ -708,7 +708,7 @@ public class AzureConfigurationTests
             .WithBody(Var.Const("payload"))
             .Call();
 
-        LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? result = await trigger.Execute(runtime.Context);
 
         Assert.NotNull(result);
         Assert.Equal("http://127.0.0.1:59911/api/OrderProcessor/triggers/manual/invoke?api-version=2022-05-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=abc", sender.Requests[1].RequestUri!.ToString());
@@ -753,7 +753,7 @@ public class AzureConfigurationTests
             .WithBody(Var.Const("payload"))
             .CallAndCapture();
 
-        LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? result = await trigger.Execute(runtime.Context);
 
         Assert.NotNull(result);
         Assert.Equal("OrderProcessor", result!.WorkflowName);
@@ -801,7 +801,7 @@ public class AzureConfigurationTests
             .Manual()
             .CallAndCapture();
 
-        LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? result = await trigger.Execute(runtime.Context);
 
         Assert.NotNull(result);
         Assert.Equal(HttpStatusCode.BadRequest, result!.StatusCode);
@@ -840,7 +840,7 @@ public class AzureConfigurationTests
             .WithBody(Var.Const("payload"))
             .Call();
 
-        LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? result = await trigger.Execute(runtime.Context);
 
         Assert.NotNull(result);
         Assert.Equal("https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc", sender.Requests[0].RequestUri!.ToString());
@@ -876,7 +876,7 @@ public class AzureConfigurationTests
             .Call();
 
         using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(1));
-        LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, cancellation.Token);
+        LogicAppExecutionResult? result = await trigger.Execute(runtime.ContextWith(cancellation.Token));
 
         Assert.NotNull(result);
         Assert.Equal("run-observed-123", result!.RunId);
@@ -913,7 +913,7 @@ public class AzureConfigurationTests
             .Timer()
             .Call();
 
-        LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? result = await trigger.Execute(runtime.Context);
 
         Assert.NotNull(result);
         Assert.Equal("https://management.azure.com/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/NightlyJob/triggers/Recurrence/run?api-version=2019-05-01", sender.Requests[0].RequestUri!.ToString());
@@ -950,7 +950,7 @@ public class AzureConfigurationTests
             .Timer()
             .Call();
 
-        LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? result = await trigger.Execute(runtime.Context);
 
         Assert.NotNull(result);
         Assert.Equal("NightlyJob", result!.WorkflowName);
@@ -1007,7 +1007,7 @@ public class AzureConfigurationTests
                         .Timer()
                     .Call();
 
-                LogicAppExecutionResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+                LogicAppExecutionResult? result = await trigger.Execute(runtime.Context);
 
                 Assert.NotNull(result);
                 Assert.Equal("run-observed-123", result!.RunId);
@@ -1163,7 +1163,7 @@ public class AzureConfigurationTests
 
         var evt = AzureExt.Event.LogicApp.RunReachedStatus("logic", Var.Const("run-123"), LogicAppRunStatus.Succeeded, Var.Const("OrderProcessor"));
 
-        LogicAppExecutionResult? result = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? result = await evt.DoEventPolling(runtime.Context);
 
         Assert.NotNull(result);
         Assert.Equal(LogicAppRunStatus.Succeeded, result!.RunStatus);
@@ -1249,7 +1249,7 @@ public class AzureConfigurationTests
 
         var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
 
-        LogicAppExecutionResult? result = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? result = await evt.DoEventPolling(runtime.Context);
 
         Assert.NotNull(result);
         Assert.Equal(LogicAppRunStatus.Succeeded, result!.RunStatus);
@@ -1319,7 +1319,7 @@ public class AzureConfigurationTests
 
         var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-500"), Var.Const("OrderProcessor"));
 
-        LogicAppExecutionResult? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? completed = await evt.DoEventPolling(runtime.Context);
 
         Assert.NotNull(completed);
         Assert.Equal(LogicAppRunStatus.Failed, completed!.RunStatus);
@@ -1366,7 +1366,7 @@ public class AzureConfigurationTests
 
         var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
 
-        LogicAppExecutionResult? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? completed = await evt.DoEventPolling(runtime.Context);
 
         Assert.NotNull(completed);
         Assert.Equal(LogicAppRunStatus.Succeeded, completed!.RunStatus);
@@ -1419,7 +1419,7 @@ public class AzureConfigurationTests
 
         var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
 
-        LogicAppExecutionResult? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? completed = await evt.DoEventPolling(runtime.Context);
 
         Assert.NotNull(completed);
         Assert.Equal(LogicAppRunStatus.TimedOut, completed!.RunStatus);
@@ -1450,7 +1450,7 @@ public class AzureConfigurationTests
         using CancellationTokenSource cancellation = new(TimeSpan.FromMilliseconds(100));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, cancellation.Token));
+            evt.DoEventPolling(runtime.ContextWith(cancellation.Token)));
 
         Assert.Single(sender.RequestUris);
         Assert.Equal("https://logic.test/runtime/webhooks/workflow/api/management/workflows/OrderProcessor/runs/run-nonresponsive?api-version=2022-03-01", sender.RequestUris[0]!.ToString());
@@ -1481,7 +1481,7 @@ public class AzureConfigurationTests
         var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-stateless"), Var.Const("StatelessOrders"));
 
         UnsupportedFrameworkValueException exception = await Assert.ThrowsAsync<UnsupportedFrameworkValueException>(() =>
-            evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+            evt.DoEventPolling(runtime.Context));
 
         Assert.Contains("stateless", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("CaptureResponse", exception.Message, StringComparison.Ordinal);
@@ -1514,7 +1514,7 @@ public class AzureConfigurationTests
 
         var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
 
-        LogicAppExecutionResult? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? completed = await evt.DoEventPolling(runtime.Context);
 
         Assert.NotNull(completed);
         Assert.Equal("https://management.azure.com/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor/runs/run-123?api-version=2019-05-01", sender.Requests[0].RequestUri!.ToString());
@@ -1545,7 +1545,7 @@ public class AzureConfigurationTests
 
         ManagedRemoteFunctionAppTrigger trigger = new("func", Var.Const(new TriggerRouting("cleanup")));
 
-        ManagedResult? result = await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        ManagedResult? result = await trigger.Execute(runtime.Context);
 
         Assert.NotNull(result);
         Assert.Equal(HttpStatusCode.OK, result!.StatusCode);
@@ -1575,7 +1575,7 @@ public class AzureConfigurationTests
 
         ManagedRemoteFunctionAppTrigger trigger = new("func", Var.Const(new TriggerRouting("cleanup")));
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.Equal("master-key", sender.Request!.Headers.GetValues("x-functions-key").Single());
     }
@@ -1600,7 +1600,7 @@ public class AzureConfigurationTests
 
         TestFramework.Core.Exceptions.FrameworkConfigurationException exception =
             await Assert.ThrowsAsync<TestFramework.Core.Exceptions.FrameworkConfigurationException>(
-                () => trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+                () => trigger.Execute(runtime.Context));
 
         Assert.Contains("AdminCode", exception.Message, StringComparison.Ordinal);
     }
@@ -1663,7 +1663,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.FunctionApp("func");
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.Equal("https://example.test/admin/host/status", sender.Request!.RequestUri!.ToString());
         Assert.Equal("admin-code", sender.Request.Headers.GetValues("x-functions-key").Single());
@@ -1733,7 +1733,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.LogicApp("logic");
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.Equal("https://logic.test/api/admin/host/status", sender.Request!.RequestUri!.ToString());
         Assert.Equal("logic-admin", sender.Request.Headers.GetValues("x-functions-key").Single());
@@ -1761,7 +1761,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.LogicApp("logic");
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.Equal("https://management.azure.com/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor/runs?api-version=2019-05-01", sender.Request!.RequestUri!.ToString());
         Assert.Equal("Bearer", sender.Request.Headers.Authorization!.Scheme);
@@ -1789,7 +1789,7 @@ public class AzureConfigurationTests
         var trigger = AzureExt.Trigger.IsLive.LogicApp("logic");
 
         FrameworkConfigurationException exception = await Assert.ThrowsAsync<FrameworkConfigurationException>(() =>
-            trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+            trigger.Execute(runtime.Context));
 
         Assert.Contains("management capability", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(nameof(ILogicAppConsumptionManagementRequestAuthorizer), exception.Message, StringComparison.Ordinal);
@@ -1823,7 +1823,7 @@ public class AzureConfigurationTests
 
         var evt = AzureExt.Event.LogicApp.RunCompleted("logic", Var.Const("run-123"), Var.Const("OrderProcessor"));
 
-        LogicAppExecutionResult? completed = await evt.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        LogicAppExecutionResult? completed = await evt.DoEventPolling(runtime.Context);
 
         Assert.NotNull(completed);
         Assert.Equal(2, sender.Requests.Count);
@@ -1850,7 +1850,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.FunctionApp("func", AlivenessLevel.Reachable);
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.Single(sender.Requests);
         Assert.Equal(HttpMethod.Head, sender.Request!.Method);
@@ -1885,7 +1885,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.ServiceBus("bus");
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.True(administration.ValidateCalled);
     }
@@ -1909,7 +1909,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.ServiceBus("bus", AlivenessLevel.Authenticated);
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.True(administration.NamespaceValidateCalled);
         Assert.False(administration.ValidateCalled);
@@ -1933,7 +1933,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.Blob("storage");
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.True(container.ValidateCalled);
     }
@@ -1956,7 +1956,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.Blob("storage", AlivenessLevel.Authenticated);
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.True(container.ValidateServiceCalled);
         Assert.False(container.ValidateCalled);
@@ -1980,7 +1980,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.Table("storage");
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.True(table.ValidateCalled);
         Assert.Equal("table", table.LastTableName);
@@ -2004,7 +2004,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.Table("storage", AlivenessLevel.Authenticated);
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.True(table.ValidateServiceCalled);
         Assert.False(table.ValidateCalled);
@@ -2028,7 +2028,7 @@ public class AzureConfigurationTests
 
         var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos");
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.True(container.ValidateCalled);
     }
@@ -2051,7 +2051,7 @@ public class AzureConfigurationTests
         var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Authenticated);
         trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.True(container.ValidateAccountCalled);
         Assert.False(container.ValidateCalled);
@@ -2076,7 +2076,7 @@ public class AzureConfigurationTests
         var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Reachable);
         trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.True(container.ValidateReachabilityCalled);
         Assert.False(container.ValidateAccountCalled);
@@ -2101,7 +2101,7 @@ public class AzureConfigurationTests
         var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos");
         trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
 
-        await trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await trigger.Execute(runtime.Context);
 
         Assert.True(container.ValidateCalled);
     }
@@ -2128,7 +2128,7 @@ public class AzureConfigurationTests
         trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(50));
 
         FrameworkTimeoutException exception = await Assert.ThrowsAsync<FrameworkTimeoutException>(() =>
-            trigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+            trigger.Execute(runtime.Context));
 
         Assert.Contains("WithTimeOut", exception.Message, StringComparison.Ordinal);
     }
@@ -2152,8 +2152,8 @@ public class AzureConfigurationTests
         CosmosDbItemArtifactReference<TestItem> reference = new("cosmos");
         CosmosDbItemArtifactData<TestItem> data = new(new TestItem("42", "tenant-1", "Ada"));
 
-        await describer.Setup(runtime.ServiceProvider, data, reference, runtime.VariableStore, runtime.Logger);
-        await describer.Deconstruct(runtime.ServiceProvider, reference, runtime.VariableStore, runtime.Logger);
+        await describer.Setup(runtime.Context, data, reference);
+        await describer.Deconstruct(runtime.Context, reference);
 
         Assert.Equal("42", reference.GetId(runtime.VariableStore));
         Assert.Equal(new PartitionKey("tenant-1"), reference.GetPartitionKey(runtime.VariableStore));
@@ -2185,7 +2185,7 @@ public class AzureConfigurationTests
         CosmosDbItemArtifactReference<TestItem> reference = new("cosmos", Var.Const(new PartitionKey("tenant-1")), Var.Const("42"));
 
         ArtifactResolveResult<CosmosDbItemArtifactDescriber<TestItem>, CosmosDbItemArtifactData<TestItem>, CosmosDbItemArtifactReference<TestItem>> result =
-            await reference.ResolveToDataAsync(runtime.ServiceProvider, ArtifactVersionIdentifier.Default, runtime.VariableStore, runtime.Logger);
+            await reference.ResolveToDataAsync(runtime.Context, ArtifactVersionIdentifier.Default);
 
         Assert.True(result.Found);
         Assert.Equal("Ada", result.Data!.Item.name);
@@ -2212,7 +2212,7 @@ public class AzureConfigurationTests
 
         CosmosDbItemArtifactQueryFinder<TestItem> finder = new("cosmos", Var.Const(new QueryDefinition("SELECT * FROM c")));
 
-        ArtifactFinderResultMulti results = await finder.FindMultiAsync(runtime.ServiceProvider, runtime.VariableStore, runtime.Logger, CancellationToken.None);
+        ArtifactFinderResultMulti results = await finder.FindMultiAsync(runtime.Context);
 
         Assert.Equal(2, results.ArtifactReferences.Length);
         Assert.Equal("SELECT * FROM c", container.LastQuery?.QueryText);
@@ -2252,8 +2252,8 @@ public class AzureConfigurationTests
         StorageAccountBlobArtifactReference reference = new("storage", Var.Const("samples/a.txt"));
         StorageAccountBlobArtifactData data = new(Encoding.UTF8.GetBytes("hello"), new Dictionary<string, string> { ["env"] = "test" });
 
-        await describer.Setup(runtime.ServiceProvider, data, reference, runtime.VariableStore, runtime.Logger);
-        await describer.Deconstruct(runtime.ServiceProvider, reference, runtime.VariableStore, runtime.Logger);
+        await describer.Setup(runtime.Context, data, reference);
+        await describer.Deconstruct(runtime.Context, reference);
 
         Assert.True(container.CreateCalled);
         Assert.Equal("samples/a.txt", container.UploadedPath);
@@ -2284,7 +2284,7 @@ public class AzureConfigurationTests
         StorageAccountBlobArtifactReference reference = new("storage", Var.Const("samples/a.txt"));
 
         ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference> result =
-            await reference.ResolveToDataAsync(runtime.ServiceProvider, ArtifactVersionIdentifier.Default, runtime.VariableStore, runtime.Logger);
+            await reference.ResolveToDataAsync(runtime.Context, ArtifactVersionIdentifier.Default);
 
         Assert.True(result.Found);
         Assert.Equal("hello", Encoding.UTF8.GetString(result.Data!.Data));
@@ -2313,8 +2313,8 @@ public class AzureConfigurationTests
         TestTableEntity entity = new() { PartitionKey = "partition", RowKey = "row", Name = "Ada" };
         TableStorageEntityArtifactData<TestTableEntity> data = new(entity);
 
-        await describer.Setup(runtime.ServiceProvider, data, reference, runtime.VariableStore, runtime.Logger);
-        await describer.Deconstruct(runtime.ServiceProvider, reference, runtime.VariableStore, runtime.Logger);
+        await describer.Setup(runtime.Context, data, reference);
+        await describer.Deconstruct(runtime.Context, reference);
 
         Assert.Equal("orders", table.LastTableName);
         Assert.True(table.CreateCalled);
@@ -2344,7 +2344,7 @@ public class AzureConfigurationTests
         TableStorageEntityArtifactReference<TestTableEntity> reference = new("storage", Var.Const("orders"), Var.Const("partition"), Var.Const("row"));
 
         ArtifactResolveResult<TableStorageEntityArtifactDescriber<TestTableEntity>, TableStorageEntityArtifactData<TestTableEntity>, TableStorageEntityArtifactReference<TestTableEntity>> result =
-            await reference.ResolveToDataAsync(runtime.ServiceProvider, ArtifactVersionIdentifier.Default, runtime.VariableStore, runtime.Logger);
+            await reference.ResolveToDataAsync(runtime.Context, ArtifactVersionIdentifier.Default);
 
         Assert.True(result.Found);
         Assert.Equal("Grace", result.Data!.Entity.Name);
@@ -2371,7 +2371,7 @@ public class AzureConfigurationTests
 
         TableStorageEntityArtifactQueryFinder<TestTableEntity> finder = new("storage", Var.Const("orders"), "PartitionKey ne ''");
 
-        ArtifactFinderResultMulti results = await finder.FindMultiAsync(runtime.ServiceProvider, runtime.VariableStore, runtime.Logger, CancellationToken.None);
+        ArtifactFinderResultMulti results = await finder.FindMultiAsync(runtime.Context);
 
         Assert.Equal(2, results.ArtifactReferences.Length);
         Assert.Equal("PartitionKey ne ''", table.LastFilter);
@@ -2397,7 +2397,7 @@ public class AzureConfigurationTests
 
         ServiceBusCreateTempSubscriptionStep step = new("topic", "tmp-123", Var.Const("m1"), Var.Const("c1"), TimeSpan.FromMinutes(5));
 
-        await step.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await step.Execute(runtime.Context);
 
         Assert.Equal("orders-topic", administration.CreatedOptions!.TopicName);
         Assert.Equal("tmp-123", administration.CreatedOptions.SubscriptionName);
@@ -2425,7 +2425,7 @@ public class AzureConfigurationTests
 
         ServiceBusDeleteTempSubscriptionStep step = new("topic", "tmp-123");
 
-        await step.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await step.Execute(runtime.Context);
 
         Assert.Equal(("orders-topic", "tmp-123"), administration.DeletedSubscription);
     }
@@ -2455,7 +2455,7 @@ public class AzureConfigurationTests
             predicate: Var.Const<Func<ServiceBusReceivedMessage, bool>>(message => message.MessageId == "m1"),
             completeMessage: Var.Const(true));
 
-        var result = await step.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        var result = await step.DoEventPolling(runtime.Context);
 
         Assert.NotNull(result);
         Assert.Same(receivedMessage, result!.Message);
@@ -2490,8 +2490,8 @@ public class AzureConfigurationTests
         ServiceBusSendTrigger sendTrigger = AzureExt.Trigger.ServiceBus.Send("queue", Var.Const(sendMessage));
         ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q1"));
 
-        await sendTrigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
-        var result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await sendTrigger.Execute(runtime.Context);
+        var result = await receiveEvent.DoEventPolling(runtime.Context);
 
         Assert.Same(sendMessage, sender.MessageSent);
         Assert.NotNull(result);
@@ -2523,8 +2523,8 @@ public class AzureConfigurationTests
         ServiceBusSendTrigger sendTrigger = AzureExt.Trigger.ServiceBus.Send("queue", Var.Const(sendMessage));
         ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q2"));
 
-        await sendTrigger.Execute(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
-        var result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await sendTrigger.Execute(runtime.Context);
+        var result = await receiveEvent.DoEventPolling(runtime.Context);
 
         Assert.Same(sendMessage, sender.MessageSent);
         Assert.False(string.IsNullOrWhiteSpace(sendMessage.SessionId));
@@ -2601,7 +2601,7 @@ public class AzureConfigurationTests
 
         ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q1"));
 
-        await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await receiveEvent.DoEventPolling(runtime.Context);
 
         Assert.True(pump.LastRequest!.Value.CompleteMessage);
         Assert.True(pump.LastRequest.Value.AbandonNonMatching);
@@ -2626,7 +2626,7 @@ public class AzureConfigurationTests
 
         ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q1"), completeMessage: Var.Const(false));
 
-        await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await receiveEvent.DoEventPolling(runtime.Context);
 
         Assert.False(pump.LastRequest!.Value.CompleteMessage);
     }
@@ -2651,7 +2651,7 @@ public class AzureConfigurationTests
 
         ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic", correlationId: Var.Const("c1"), createTempSubscription: true);
 
-        await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        await receiveEvent.DoEventPolling(runtime.Context);
 
         Assert.False(pump.LastRequest!.Value.AbandonNonMatching);
     }
@@ -2678,7 +2678,7 @@ public class AzureConfigurationTests
 
         StepGeneric? preStep = ((IHasPreStep)receiveEvent).CreatePreStep(runtime.VariableStore);
         StepGeneric? cleanupStep = ((IHasCleanupStep)receiveEvent).CreateCleanupStep(runtime.VariableStore);
-        var result = await receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None);
+        var result = await receiveEvent.DoEventPolling(runtime.Context);
 
         Assert.IsType<ServiceBusCreateTempSubscriptionStep>(preStep);
         Assert.IsType<ServiceBusDeleteTempSubscriptionStep>(cleanupStep);
@@ -2707,7 +2707,7 @@ public class AzureConfigurationTests
         ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic", messageId: Var.Const("missing-sub"));
 
         FrameworkConfigurationException exception = await Assert.ThrowsAsync<FrameworkConfigurationException>(() =>
-            receiveEvent.DoEventPolling(runtime.ServiceProvider, runtime.VariableStore, runtime.ArtifactStore, runtime.Logger, CancellationToken.None));
+            receiveEvent.DoEventPolling(runtime.Context));
 
         Assert.Contains("createTempSubscription", exception.Message, StringComparison.Ordinal);
     }
@@ -2725,48 +2725,42 @@ public class AzureConfigurationTests
         Assert.Equal(value, identifier?.ToString());
     }
 
+    /// <summary>
+    /// What a test hands a step it drives directly.
+    /// </summary>
+    /// <remarks>
+    /// This used to build Core's logger and stores by reflection, because their constructors are internal
+    /// and a package cannot reach them. <c>RunContext.Detached</c> exists now, so the reflection is gone -
+    /// the hole it was working around was in Core's public surface, not in this suite.
+    /// </remarks>
     private sealed class RuntimeContext
     {
-        public IServiceProvider ServiceProvider { get; }
-        public ScopedLogger Logger { get; }
-        public VariableStore VariableStore { get; }
-        public ArtifactStore ArtifactStore { get; }
-
         private RuntimeContext(Action<IServiceCollection>? configureServices, IRunDebugger? debugger)
         {
             ServiceCollection services = new();
             configureServices?.Invoke(services);
-            ServiceProvider = services.BuildServiceProvider();
 
-            Type coreAssemblyType = typeof(VariableStore);
-            Type debuggingRunSessionType = coreAssemblyType.Assembly.GetType("TestFramework.Core.Debugger.DebuggingRunSession", throwOnError: true)!;
-            object activeDebugger = debugger ?? new NullRunDebugger();
-            object debuggingSession = debuggingRunSessionType
-                .GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
-                .Single()
-                // Every parameter spelled out: reflection does not apply a constructor's default
-                // values, so the caller-info arguments have to be supplied even though calling
-                // code never passes them.
-                .Invoke([activeDebugger, null, 0]);
-
-            Logger = (ScopedLogger)typeof(ScopedLogger)
-                .GetMethod("CreateWithDebuggerSession", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!
-                .Invoke(null, [debuggingSession])!;
-
-            VariableStore = (VariableStore)Activator.CreateInstance(
-                typeof(VariableStore),
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
-                binder: null,
-                args: new object?[] { Logger, debuggingSession },
-                culture: null)!;
-
-            ArtifactStore = (ArtifactStore)Activator.CreateInstance(
-                typeof(ArtifactStore),
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
-                binder: null,
-                args: new object?[] { Logger, debuggingSession },
-                culture: null)!;
+            Context = RunContext.Detached(services.BuildServiceProvider(), debugger);
         }
+
+        /// <summary>The context to pass to a step, with stores nothing else shares.</summary>
+        public RunContext Context { get; }
+
+        public IServiceProvider ServiceProvider => Context.Services;
+
+        public ScopedLogger Logger => Context.Logger;
+
+        public VariableStore VariableStore => Context.Variables;
+
+        public ArtifactStore ArtifactStore => Context.Artifacts;
+
+        /// <summary>
+        /// The same stores and services, with a token the test can cancel.
+        /// </summary>
+        /// <param name="cancellationToken">What stops the step.</param>
+        /// <returns>The context.</returns>
+        public RunContext ContextWith(CancellationToken cancellationToken)
+            => RunContext.Ambient(ServiceProvider, VariableStore, ArtifactStore, Logger, Context.Values, cancellationToken);
 
         public static RuntimeContext Create(Action<IServiceCollection>? configureServices = null, IRunDebugger? debugger = null) => new(configureServices, debugger);
     }
@@ -3335,7 +3329,7 @@ public class AzureConfigurationTests
 
         public override Step<LogicAppRunDetails> Clone() => new StaticLogicAppRunDetailsStep(result).WithClonedOptions(this);
 
-        public override Task<LogicAppRunDetails?> Execute(IServiceProvider serviceProvider, VariableStore variableStore, ArtifactStore artifactStore, ScopedLogger logger, CancellationToken cancellationToken)
+        public override Task<LogicAppRunDetails?> Execute(RunContext context)
             => Task.FromResult<LogicAppRunDetails?>(result);
 
         public override StepInstance<Step<LogicAppRunDetails>, LogicAppRunDetails> GetInstance() => new(this);
