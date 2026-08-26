@@ -123,7 +123,7 @@ public class ServiceBusProcessEvent(
     /// <returns>The matching Service Bus message, or <see langword="null"/> when none is found.</returns>
     public override async Task<ServiceBusReceivedMessageContext?> DoEventPolling(RunContext context)
     {
-        ServiceBusConfig config = context.Services.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
+        ServiceBusConfig config = TestFramework.Azure.ServiceBus.ServiceBusResources.Resolve(context, identifier);
         bool useTempSubscription = createTempSubscription?.GetValue(context.Variables) == true;
 
         ServiceBusConfigReceiveMode receiveMode = config.GetReceiveMode(useTempSubscription);

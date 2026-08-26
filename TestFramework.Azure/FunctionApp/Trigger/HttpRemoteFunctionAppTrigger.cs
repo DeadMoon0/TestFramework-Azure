@@ -39,7 +39,7 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         var _request = request.GetRequiredValue(context.Variables);
 
         FunctionAppTriggerConfig config = context.Services.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
-        FunctionAppConfig functionConfig = context.Services.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig(appIdentifier);
+        FunctionAppConfig functionConfig = TestFramework.Azure.FunctionApp.FunctionAppResources.Resolve(context, appIdentifier);
         RemoteConnection remoteConnection = new RemoteConnection(new Uri(functionConfig.BaseUrl));
         if (config.DoPing) await remoteConnection.EnsurePingAsync();
         Uri fullTriggerUri = BuildTriggerUri(remoteConnection.BasePath, functionConfig.RoutePrefix, _trigger.Path);

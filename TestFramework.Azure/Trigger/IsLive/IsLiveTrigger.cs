@@ -140,7 +140,7 @@ internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier,
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
         FunctionAppTriggerConfig triggerConfig = context.Services.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
-        FunctionAppConfig functionConfig = context.Services.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig(identifier);
+        FunctionAppConfig functionConfig = TestFramework.Azure.FunctionApp.FunctionAppResources.Resolve(context, identifier);
         RemoteConnection remoteConnection = new(new Uri(functionConfig.BaseUrl));
         if (currentAlivenessLevel == AlivenessLevel.Reachable)
         {
@@ -255,7 +255,7 @@ internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, V
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
-        ServiceBusConfig config = context.Services.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig(identifier);
+        ServiceBusConfig config = TestFramework.Azure.ServiceBus.ServiceBusResources.Resolve(context, identifier);
         IServiceBusAdministrationAdapter admin = context.Services.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
         if (currentAlivenessLevel == AlivenessLevel.Resource)
         {
@@ -282,7 +282,7 @@ internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifi
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
-        StorageAccountConfig config = context.Services.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(identifier);
+        StorageAccountConfig config = TestFramework.Azure.StorageAccount.StorageAccountResources.Resolve(context, identifier);
         IBlobContainerAdapter container = context.Services.GetAzureComponentFactory().Blob.CreateContainer(config);
         if (currentAlivenessLevel == AlivenessLevel.Resource)
         {
@@ -309,7 +309,7 @@ internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identif
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
-        StorageAccountConfig config = context.Services.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig(identifier);
+        StorageAccountConfig config = TestFramework.Azure.StorageAccount.StorageAccountResources.Resolve(context, identifier);
         ITableAdapter table = context.Services.GetAzureComponentFactory().Table.CreateTable(config, config.TableContainerNameRequired);
         if (currentAlivenessLevel == AlivenessLevel.Resource)
         {
@@ -336,7 +336,7 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
-        CosmosContainerDbConfig config = context.Services.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(identifier);
+        CosmosContainerDbConfig config = TestFramework.Azure.DB.CosmosDB.CosmosResources.Resolve(context, identifier);
         TimeSpan timeout = TimeOutOptions.TimeOut.GetValue(context.Variables);
         if (timeout <= TimeSpan.Zero)
         {

@@ -28,7 +28,7 @@ public class CosmosDbItemArtifactQueryFinder<TItem>(CosmosContainerIdentifier db
     /// </summary>
     public override async Task<ArtifactFinderResult?> FindAsync(RunContext context)
     {
-        CosmosContainerDbConfig config = context.Services.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(dbIdentifier);
+        CosmosContainerDbConfig config = TestFramework.Azure.DB.CosmosDB.CosmosResources.Resolve(context, dbIdentifier);
         ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(config);
 
         bool found = false;
@@ -50,7 +50,7 @@ public class CosmosDbItemArtifactQueryFinder<TItem>(CosmosContainerIdentifier db
     /// </summary>
     public override async Task<ArtifactFinderResultMulti> FindMultiAsync(RunContext context)
     {
-        CosmosContainerDbConfig config = context.Services.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig(dbIdentifier);
+        CosmosContainerDbConfig config = TestFramework.Azure.DB.CosmosDB.CosmosResources.Resolve(context, dbIdentifier);
         ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(config);
 
         ICosmosDbIdentifierResolver resolver = context.Services.GetService<ICosmosDbIdentifierResolver>() ?? new DefaultCosmosDbIdentifierResolver();
