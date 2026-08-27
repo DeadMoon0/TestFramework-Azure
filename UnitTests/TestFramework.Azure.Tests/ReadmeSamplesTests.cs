@@ -100,7 +100,7 @@ public class ReadmeSamplesTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.Accepted));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
+            services.Declare(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
             {
                 BaseUrl = "https://functions.test/",
                 Code = "function-key",
@@ -127,7 +127,7 @@ public class ReadmeSamplesTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
+            services.Declare(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
             {
                 BaseUrl = "https://functions.test/",
                 Code = "function-key",
@@ -152,7 +152,7 @@ public class ReadmeSamplesTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
+            services.Declare(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
             {
                 BaseUrl = "https://functions.test/",
                 Code = "function-key",
@@ -178,7 +178,7 @@ public class ReadmeSamplesTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
+            services.Declare(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
             {
                 BaseUrl = "https://functions.test/",
                 Code = "function-key",
@@ -257,7 +257,7 @@ public class ReadmeSamplesTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
             {
                 WorkflowName = "StatelessOrders",
                 Standard = new LogicAppStandardConfig
@@ -320,7 +320,7 @@ public class ReadmeSamplesTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.AddSingleton(ConfigStore<LogicAppConfig>.Create("ConsumptionOrders", new LogicAppConfig
+            services.Declare(ConfigStore<LogicAppConfig>.Create("ConsumptionOrders", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 HostingMode = LogicAppHostingMode.Consumption,

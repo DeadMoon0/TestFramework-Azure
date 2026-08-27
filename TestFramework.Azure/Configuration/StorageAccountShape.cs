@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using TestFramework.Core.Exceptions;
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Config.Configuration;
@@ -79,4 +81,53 @@ internal sealed class StorageAccountShape(IConfigProvider provider) : ConfigShap
 
         return values;
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The connection string carries the account and its key at once, which is why the kind declares it
+    /// secret: it has to travel for anything to connect, and a listing must never print it.
+    /// </remarks>
+    public override StorageAccountConfig Read(IReadOnlyDictionary<string, string> values, string identifier)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+        return new StorageAccountConfig
+        {
+            ConnectionString = Text(values, ValueNames.ConnectionString) ?? throw Missing(ValueNames.ConnectionString, identifier, values),
+            QueueContainerName = Text(values, AzureEnvironmentResourceKinds.QueueNameValue),
+            BlobContainerName = Text(values, AzureEnvironmentResourceKinds.BlobContainerNameValue),
+            TableContainerName = Text(values, AzureEnvironmentResourceKinds.TableContainerNameValue),
+        };
+    }
+
+    private static string? Text(IReadOnlyDictionary<string, string> values, string valueName)
+        => values.TryGetValue(valueName, out string? value) && value is { Length: > 0 } ? value : null;
+
+    private static bool Flag(IReadOnlyDictionary<string, string> values, string valueName, string identifier, bool fallback)
+    {
+        if (!values.TryGetValue(valueName, out string? value))
+        {
+            return fallback;
+        }
+
+        return bool.TryParse(value, out bool parsed)
+            ? parsed
+            : throw Unreadable(value, identifier, valueName, "'true' or 'false'");
+    }
+
+    private static FrameworkConfigurationException Unreadable(string value, string identifier, string valueName, string expected)
+        => new FrameworkConfigurationException(
+            $"The run holds '{value}' as {valueName} for '{identifier}', which cannot be read as {expected}.",
+            [
+                $"Correct the configuration entry, or the environment component that publishes it.",
+            ]);
+
+    private static FrameworkConfigurationException Missing(string valueName, string identifier, IReadOnlyDictionary<string, string> values)
+        => new FrameworkConfigurationException(
+            $"The run has no {valueName} for '{identifier}'.",
+            [
+                "Add it to the configuration entry, or include the definition that provisions the resource.",
+            ],
+            [.. values.Keys]);
 }

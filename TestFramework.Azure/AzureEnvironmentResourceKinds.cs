@@ -64,6 +64,31 @@ public static class AzureEnvironmentResourceKinds
     public const string TableContainerNameValue = "TableContainerName";
 
     /// <summary>
+    /// The value name a Function App resource publishes its function key under.
+    /// </summary>
+    public const string CodeValue = "Code";
+
+    /// <summary>
+    /// The value name a Function App resource publishes its admin key under.
+    /// </summary>
+    public const string AdminCodeValue = "AdminCode";
+
+    /// <summary>
+    /// The value name a Service Bus resource publishes its session requirement under.
+    /// </summary>
+    public const string RequiredSessionValue = "RequiredSession";
+
+    /// <summary>
+    /// The value name a Cosmos resource publishes its provisioned throughput under.
+    /// </summary>
+    public const string ProvisionedThroughputValue = "ProvisionedThroughput";
+
+    /// <summary>
+    /// The value name a Cosmos resource publishes its schema-creation tolerance under.
+    /// </summary>
+    public const string AllowSchemaCreationValue = "AllowSchemaCreation";
+
+    /// <summary>
     /// The value name a Function App publishes its route prefix under.
     /// </summary>
     public const string RoutePrefixValue = "RoutePrefix";
@@ -89,6 +114,8 @@ public static class AzureEnvironmentResourceKinds
         .Named(FunctionApp)
         .OffersPerVantage(ValueNames.BaseUrl)
         .Offers(RoutePrefixValue, optional: true)
+        .Offers(CodeValue, optional: true, secret: true)
+        .Offers(AdminCodeValue, optional: true, secret: true)
         .Build();
 
     /// <summary>
@@ -101,6 +128,11 @@ public static class AzureEnvironmentResourceKinds
     public static readonly ResourceKind LogicAppKind = ResourceKind
         .Named(LogicApp)
         .OffersPerVantage(ValueNames.BaseUrl, optional: true)
+        .Offers("HostingMode", optional: true)
+        .Offers("WorkflowName", optional: true)
+        .Offers("Standard:Code", optional: true, secret: true)
+        .Offers("Standard:AdminCode", optional: true, secret: true)
+        .Offers("Consumption:WorkflowResourceId", optional: true)
         .Build();
 
     /// <summary>
@@ -112,6 +144,7 @@ public static class AzureEnvironmentResourceKinds
         .Offers(QueueNameValue, optional: true)
         .Offers(TopicNameValue, optional: true)
         .Offers(SubscriptionNameValue, optional: true)
+        .Offers(RequiredSessionValue, optional: true)
         .Build();
 
     /// <summary>
@@ -133,6 +166,8 @@ public static class AzureEnvironmentResourceKinds
         .OffersPerVantage(ValueNames.ConnectionString)
         .Offers(DatabaseNameValue)
         .Offers(ContainerNameValue)
+        .Offers(ProvisionedThroughputValue, optional: true)
+        .Offers(AllowSchemaCreationValue, optional: true)
         .Build();
 
     /// <summary>

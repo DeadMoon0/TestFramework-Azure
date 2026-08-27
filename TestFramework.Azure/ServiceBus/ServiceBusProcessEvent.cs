@@ -123,7 +123,7 @@ public class ServiceBusProcessEvent(
     /// <returns>The matching Service Bus message, or <see langword="null"/> when none is found.</returns>
     public override async Task<ServiceBusReceivedMessageContext?> DoEventPolling(RunContext context)
     {
-        Resolved<ServiceBusConfig> serviceBus = AzureResources.ServiceBus(context, identifier);
+        Resolved<ServiceBusConfig> serviceBus = AzureResources.For<ServiceBusConfig>(context, identifier);
         ServiceBusConfig config = serviceBus.Value;
         bool useTempSubscription = createTempSubscription?.GetValue(context.Variables) == true;
 

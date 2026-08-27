@@ -56,7 +56,7 @@ public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableSto
     public override async Task Setup(RunContext context, TableStorageEntityArtifactData<T> data, TableStorageEntityArtifactReference<T> reference)
     {
         ITableAdapter tableClient = context.Services.GetAzureComponentFactory()
-            .Table.CreateTable(AzureResources.StorageAccount(context, reference.Identifier), reference.GetTableName(context.Variables));
+            .Table.CreateTable(AzureResources.For<StorageAccountConfig>(context, reference.Identifier), reference.GetTableName(context.Variables));
         await tableClient.CreateIfNotExistsAsync();
         await tableClient.UpsertEntityAsync(data.Entity);
 
@@ -69,7 +69,7 @@ public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableSto
     public override async Task Deconstruct(RunContext context, TableStorageEntityArtifactReference<T> reference)
     {
         ITableAdapter tableClient = context.Services.GetAzureComponentFactory()
-            .Table.CreateTable(AzureResources.StorageAccount(context, reference.Identifier), reference.GetTableName(context.Variables));
+            .Table.CreateTable(AzureResources.For<StorageAccountConfig>(context, reference.Identifier), reference.GetTableName(context.Variables));
         await tableClient.DeleteEntityAsync(reference.GetPartitionKey(context.Variables), reference.GetRowKey(context.Variables));
 
         context.Logger.LogInformation($"Table entity {reference.GetPartitionKey(context.Variables)}/{reference.GetRowKey(context.Variables)} deleted.");

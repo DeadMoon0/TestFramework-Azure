@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,18 +53,35 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public async Task AFunctionKeyIsNotAResourceValue()
+    public async Task AFunctionKeyTravelsAndIsNeverPrinted()
     {
-        // The line every kind here draws: a coordinate says where something is and travels with the resource;
-        // a credential says who you are and stays in the typed configuration the steps already read. Asking
-        // the graph for it fails rather than quietly answering.
-        await Assert.ThrowsAsync<Core.Exceptions.TimelineRunFailedException>(
-            () => Read(
-                AzureEnvironmentResourceKinds.FunctionApp,
-                "orders-fn",
-                "Code",
-                ("FunctionApp:orders-fn:BaseUrl", "http://localhost:7071/"),
-                ("FunctionApp:orders-fn:Code", "secret-key")));
+        // **This reverses a rule that used to be asserted here**, and the reversal is the point. A credential
+        // used to stay out of the graph and live in a typed configuration store the steps read instead - which
+        // worked only for as long as there was a store. There is not one now: a run's configuration is run
+        // data and travels on the run, so a key that could not travel would be a key nothing could reach.
+        //
+        // What replaced the rule is stronger than it was. The key travels, and the kind declares it secret, so
+        // the listing that failure messages and the frozen run are built from redacts it by construction
+        // rather than by whoever formats them remembering to.
+        (string Key, string Value)[] configured =
+        [
+            ("FunctionApp:orders-fn:BaseUrl", "http://localhost:7071/"),
+            ("FunctionApp:orders-fn:Code", "secret-key"),
+        ];
+
+        // Reachable, because something has to authenticate with it.
+        Assert.Equal(
+            "secret-key",
+            await Read(AzureEnvironmentResourceKinds.FunctionApp, "orders-fn", AzureEnvironmentResourceKinds.CodeValue, configured));
+
+        // And absent from every listing.
+        string listed = await Listing(configured);
+
+        Assert.DoesNotContain("secret-key", listed, StringComparison.Ordinal);
+        Assert.Contains("Code=(secret)", listed, StringComparison.Ordinal);
+
+        // Not a blanket: the address beside it is not a credential and stays readable.
+        Assert.Contains("http://localhost:7071/", listed, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -178,6 +196,22 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
 
     private Task<string?> Read(string kind, string identifier, string valueName, params (string Key, string Value)[] configured)
         => Read(kind, identifier, valueName, ResourceVantage.Host, configured);
+
+    /// <summary>
+    /// Everything a finished run says it knows, as a failure message or the frozen run would show it.
+    /// </summary>
+    private async Task<string> Listing(params (string Key, string Value)[] configured)
+    {
+        Timeline timeline = Timeline.Create()
+            .Trigger(new ReadsValueStep(AzureEnvironmentResourceKinds.FunctionApp, "orders-fn", ValueNames.BaseUrl, ResourceVantage.Host)).Name("reads")
+            .Build();
+
+        TimelineRun run = await timeline.SetupRun(Configured(configured), output).RunAsync();
+
+        run.EnsureRanToCompletion();
+
+        return string.Join(" | ", run.Values.Snapshot().Select(static value => $"{value.Key}={value.Value}"));
+    }
 
     private async Task<string?> Read(
         string kind,

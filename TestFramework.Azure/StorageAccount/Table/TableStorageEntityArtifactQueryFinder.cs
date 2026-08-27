@@ -32,7 +32,7 @@ public class TableStorageEntityArtifactQueryFinder<T>(StorageAccountIdentifier i
     public override async Task<ArtifactFinderResult?> FindAsync(RunContext context)
     {
         ITableAdapter tableClient = context.Services.GetAzureComponentFactory()
-            .Table.CreateTable(AzureResources.StorageAccount(context, identifier), tableName.GetRequiredValue(context.Variables));
+            .Table.CreateTable(AzureResources.For<StorageAccountConfig>(context, identifier), tableName.GetRequiredValue(context.Variables));
 
         await foreach (T entity in tableClient.QueryEntitiesAsync<T>(filter, context.Deadline.Token))
         {
@@ -48,7 +48,7 @@ public class TableStorageEntityArtifactQueryFinder<T>(StorageAccountIdentifier i
     public override async Task<ArtifactFinderResultMulti> FindMultiAsync(RunContext context)
     {
         ITableAdapter tableClient = context.Services.GetAzureComponentFactory()
-            .Table.CreateTable(AzureResources.StorageAccount(context, identifier), tableName.GetRequiredValue(context.Variables));
+            .Table.CreateTable(AzureResources.For<StorageAccountConfig>(context, identifier), tableName.GetRequiredValue(context.Variables));
 
         List<ArtifactFinderResult> data = [];
         await foreach (T entity in tableClient.QueryEntitiesAsync<T>(filter, context.Deadline.Token))

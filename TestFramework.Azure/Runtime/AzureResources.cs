@@ -1,48 +1,37 @@
-using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Core.Steps;
 
 namespace TestFramework.Azure.Runtime;
 
 /// <summary>
-/// The one door between "where is this resource" and "give me a client for it".
+/// The one door between "what is this resource configured as" and "give me a client for it".
 /// </summary>
 /// <remarks>
 /// <para>
-/// Each resource type already has a resolver that reads what was declared and overlays what the run
-/// produced. What was missing is that nothing obliged a caller to use it: a client factory took the
-/// configuration record, and a record straight from <c>ConfigStore&lt;T&gt;</c> is the same type. This class
-/// mints the <see cref="Resolved{TConfig}"/> the factories now demand, and it is the only thing that can -
-/// so every client in the package is built from coordinates the run stands behind.
+/// A client factory takes a <see cref="Resolved{TConfig}"/> and this class is the only thing that can make
+/// one, so every client in the package is built from configuration the run stands behind. Without it,
+/// handing a factory a record from anywhere else compiled and read like every neighbouring line - and for a
+/// containerised resource returned a placeholder, which failed minutes later as a connection error rather
+/// than as a message.
 /// </para>
 /// <para>
-/// It is deliberately not a second resolver. Each method delegates to the resolver that owns the type, which
-/// stays next to that type; this is the gate, not the logic.
+/// One method rather than one per resource type. There used to be five, each naming a kind and calling that
+/// resource's own resolver; both of those disappeared when a run learned to answer for its own configuration,
+/// because the shape that owns a record already knows the kind it belongs to. What is left is the minting -
+/// which is the only part that was ever this class's job.
 /// </para>
 /// </remarks>
 internal static class AzureResources
 {
-    /// <summary>Where a storage account is, for a blob or table client.</summary>
+    /// <summary>
+    /// The configuration of one resource, as this run knows it, in the form a client factory accepts.
+    /// </summary>
+    /// <typeparam name="TConfig">The configuration record.</typeparam>
     /// <param name="context">The run.</param>
-    /// <param name="identifier">Which account.</param>
-    /// <returns>The account's configuration, resolved.</returns>
-    internal static Resolved<StorageAccountConfig> StorageAccount(RunContext context, string identifier)
-        => Mint(TestFramework.Azure.StorageAccount.StorageAccountResources.Resolve(context, identifier));
-
-    /// <summary>Where a Cosmos container is.</summary>
-    /// <param name="context">The run.</param>
-    /// <param name="identifier">Which container.</param>
-    /// <returns>The container's configuration, resolved.</returns>
-    internal static Resolved<CosmosContainerDbConfig> Cosmos(RunContext context, string identifier)
-        => Mint(TestFramework.Azure.DB.CosmosDB.CosmosResources.Resolve(context, identifier));
-
-    /// <summary>Where a Service Bus namespace is.</summary>
-    /// <param name="context">The run.</param>
-    /// <param name="identifier">Which namespace entry.</param>
-    /// <returns>The namespace's configuration, resolved.</returns>
-    internal static Resolved<ServiceBusConfig> ServiceBus(RunContext context, string identifier)
-        => Mint(TestFramework.Azure.ServiceBus.ServiceBusResources.Resolve(context, identifier));
-
-    private static Resolved<TConfig> Mint<TConfig>(TConfig resolved) => new Minted<TConfig>(resolved);
+    /// <param name="identifier">Which resource.</param>
+    /// <returns>The record, resolved.</returns>
+    internal static Resolved<TConfig> For<TConfig>(RunContext context, string identifier)
+        where TConfig : class
+        => new Minted<TConfig>(context.Configured<TConfig>(identifier));
 
     /// <summary>
     /// The only subclass, and private, so this class is the only source of a resolved record.

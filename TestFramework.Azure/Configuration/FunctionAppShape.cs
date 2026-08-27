@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using TestFramework.Core.Exceptions;
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Config.Configuration;
@@ -21,9 +23,12 @@ namespace TestFramework.Azure.Configuration;
 /// one section is two sets of validation rules, and the second one written is the one that quietly accepts
 /// what the first refuses.
 /// </para>
-/// The route prefix travels with the address because it is part of reaching a function - a caller composing a
-/// URL needs both. The function key does not: it says who you are rather than where the app is, and the steps
-/// that need it read it from the typed configuration.
+/// <para>
+/// The whole entry travels, keys included. That reverses an earlier line here - a credential used to stay out
+/// of the graph and live in a typed configuration store instead - which held only while there was a store to
+/// live in. A key is declared secret on the kind now, so it reaches whatever authenticates and never reaches
+/// a listing.
+/// </para>
 /// </remarks>
 /// <param name="provider">Reads an entry, including whatever validation the caller configured.</param>
 internal sealed class FunctionAppShape(IConfigProvider provider) : ConfigShape<FunctionAppConfig>
@@ -63,11 +68,79 @@ internal sealed class FunctionAppShape(IConfigProvider provider) : ConfigShape<F
             values[new ValueKey(ValueNames.BaseUrl, ResourceVantage.Network)] = baseUrl;
         }
 
-        if (config.RoutePrefix is { Length: > 0 } routePrefix)
+        // Always, empty included. An empty route prefix is a stated choice - it means "call the site root" -
+        // and skipping it because it is empty would make the reader fall back to the default "api", which is
+        // the opposite of what was asked for. "Absent" and "empty" are different answers for a non-nullable
+        // property with a default, and only the one that was never written down may take the default.
+        values[new ValueKey(AzureEnvironmentResourceKinds.RoutePrefixValue)] = config.RoutePrefix ?? string.Empty;
+
+        if (config.Code is { Length: > 0 } code)
         {
-            values[new ValueKey(AzureEnvironmentResourceKinds.RoutePrefixValue)] = routePrefix;
+            values[new ValueKey(AzureEnvironmentResourceKinds.CodeValue)] = code;
+        }
+
+        if (config.AdminCode is { Length: > 0 } adminCode)
+        {
+            values[new ValueKey(AzureEnvironmentResourceKinds.AdminCodeValue)] = adminCode;
         }
 
         return values;
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The keys travel and are declared secret on the kind. A function key is a credential that is not also
+    /// an address - unlike a connection string - so redacting it in a listing costs a reader nothing, and it
+    /// is the reason this entry could not be rebuilt from coordinates alone before secrets could travel.
+    /// </remarks>
+    public override FunctionAppConfig Read(IReadOnlyDictionary<string, string> values, string identifier)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+        FunctionAppConfig config = new FunctionAppConfig
+        {
+            BaseUrl = Text(values, ValueNames.BaseUrl) ?? throw Missing(ValueNames.BaseUrl, identifier, values),
+            Code = Text(values, AzureEnvironmentResourceKinds.CodeValue) ?? throw Missing(AzureEnvironmentResourceKinds.CodeValue, identifier, values),
+            AdminCode = Text(values, AzureEnvironmentResourceKinds.AdminCodeValue),
+        };
+
+        // Presence, not emptiness - see the note in Values.
+        if (values.TryGetValue(AzureEnvironmentResourceKinds.RoutePrefixValue, out string? routePrefix))
+        {
+            config = config with { RoutePrefix = routePrefix };
+        }
+
+        return config;
+    }
+
+    private static string? Text(IReadOnlyDictionary<string, string> values, string valueName)
+        => values.TryGetValue(valueName, out string? value) && value is { Length: > 0 } ? value : null;
+
+    private static bool Flag(IReadOnlyDictionary<string, string> values, string valueName, string identifier, bool fallback)
+    {
+        if (!values.TryGetValue(valueName, out string? value))
+        {
+            return fallback;
+        }
+
+        return bool.TryParse(value, out bool parsed)
+            ? parsed
+            : throw Unreadable(value, identifier, valueName, "'true' or 'false'");
+    }
+
+    private static FrameworkConfigurationException Unreadable(string value, string identifier, string valueName, string expected)
+        => new FrameworkConfigurationException(
+            $"The run holds '{value}' as {valueName} for '{identifier}', which cannot be read as {expected}.",
+            [
+                $"Correct the configuration entry, or the environment component that publishes it.",
+            ]);
+
+    private static FrameworkConfigurationException Missing(string valueName, string identifier, IReadOnlyDictionary<string, string> values)
+        => new FrameworkConfigurationException(
+            $"The run has no {valueName} for '{identifier}'.",
+            [
+                "Add it to the configuration entry, or include the definition that provisions the resource.",
+            ],
+            [.. values.Keys]);
 }

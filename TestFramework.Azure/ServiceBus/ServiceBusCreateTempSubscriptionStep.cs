@@ -42,7 +42,7 @@ internal class ServiceBusCreateTempSubscriptionStep(
 
     public override async Task<EmptyStepResultContext?> Execute(RunContext context)
     {
-        Resolved<ServiceBusConfig> serviceBus = AzureResources.ServiceBus(context, identifier);
+        Resolved<ServiceBusConfig> serviceBus = AzureResources.For<ServiceBusConfig>(context, identifier);
         ServiceBusConfig config = serviceBus.Value;
 
         if (!config.IsTopic)

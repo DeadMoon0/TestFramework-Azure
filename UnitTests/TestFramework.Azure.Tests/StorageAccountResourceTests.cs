@@ -183,7 +183,7 @@ public class StorageAccountResourceTests(ITestOutputHelper output)
 
         public override Task<EmptyStepResultContext?> Execute(RunContext context)
         {
-            StorageAccountConfig resolved = StorageAccount.StorageAccountResources.Resolve(context, identifier);
+            StorageAccountConfig resolved = context.Configured<StorageAccountConfig>(identifier);
 
             context.Variables.SetVariable("connection", resolved.ConnectionString);
             context.Variables.SetVariable("container", resolved.BlobContainerName);

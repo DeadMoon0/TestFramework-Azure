@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using TestFramework.Core.Exceptions;
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Config.Configuration;
@@ -69,4 +71,47 @@ internal sealed class SqlDatabaseShape(IConfigProvider provider) : ConfigShape<S
 
         return values;
     }
+
+    /// <inheritdoc />
+    public override SqlDatabaseConfig Read(IReadOnlyDictionary<string, string> values, string identifier)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+        return new SqlDatabaseConfig
+        {
+            ConnectionString = Text(values, ValueNames.ConnectionString) ?? throw Missing(ValueNames.ConnectionString, identifier, values),
+            DatabaseName = Text(values, AzureEnvironmentResourceKinds.DatabaseNameValue) ?? throw Missing(AzureEnvironmentResourceKinds.DatabaseNameValue, identifier, values),
+        };
+    }
+
+    private static string? Text(IReadOnlyDictionary<string, string> values, string valueName)
+        => values.TryGetValue(valueName, out string? value) && value is { Length: > 0 } ? value : null;
+
+    private static bool Flag(IReadOnlyDictionary<string, string> values, string valueName, string identifier, bool fallback)
+    {
+        if (!values.TryGetValue(valueName, out string? value))
+        {
+            return fallback;
+        }
+
+        return bool.TryParse(value, out bool parsed)
+            ? parsed
+            : throw Unreadable(value, identifier, valueName, "'true' or 'false'");
+    }
+
+    private static FrameworkConfigurationException Unreadable(string value, string identifier, string valueName, string expected)
+        => new FrameworkConfigurationException(
+            $"The run holds '{value}' as {valueName} for '{identifier}', which cannot be read as {expected}.",
+            [
+                $"Correct the configuration entry, or the environment component that publishes it.",
+            ]);
+
+    private static FrameworkConfigurationException Missing(string valueName, string identifier, IReadOnlyDictionary<string, string> values)
+        => new FrameworkConfigurationException(
+            $"The run has no {valueName} for '{identifier}'.",
+            [
+                "Add it to the configuration entry, or include the definition that provisions the resource.",
+            ],
+            [.. values.Keys]);
 }

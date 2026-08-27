@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using TestFramework.Core.Exceptions;
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Config.Configuration;
@@ -78,6 +80,58 @@ internal sealed class ServiceBusShape(IConfigProvider provider) : ConfigShape<Se
             values[new ValueKey(AzureEnvironmentResourceKinds.SubscriptionNameValue)] = subscriptionName;
         }
 
+        values[new ValueKey(AzureEnvironmentResourceKinds.RequiredSessionValue)] = config.RequiredSession ? "true" : "false";
+
         return values;
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The session requirement travels because it shapes how a receiver is built rather than only how a
+    /// message is read - a reader that guessed it would build the wrong processor.
+    /// </remarks>
+    public override ServiceBusConfig Read(IReadOnlyDictionary<string, string> values, string identifier)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+        return new ServiceBusConfig
+        {
+            ConnectionString = Text(values, ValueNames.ConnectionString) ?? throw Missing(ValueNames.ConnectionString, identifier, values),
+            QueueName = Text(values, AzureEnvironmentResourceKinds.QueueNameValue),
+            TopicName = Text(values, AzureEnvironmentResourceKinds.TopicNameValue),
+            SubscriptionName = Text(values, AzureEnvironmentResourceKinds.SubscriptionNameValue),
+            RequiredSession = Flag(values, AzureEnvironmentResourceKinds.RequiredSessionValue, identifier, fallback: false),
+        };
+    }
+
+    private static string? Text(IReadOnlyDictionary<string, string> values, string valueName)
+        => values.TryGetValue(valueName, out string? value) && value is { Length: > 0 } ? value : null;
+
+    private static bool Flag(IReadOnlyDictionary<string, string> values, string valueName, string identifier, bool fallback)
+    {
+        if (!values.TryGetValue(valueName, out string? value))
+        {
+            return fallback;
+        }
+
+        return bool.TryParse(value, out bool parsed)
+            ? parsed
+            : throw Unreadable(value, identifier, valueName, "'true' or 'false'");
+    }
+
+    private static FrameworkConfigurationException Unreadable(string value, string identifier, string valueName, string expected)
+        => new FrameworkConfigurationException(
+            $"The run holds '{value}' as {valueName} for '{identifier}', which cannot be read as {expected}.",
+            [
+                $"Correct the configuration entry, or the environment component that publishes it.",
+            ]);
+
+    private static FrameworkConfigurationException Missing(string valueName, string identifier, IReadOnlyDictionary<string, string> values)
+        => new FrameworkConfigurationException(
+            $"The run has no {valueName} for '{identifier}'.",
+            [
+                "Add it to the configuration entry, or include the definition that provisions the resource.",
+            ],
+            [.. values.Keys]);
 }

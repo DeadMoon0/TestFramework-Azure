@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using TestFramework.Azure.Configuration.SpecificConfigs;
@@ -106,9 +106,9 @@ public class SqlDbContextRegistry
     /// Builds one context against the database this run is actually using.
     /// </summary>
     /// <remarks>
-    /// The connection comes from <see cref="SqlDatabaseResources"/>, which answers whether a person wrote the
-    /// address down or a container produced it while starting - so the same registration serves a deployed
-    /// database and a containerised one, and neither the caller nor this class learns which happened.
+    /// The connection comes from the run, which answers whether a person wrote the address down or a
+    /// container produced it while starting - so the same registration serves a deployed database and a
+    /// containerised one, and neither the caller nor this class learns which happened.
     /// </remarks>
     private static TContext Build<TContext>(
         RunContext run,
@@ -117,7 +117,7 @@ public class SqlDbContextRegistry
         Action<IServiceProvider, DbContextOptionsBuilder<TContext>>? configure)
         where TContext : DbContext
     {
-        SqlDatabaseConfig resolved = SqlDatabaseResources.Resolve(run, identifier);
+        SqlDatabaseConfig resolved = run.Configured<SqlDatabaseConfig>(identifier);
 
         DbContextOptionsBuilder<TContext> builder = new DbContextOptionsBuilder<TContext>();
         builder.UseSqlServer(resolved.ConnectionString);

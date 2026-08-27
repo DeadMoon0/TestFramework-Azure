@@ -71,7 +71,7 @@ public class TableStorageEntityArtifactReference<T>
     public override async Task<ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
         ITableAdapter tableClient = context.Services.GetAzureComponentFactory()
-            .Table.CreateTable(AzureResources.StorageAccount(context, Identifier), GetTableName(context.Variables));
+            .Table.CreateTable(AzureResources.For<StorageAccountConfig>(context, Identifier), GetTableName(context.Variables));
         TableReadResponse<T> response = await tableClient.GetEntityAsync<T>(GetPartitionKey(context.Variables), GetRowKey(context.Variables));
         if (response.Found)
         {

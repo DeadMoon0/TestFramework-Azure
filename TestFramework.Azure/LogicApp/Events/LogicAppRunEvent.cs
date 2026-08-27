@@ -92,7 +92,7 @@ public sealed class LogicAppRunEvent(
     /// <returns>The matching run details, or <see langword="null"/> while polling should continue.</returns>
     public override async Task<LogicAppExecutionResult?> DoEventPolling(RunContext context)
     {
-        LogicAppConfig config = context.Services.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
+        LogicAppConfig config = context.Configured<LogicAppConfig>(identifier);
         config.EnsureSupportsManagement("observe Logic App workflow runs");
         string resolvedWorkflowName = LogicAppRoutes.ResolveWorkflowName(config, workflowName?.GetValue(context.Variables));
         string resolvedRunId = runId.GetRequiredValue(context.Variables);

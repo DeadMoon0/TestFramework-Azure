@@ -42,8 +42,8 @@ internal sealed class LogicAppExecutionStep(
     {
         return request.TriggerMode switch
         {
-            LogicAppTriggerExecutionMode.HttpCallback => await ExecuteHttpAsync(context.Services, context.Variables, context.Deadline.Token),
-            LogicAppTriggerExecutionMode.ManagementRun => await LogicAppManagementTrigger.ExecuteAsync(context.Services, context.Variables, identifier, request.WorkflowName, request.TriggerName, context.Deadline.Token),
+            LogicAppTriggerExecutionMode.HttpCallback => await ExecuteHttpAsync(context, context.Deadline.Token),
+            LogicAppTriggerExecutionMode.ManagementRun => await LogicAppManagementTrigger.ExecuteAsync(context, identifier, request.WorkflowName, request.TriggerName, context.Deadline.Token),
             _ => throw new TestFramework.Core.Exceptions.UnsupportedFrameworkValueException($"Unsupported Logic App trigger mode '{request.TriggerMode}'.")
         };
     }
@@ -63,14 +63,13 @@ internal sealed class LogicAppExecutionStep(
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
         => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.LogicApp, identifier)];
 
-    private async Task<LogicAppExecutionResult> ExecuteHttpAsync(IServiceProvider serviceProvider, VariableStore variableStore, CancellationToken cancellationToken)
+    private async Task<LogicAppExecutionResult> ExecuteHttpAsync(RunContext context, CancellationToken cancellationToken)
     {
         VariableReference<CommonHttpRequest> httpRequest = request.Request
             ?? throw new TestFramework.Core.Exceptions.FrameworkStateException("HTTP Logic App execution requires a request payload builder.");
 
         LogicAppHttpInvokeResponse invocation = await LogicAppHttpTriggerExecution.InvokeAsync(
-            serviceProvider,
-            variableStore,
+            context,
             identifier,
             request.WorkflowName,
             request.TriggerName,

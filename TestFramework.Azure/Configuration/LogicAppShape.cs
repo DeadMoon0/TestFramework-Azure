@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using TestFramework.Core.Exceptions;
 using Microsoft.Extensions.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.LogicApp;
@@ -68,6 +69,85 @@ internal sealed class LogicAppShape(IConfigProvider provider) : ConfigShape<Logi
             values[new ValueKey(ValueNames.BaseUrl, ResourceVantage.Network)] = resolved;
         }
 
+        // Flattened, because a value is a name and a string: the nested records are how an author writes two
+        // mutually exclusive hosting modes down, not two shapes a reader has to handle. Which mode an entry
+        // declared decides which of them held anything, and that answer is one value.
+        values[new ValueKey(nameof(LogicAppConfig.HostingMode))] = config.HostingMode.ToString();
+
+        Add(values, nameof(LogicAppConfig.WorkflowName), config.WorkflowName);
+        Add(values, StandardCode, config.Standard.Code);
+        Add(values, StandardAdminCode, config.Standard.AdminCode);
+        Add(values, ConsumptionResourceId, config.Consumption.WorkflowResourceId);
+
         return values;
     }
+
+    /// <summary>The value name the Standard host's function key travels under.</summary>
+    private const string StandardCode = "Standard:Code";
+
+    /// <summary>The value name the Standard host's admin key travels under.</summary>
+    private const string StandardAdminCode = "Standard:AdminCode";
+
+    /// <summary>The value name the Consumption workflow's resource id travels under.</summary>
+    private const string ConsumptionResourceId = "Consumption:WorkflowResourceId";
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// <para>
+    /// The one entry in the family whose record nests, and rebuilding it is where the nesting turns out to be
+    /// an authoring convenience rather than structure a reader needs. The address is already resolved to one
+    /// value by <see cref="Values"/> - whichever of the two homes the declared hosting mode chose - so this
+    /// puts it back into the half that mode reads from.
+    /// </para>
+    /// <para>
+    /// The keys keep their colon-separated names, which is what the configuration section calls them, so an
+    /// entry and its values read the same way round.
+    /// </para>
+    /// </remarks>
+    public override LogicAppConfig Read(IReadOnlyDictionary<string, string> values, string identifier)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+        LogicAppHostingMode hostingMode = LogicAppHostingMode.Standard;
+
+        if (values.TryGetValue(nameof(LogicAppConfig.HostingMode), out string? declaredMode))
+        {
+            hostingMode = Enum.TryParse(declaredMode, ignoreCase: true, out LogicAppHostingMode parsed)
+                ? parsed
+                : throw new FrameworkConfigurationException(
+                    $"The run holds '{declaredMode}' as {nameof(LogicAppConfig.HostingMode)} for Logic App '{identifier}', which is not a hosting mode.",
+                    [$"Use one of: {string.Join(", ", Enum.GetNames<LogicAppHostingMode>())}."]);
+        }
+
+        string? address = Text(values, ValueNames.BaseUrl);
+
+        return new LogicAppConfig
+        {
+            HostingMode = hostingMode,
+            WorkflowName = Text(values, nameof(LogicAppConfig.WorkflowName)),
+            Standard = new LogicAppStandardConfig
+            {
+                BaseUrl = hostingMode == LogicAppHostingMode.Consumption ? null : address,
+                Code = Text(values, StandardCode),
+                AdminCode = Text(values, StandardAdminCode),
+            },
+            Consumption = new LogicAppConsumptionConfig
+            {
+                InvokeUrl = hostingMode == LogicAppHostingMode.Consumption ? address : null,
+                WorkflowResourceId = Text(values, ConsumptionResourceId),
+            },
+        };
+    }
+
+    private static void Add(Dictionary<ValueKey, string> values, string valueName, string? value)
+    {
+        if (value is { Length: > 0 })
+        {
+            values[new ValueKey(valueName)] = value;
+        }
+    }
+
+    private static string? Text(IReadOnlyDictionary<string, string> values, string valueName)
+        => values.TryGetValue(valueName, out string? value) && value is { Length: > 0 } ? value : null;
 }

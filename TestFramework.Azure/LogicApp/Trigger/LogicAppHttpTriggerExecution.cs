@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Collections.ObjectModel;
@@ -14,15 +14,19 @@ using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
+using TestFramework.Core.Steps;
 using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.LogicApp.Trigger;
 
 internal static class LogicAppHttpTriggerExecution
 {
+    /// <remarks>
+    /// Takes the run rather than two pieces of one: a Logic App's configuration is read from the run now,
+    /// so a service provider could not answer for it, and the variable store was only ever the run's.
+    /// </remarks>
     internal static async Task<LogicAppHttpInvokeResponse> InvokeAsync(
-        IServiceProvider serviceProvider,
-        VariableStore variableStore,
+        RunContext context,
         LogicAppIdentifier identifier,
         VariableReference<string>? workflowName,
         VariableReference<string> triggerName,
@@ -30,7 +34,10 @@ internal static class LogicAppHttpTriggerExecution
         bool includeResponseBody,
         CancellationToken cancellationToken)
     {
-        LogicAppConfig config = serviceProvider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
+        VariableStore variableStore = context.Variables;
+        IServiceProvider serviceProvider = context.Services;
+
+        LogicAppConfig config = context.Configured<LogicAppConfig>(identifier);
         string resolvedWorkflowName = LogicAppRoutes.ResolveWorkflowName(config, workflowName?.GetValue(variableStore));
         string resolvedTriggerName = triggerName.GetRequiredValue(variableStore);
         config.EnsureSupportsDirectInvocation("invoke Logic App HTTP triggers");

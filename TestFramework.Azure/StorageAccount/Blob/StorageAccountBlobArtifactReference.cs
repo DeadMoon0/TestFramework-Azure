@@ -44,7 +44,7 @@ public class StorageAccountBlobArtifactReference(StorageAccountIdentifier identi
     public override async Task<ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
         IBlobContainerAdapter container = context.Services.GetAzureComponentFactory()
-            .Blob.CreateContainer(AzureResources.StorageAccount(context, Identifier));
+            .Blob.CreateContainer(AzureResources.For<StorageAccountConfig>(context, Identifier));
         BlobReadResponse blob = await container.ReadBlobAsync(GetPath(context.Variables));
         if (!blob.Found) return new ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference> { Found = false };
         return new ArtifactResolveResult<StorageAccountBlobArtifactDescriber, StorageAccountBlobArtifactData, StorageAccountBlobArtifactReference>

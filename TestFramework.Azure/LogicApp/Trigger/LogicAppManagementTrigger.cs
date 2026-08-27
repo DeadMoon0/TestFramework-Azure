@@ -12,15 +12,22 @@ using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
+using TestFramework.Core.Steps;
 using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.LogicApp.Trigger;
 
 internal static class LogicAppManagementTrigger
 {
-    internal static async Task<LogicAppExecutionResult> ExecuteAsync(IServiceProvider serviceProvider, VariableStore variableStore, LogicAppIdentifier identifier, VariableReference<string>? workflowName, VariableReference<string> triggerName, CancellationToken cancellationToken)
+    /// <remarks>
+    /// Takes the run rather than two pieces of one, for the same reason the HTTP path does.
+    /// </remarks>
+    internal static async Task<LogicAppExecutionResult> ExecuteAsync(RunContext context, LogicAppIdentifier identifier, VariableReference<string>? workflowName, VariableReference<string> triggerName, CancellationToken cancellationToken)
     {
-        LogicAppConfig config = serviceProvider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig(identifier);
+        VariableStore variableStore = context.Variables;
+        IServiceProvider serviceProvider = context.Services;
+
+        LogicAppConfig config = context.Configured<LogicAppConfig>(identifier);
         config.EnsureSupportsManagement("trigger Logic App workflows through management endpoints");
         string resolvedWorkflowName = LogicAppRoutes.ResolveWorkflowName(config, workflowName?.GetValue(variableStore));
         string resolvedTriggerName = triggerName.GetRequiredValue(variableStore);

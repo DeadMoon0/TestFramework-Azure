@@ -32,7 +32,7 @@ internal class ServiceBusDeleteTempSubscriptionStep(
 
     public override async Task<EmptyStepResultContext?> Execute(RunContext context)
     {
-        Resolved<ServiceBusConfig> serviceBus = AzureResources.ServiceBus(context, identifier);
+        Resolved<ServiceBusConfig> serviceBus = AzureResources.For<ServiceBusConfig>(context, identifier);
         ServiceBusConfig config = serviceBus.Value;
 
         IServiceBusAdministrationAdapter adminClient = context.Services.GetAzureComponentFactory().ServiceBus.CreateAdministration(serviceBus);

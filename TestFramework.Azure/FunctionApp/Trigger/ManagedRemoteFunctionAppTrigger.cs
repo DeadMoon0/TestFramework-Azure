@@ -40,7 +40,7 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
         var _trigger = trigger.GetRequiredValue(context.Variables);
 
         FunctionAppTriggerConfig config = context.Services.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
-        FunctionAppConfig functionConfig = TestFramework.Azure.FunctionApp.FunctionAppResources.Resolve(context, appIdentifier);
+        FunctionAppConfig functionConfig = context.Configured<FunctionAppConfig>(appIdentifier);
         RemoteConnection remoteConnection = new RemoteConnection(new Uri(functionConfig.BaseUrl));
         if (config.DoPing) await remoteConnection.EnsurePingAsync();
         Uri fullTriggerUri = new Uri(remoteConnection.BasePath, $"{AdminFunctionsUri}/{_trigger.Name}");
