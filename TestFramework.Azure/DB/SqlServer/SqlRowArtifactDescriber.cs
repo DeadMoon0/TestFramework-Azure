@@ -71,7 +71,7 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
     public override async Task Setup(RunContext context, SqlRowArtifactData<TRow> data, SqlRowArtifactReference<TRow> reference)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
-        DbContext dbContext = resolver.Resolve(reference.DbIdentifier);
+        DbContext dbContext = resolver.Resolve(context, reference.DbIdentifier);
         await resolver.EnsureReadyAsync(dbContext, reference.DbIdentifier, context.Logger);
 
         object[] keyValues = reference.GetTypedKeyValues(dbContext, context.Variables);
@@ -104,7 +104,7 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
     public override async Task Deconstruct(RunContext context, SqlRowArtifactReference<TRow> reference)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
-        DbContext dbContext = resolver.Resolve(reference.DbIdentifier);
+        DbContext dbContext = resolver.Resolve(context, reference.DbIdentifier);
         await resolver.EnsureReadyAsync(dbContext, reference.DbIdentifier, context.Logger);
 
         object[] keyValues = reference.GetTypedKeyValues(dbContext, context.Variables);

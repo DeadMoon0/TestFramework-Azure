@@ -139,7 +139,6 @@ public class DefaultConfigProvider : IConfigProvider
         {
             ConnectionString = configuration.GetSection(SqlDatabaseSelector).GetSection(identifier).GetSection(nameof(SqlDatabaseConfig.ConnectionString)).Value ?? throw new ConfigurationValidationException(nameof(SqlDatabaseConfig.ConnectionString)),
             DatabaseName = configuration.GetSection(SqlDatabaseSelector).GetSection(identifier).GetSection(nameof(SqlDatabaseConfig.DatabaseName)).Value ?? throw new ConfigurationValidationException(nameof(SqlDatabaseConfig.DatabaseName)),
-            ContextType = configuration.GetSection(SqlDatabaseSelector).GetSection(identifier).GetSection(nameof(SqlDatabaseConfig.ContextType)).Value,
         };
     }
 }

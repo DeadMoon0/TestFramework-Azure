@@ -63,8 +63,8 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
     /// </summary>
     public override async Task<ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
-        CosmosContainerDbConfig config = TestFramework.Azure.DB.CosmosDB.CosmosResources.Resolve(context, DbIdentifier);
-        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(config);
+        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory()
+            .Cosmos.CreateContainer(AzureResources.Cosmos(context, DbIdentifier));
 
         CosmosReadResponse itemResp = await container.ReadItemAsync(GetId(context.Variables), GetPartitionKey(context.Variables));
         if (!itemResp.Found)

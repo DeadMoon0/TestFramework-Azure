@@ -1,4 +1,4 @@
-using Azure.Messaging.ServiceBus;
+﻿using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -29,7 +29,7 @@ internal interface IAzureComponentFactory
 
 internal interface IBlobComponentFactory
 {
-    IBlobContainerAdapter CreateContainer(StorageAccountConfig config);
+    IBlobContainerAdapter CreateContainer(Resolved<StorageAccountConfig> account);
 }
 
 internal interface IBlobContainerAdapter
@@ -46,7 +46,7 @@ internal readonly record struct BlobReadResponse(bool Found, byte[]? Data, IRead
 
 internal interface ITableComponentFactory
 {
-    ITableAdapter CreateTable(StorageAccountConfig config, string tableName);
+    ITableAdapter CreateTable(Resolved<StorageAccountConfig> account, string tableName);
 }
 
 internal interface ITableAdapter
@@ -64,7 +64,7 @@ internal readonly record struct TableReadResponse<T>(bool Found, T? Entity) wher
 
 internal interface ICosmosComponentFactory
 {
-    ICosmosContainerAdapter CreateContainer(CosmosContainerDbConfig config);
+    ICosmosContainerAdapter CreateContainer(Resolved<CosmosContainerDbConfig> container);
 }
 
 internal interface ICosmosContainerAdapter
@@ -83,9 +83,9 @@ internal readonly record struct CosmosReadResponse(bool Found, Stream? Content);
 
 internal interface IServiceBusComponentFactory
 {
-    IServiceBusSenderAdapter CreateSender(ServiceBusConfig config);
-    IServiceBusMessagePump CreateMessagePump(ServiceBusConfig config, string? subscriptionName);
-    IServiceBusAdministrationAdapter CreateAdministration(ServiceBusConfig config);
+    IServiceBusSenderAdapter CreateSender(Resolved<ServiceBusConfig> serviceBus);
+    IServiceBusMessagePump CreateMessagePump(Resolved<ServiceBusConfig> serviceBus, string? subscriptionName);
+    IServiceBusAdministrationAdapter CreateAdministration(Resolved<ServiceBusConfig> serviceBus);
 }
 
 internal interface IServiceBusSenderAdapter : IAsyncDisposable
@@ -170,8 +170,10 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
     private sealed class DefaultCosmosComponentFactory(IServiceProvider serviceProvider, AzureClientCache clientCache) : ICosmosComponentFactory
     {
-        public ICosmosContainerAdapter CreateContainer(CosmosContainerDbConfig config)
+        public ICosmosContainerAdapter CreateContainer(Resolved<CosmosContainerDbConfig> container)
         {
+            CosmosContainerDbConfig config = container.Value;
+
             // Keyed by the whole config record: CosmosClient is a documented singleton, and the
             // options provider may return different options for different configurations.
             CosmosClient client = clientCache.GetOrAdd(config, () =>
@@ -186,8 +188,9 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
     private sealed class DefaultBlobComponentFactory(AzureClientCache clientCache) : IBlobComponentFactory
     {
-        public IBlobContainerAdapter CreateContainer(StorageAccountConfig config)
+        public IBlobContainerAdapter CreateContainer(Resolved<StorageAccountConfig> account)
         {
+            StorageAccountConfig config = account.Value;
             BlobServiceClient client = clientCache.GetOrAdd(config.ConnectionString, () => new BlobServiceClient(config.ConnectionString));
             BlobContainerClient container = client.GetBlobContainerClient(config.BlobContainerNameRequired);
             return new DefaultBlobContainerAdapter(client, container);
@@ -236,8 +239,9 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
     private sealed class DefaultTableComponentFactory(AzureClientCache clientCache) : ITableComponentFactory
     {
-        public ITableAdapter CreateTable(StorageAccountConfig config, string tableName)
+        public ITableAdapter CreateTable(Resolved<StorageAccountConfig> account, string tableName)
         {
+            StorageAccountConfig config = account.Value;
             TableServiceClient serviceClient = clientCache.GetOrAdd(config.ConnectionString, () => new TableServiceClient(config.ConnectionString));
             TableClient tableClient = serviceClient.GetTableClient(tableName);
             return new DefaultTableAdapter(serviceClient, tableClient);
@@ -369,18 +373,21 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         private ServiceBusClient GetClient(ServiceBusConfig config)
             => clientCache.GetOrAdd(config.ConnectionString, () => new ServiceBusClient(config.ConnectionString));
 
-        public IServiceBusSenderAdapter CreateSender(ServiceBusConfig config)
+        public IServiceBusSenderAdapter CreateSender(Resolved<ServiceBusConfig> serviceBus)
         {
+            ServiceBusConfig config = serviceBus.Value;
             return new DefaultServiceBusSenderAdapter(GetClient(config), config);
         }
 
-        public IServiceBusMessagePump CreateMessagePump(ServiceBusConfig config, string? subscriptionName)
+        public IServiceBusMessagePump CreateMessagePump(Resolved<ServiceBusConfig> serviceBus, string? subscriptionName)
         {
+            ServiceBusConfig config = serviceBus.Value;
             return new DefaultServiceBusMessagePump(GetClient(config), config, subscriptionName);
         }
 
-        public IServiceBusAdministrationAdapter CreateAdministration(ServiceBusConfig config)
+        public IServiceBusAdministrationAdapter CreateAdministration(Resolved<ServiceBusConfig> serviceBus)
         {
+            ServiceBusConfig config = serviceBus.Value;
             return new DefaultServiceBusAdministrationAdapter(
                 clientCache.GetOrAdd(config.ConnectionString, () => new ServiceBusAdministrationClient(config.ConnectionString)),
                 config);

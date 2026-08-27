@@ -1,32 +1,42 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using TestFramework.Azure.Identifier;
 using TestFramework.Core.Logging;
+using TestFramework.Core.Steps;
 
 namespace TestFramework.Azure.DB.SqlServer;
 
 /// <summary>
-/// Resolves EF Core <c>DbContext</c> instances for SQL-backed Azure artifacts and triggers.
+/// Builds EF Core <c>DbContext</c> instances for SQL-backed Azure artifacts and triggers.
 /// </summary>
 public interface ISqlDbContextResolver
 {
     /// <summary>
-    /// Resolves a DbContext for the given SQL database identifier.
-    /// Resolution order:
-    ///   1. Identifier-based registration (AddForIdentifier)
-    ///   2. ContextType in config (CLR type resolved from DI)
-    ///   3. Default registration (AddDefault)
-    /// Throws if no context can be resolved.
+    /// Builds a context for a SQL database identifier, against the database this run is using.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Two roads, in order: a registration for this identifier, then a default registration covering every
+    /// identifier. Neither is a lookup in a container - the registry constructs the context from options the
+    /// framework points at the run's database, which is why this takes the run.
+    /// </para>
+    /// <para>
+    /// There used to be a third road, a <c>ContextType</c> string in configuration resolved from DI. It is
+    /// gone: a context resolved from a container takes its connection string from wherever that registration
+    /// read it, which for a containerised database is a placeholder, and it was a third way of saying what
+    /// the two registrations already say.
+    /// </para>
+    /// </remarks>
+    /// <param name="context">The run.</param>
     /// <param name="identifier">The SQL database identifier requested by the DSL.</param>
-    /// <returns>The resolved <c>DbContext</c>.</returns>
-    DbContext Resolve(SqlDatabaseIdentifier identifier);
+    /// <returns>The context.</returns>
+    DbContext Resolve(RunContext context, SqlDatabaseIdentifier identifier);
 
     /// <summary>
     /// Validates (and optionally applies) migrations for the given context.
     /// Must be called before every database operation.
     /// </summary>
-    /// <param name="context">The resolved context instance.</param>
+    /// <param name="context">The context instance.</param>
     /// <param name="identifier">The SQL database identifier requested by the DSL.</param>
     /// <param name="logger">The logger used to report migration actions.</param>
     /// <returns>A task that completes when the context is ready for use.</returns>

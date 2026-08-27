@@ -57,15 +57,22 @@ public class ConfigStore<TConfig>
                 return config;
             }
 
+            // The known identifiers go in the exception's own list rather than into the sentence. Concatenating
+            // them made one long line that a reader has to parse; the structured form is what every other
+            // failure in the family uses, and it is what a debugger renders as a list.
             List<string> registered = new(_config.Keys);
             registered.Sort(StringComparer.Ordinal);
 
-            string known = registered.Count == 0
-                ? "none - no configuration of this type has been registered"
-                : string.Join(", ", registered.ConvertAll(entry => $"'{entry}'"));
-
+            // "Nothing of this type at all" stays in the sentence, because an empty Available list renders as
+            // nothing and a reader would not be able to tell it from a typo.
             throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
-                $"No {typeof(TConfig).Name} is registered under the identifier '{identifier}'. Registered identifiers: {known}.");
+                registered.Count == 0
+                    ? $"No {typeof(TConfig).Name} is registered under the identifier '{identifier}', and no configuration of this type has been registered at all."
+                    : $"No {typeof(TConfig).Name} is registered under the identifier '{identifier}'.",
+                [
+                    "Add the entry to your configuration, or declare a default for it on the component definition that provisions the resource.",
+                ],
+                registered);
         }
     }
 

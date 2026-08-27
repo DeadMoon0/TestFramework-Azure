@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 
@@ -67,8 +67,7 @@ public sealed class DefaultConfigExporter : IConfigExporter
             DefaultConfigProvider.SqlDatabaseSelector,
             identifier,
             (nameof(SqlDatabaseConfig.ConnectionString), config.ConnectionString),
-            (nameof(SqlDatabaseConfig.DatabaseName), config.DatabaseName),
-            (nameof(SqlDatabaseConfig.ContextType), config.ContextType));
+            (nameof(SqlDatabaseConfig.DatabaseName), config.DatabaseName));
 
     private static IReadOnlyDictionary<string, string> CreateSection(string selector, string identifier, params (string PropertyName, string? Value)[] values)
     {

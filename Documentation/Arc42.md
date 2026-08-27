@@ -1,4 +1,4 @@
-# TestFramework.Azure — arc42 Architecture Documentation
+﻿# TestFramework.Azure — arc42 Architecture Documentation
 
 > **Version:** 1.1
 > **Date:** April 2026
@@ -387,7 +387,7 @@ classDiagram
     class StorageAccountConfig { +string ConnectionString, BlobContainerName, TableContainerName }
     class CosmosContainerDbConfig { +string ConnectionString, DatabaseName, ContainerName }
     class ServiceBusConfig { +string ConnectionString, QueueName, TopicName, SubscriptionName, RequiredSession }
-    class SqlDatabaseConfig { +string ConnectionString, DatabaseName, ContextType }
+    class SqlDatabaseConfig { +string ConnectionString, DatabaseName }
     IConfigProvider <|.. DefaultConfigProvider
 ```
 
@@ -396,15 +396,14 @@ classDiagram
 ```mermaid
 graph TD
     REQ["SqlRowArtifactDescriber needs DbContext"] --> RES[SqlDbContextResolver]
-    RES --> T1{"1. Identifier has registered context?"}
-    T1 -->|Yes| CTX1[Registered context type]
-    T1 -->|No| T2{"2. Config has ContextType string?"}
-    T2 -->|Yes| CTX2["Activate via Assembly.GetType()"]
-    T2 -->|No| T3{"3. Default context registered?"}
-    T3 -->|Yes| CTX3[Default context]
-    T3 -->|No| ERR[InvalidOperationException]
+    RES --> COORD["SqlDatabaseResources.Resolve(run, identifier)"]
+    COORD --> OPTS["DbContextOptions pointed at the run's database"]
+    OPTS --> T1{"1. Registration for this identifier?"}
+    T1 -->|Yes| CTX1["caller's create(options)"]
+    T1 -->|No| T3{"2. Default registration?"}
+    T3 -->|Yes| CTX3["caller's create(options)"]
+    T3 -->|No| ERR[FrameworkConfigurationException naming what is registered]
     CTX1 --> MIG[SqlMigrationTracker]
-    CTX2 --> MIG
     CTX3 --> MIG
     MIG -->|First use for this DB| MIGRATE["MigrateAsync() or EnsureCreatedAsync()"]
     MIG -->|Already migrated| READY[Context ready for CRUD]

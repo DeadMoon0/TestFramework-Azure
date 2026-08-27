@@ -42,7 +42,8 @@ internal class ServiceBusCreateTempSubscriptionStep(
 
     public override async Task<EmptyStepResultContext?> Execute(RunContext context)
     {
-        ServiceBusConfig config = TestFramework.Azure.ServiceBus.ServiceBusResources.Resolve(context, identifier);
+        Resolved<ServiceBusConfig> serviceBus = AzureResources.ServiceBus(context, identifier);
+        ServiceBusConfig config = serviceBus.Value;
 
         if (!config.IsTopic)
             throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
@@ -72,7 +73,7 @@ internal class ServiceBusCreateTempSubscriptionStep(
             ruleOptions = new CreateRuleOptions("TempFilter", filter);
         }
 
-        IServiceBusAdministrationAdapter adminClient = context.Services.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
+        IServiceBusAdministrationAdapter adminClient = context.Services.GetAzureComponentFactory().ServiceBus.CreateAdministration(serviceBus);
 
         await adminClient.CreateSubscriptionAsync(subOptions, ruleOptions, context.Deadline.Token);
 

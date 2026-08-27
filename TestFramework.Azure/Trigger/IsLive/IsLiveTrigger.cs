@@ -255,8 +255,8 @@ internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, V
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
-        ServiceBusConfig config = TestFramework.Azure.ServiceBus.ServiceBusResources.Resolve(context, identifier);
-        IServiceBusAdministrationAdapter admin = context.Services.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
+        IServiceBusAdministrationAdapter admin = context.Services.GetAzureComponentFactory()
+            .ServiceBus.CreateAdministration(AzureResources.ServiceBus(context, identifier));
         if (currentAlivenessLevel == AlivenessLevel.Resource)
         {
             await admin.ValidateConnectionAsync(context.Deadline.Token);
@@ -282,8 +282,8 @@ internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifi
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
-        StorageAccountConfig config = TestFramework.Azure.StorageAccount.StorageAccountResources.Resolve(context, identifier);
-        IBlobContainerAdapter container = context.Services.GetAzureComponentFactory().Blob.CreateContainer(config);
+        IBlobContainerAdapter container = context.Services.GetAzureComponentFactory()
+            .Blob.CreateContainer(AzureResources.StorageAccount(context, identifier));
         if (currentAlivenessLevel == AlivenessLevel.Resource)
         {
             await container.ValidateConnectionAsync(context.Deadline.Token);
@@ -309,8 +309,9 @@ internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identif
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
-        StorageAccountConfig config = TestFramework.Azure.StorageAccount.StorageAccountResources.Resolve(context, identifier);
-        ITableAdapter table = context.Services.GetAzureComponentFactory().Table.CreateTable(config, config.TableContainerNameRequired);
+        Resolved<StorageAccountConfig> account = AzureResources.StorageAccount(context, identifier);
+        ITableAdapter table = context.Services.GetAzureComponentFactory()
+            .Table.CreateTable(account, account.Value.TableContainerNameRequired);
         if (currentAlivenessLevel == AlivenessLevel.Resource)
         {
             await table.ValidateConnectionAsync(context.Deadline.Token);
@@ -336,14 +337,14 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
-        CosmosContainerDbConfig config = TestFramework.Azure.DB.CosmosDB.CosmosResources.Resolve(context, identifier);
+        Resolved<CosmosContainerDbConfig> cosmos = AzureResources.Cosmos(context, identifier);
         TimeSpan timeout = TimeOutOptions.TimeOut.GetValue(context.Variables);
         if (timeout <= TimeSpan.Zero)
         {
             throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Cosmos IsLive timeout for '{identifier}' must be greater than zero.");
         }
 
-        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(config);
+        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(cosmos);
 
         return currentAlivenessLevel switch
         {
@@ -404,7 +405,7 @@ internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier,
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
-        DbContext dbContext = resolver.Resolve(identifier);
+        DbContext dbContext = resolver.Resolve(context, identifier);
         if (!await dbContext.Database.CanConnectAsync(context.Deadline.Token))
         {
             throw new TestFramework.Core.Exceptions.FrameworkStateException($"Could not connect to SQL database '{identifier}'.");

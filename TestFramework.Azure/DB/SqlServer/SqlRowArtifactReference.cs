@@ -87,7 +87,7 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
     public override async Task<ArtifactResolveResult<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
-        DbContext dbContext = resolver.Resolve(DbIdentifier);
+        DbContext dbContext = resolver.Resolve(context, DbIdentifier);
         await resolver.EnsureReadyAsync(dbContext, DbIdentifier, context.Logger);
 
         object[] keyValues = GetTypedKeyValues(dbContext, context.Variables);

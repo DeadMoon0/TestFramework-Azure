@@ -123,7 +123,8 @@ public class ServiceBusProcessEvent(
     /// <returns>The matching Service Bus message, or <see langword="null"/> when none is found.</returns>
     public override async Task<ServiceBusReceivedMessageContext?> DoEventPolling(RunContext context)
     {
-        ServiceBusConfig config = TestFramework.Azure.ServiceBus.ServiceBusResources.Resolve(context, identifier);
+        Resolved<ServiceBusConfig> serviceBus = AzureResources.ServiceBus(context, identifier);
+        ServiceBusConfig config = serviceBus.Value;
         bool useTempSubscription = createTempSubscription?.GetValue(context.Variables) == true;
 
         ServiceBusConfigReceiveMode receiveMode = config.GetReceiveMode(useTempSubscription);
@@ -139,7 +140,7 @@ public class ServiceBusProcessEvent(
         // construction. The shared modes see other runs' traffic and must release those locks.
         bool abandonNonMatching = receiveMode is ServiceBusConfigReceiveMode.Queue or ServiceBusConfigReceiveMode.TopicSubscription;
 
-        await using IServiceBusMessagePump pump = context.Services.GetAzureComponentFactory().ServiceBus.CreateMessagePump(config, subscriptionName);
+        await using IServiceBusMessagePump pump = context.Services.GetAzureComponentFactory().ServiceBus.CreateMessagePump(serviceBus, subscriptionName);
         ServiceBusReceivedMessage? message = await pump.ReceiveMessageAsync(
             new ServiceBusReceiveRequest(
                 messageId?.GetValue(context.Variables),

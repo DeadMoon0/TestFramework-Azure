@@ -55,8 +55,8 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
     /// </summary>
     public override async Task Deconstruct(RunContext context, CosmosDbItemArtifactReference<TItem> reference)
     {
-        CosmosContainerDbConfig config = TestFramework.Azure.DB.CosmosDB.CosmosResources.Resolve(context, reference.DbIdentifier);
-        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(config);
+        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory()
+            .Cosmos.CreateContainer(AzureResources.Cosmos(context, reference.DbIdentifier));
 
         await container.DeleteItemAsync<TItem>(reference.GetId(context.Variables), reference.GetPartitionKey(context.Variables));
 
@@ -68,8 +68,9 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
     /// </summary>
     public override async Task Setup(RunContext context, CosmosDbItemArtifactData<TItem> data, CosmosDbItemArtifactReference<TItem> reference)
     {
-        CosmosContainerDbConfig config = TestFramework.Azure.DB.CosmosDB.CosmosResources.Resolve(context, reference.DbIdentifier);
-        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(config);
+        Resolved<CosmosContainerDbConfig> cosmos = AzureResources.Cosmos(context, reference.DbIdentifier);
+        CosmosContainerDbConfig config = cosmos.Value;
+        ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(cosmos);
 
         ICosmosDbIdentifierResolver resolver = context.Services.GetService<ICosmosDbIdentifierResolver>() ?? new DefaultCosmosDbIdentifierResolver();
         reference.SetIdentifier(resolver.ResolveId(data.Item), resolver.ResolvePartitionKey(data.Item));

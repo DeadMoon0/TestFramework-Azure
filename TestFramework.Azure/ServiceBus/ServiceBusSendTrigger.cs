@@ -62,8 +62,9 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
     /// <returns>A task that completes when the message has been sent.</returns>
     public override async Task<ServiceBusSentMessageContext?> Execute(RunContext context)
     {
-        ServiceBusConfig config = TestFramework.Azure.ServiceBus.ServiceBusResources.Resolve(context, identifier);
-        await using IServiceBusSenderAdapter sender = context.Services.GetAzureComponentFactory().ServiceBus.CreateSender(config);
+        Resolved<ServiceBusConfig> serviceBus = AzureResources.ServiceBus(context, identifier);
+        ServiceBusConfig config = serviceBus.Value;
+        await using IServiceBusSenderAdapter sender = context.Services.GetAzureComponentFactory().ServiceBus.CreateSender(serviceBus);
 
         ServiceBusMessage _message = message.GetRequiredValue(context.Variables);
         if (config.RequiredSession && _message.SessionId is null)

@@ -1,4 +1,4 @@
-# TestFramework.Azure
+﻿# TestFramework.Azure
 
 ## Introduction
 
@@ -93,7 +93,7 @@ Supported record types:
 | `CosmosDb:{identifier}` | `CosmosContainerDbConfig` | `ConnectionString`, `DatabaseName`, `ContainerName` | None | Cosmos artifacts, query finders, and Cosmos liveness checks |
 | `ServiceBus:{identifier}` | `ServiceBusConfig` | `ConnectionString` plus either `QueueName` or `TopicName` | `SubscriptionName`, `RequiredSession` | Service Bus send triggers and message-received events |
 | `StorageAccount:{identifier}` | `StorageAccountConfig` | `ConnectionString` | `QueueContainerName`, `BlobContainerName`, `TableContainerName` | Blob artifacts, table artifacts, and storage liveness checks |
-| `SqlDatabase:{identifier}` | `SqlDatabaseConfig` | `ConnectionString`, `DatabaseName` | `ContextType` | SQL row artifacts, SQL query finders, and SQL liveness checks |
+| `SqlDatabase:{identifier}` | `SqlDatabaseConfig` | `ConnectionString`, `DatabaseName` | — | SQL row artifacts, SQL query finders, and SQL liveness checks |
 
 > **Breaking change:** `FunctionAppConfig.BaseUrl` is now strictly the site root and the `api/` prefix
 > comes from the new `RoutePrefix` property. If your `BaseUrl` currently ends in `/api/`, drop that
@@ -114,7 +114,14 @@ Configuration expectations:
 - `CosmosContainerDbConfig` is container-specific. One identifier points to one database/container pair.
 - `ServiceBusConfig` should define either queue mode or topic mode. Queue mode uses `QueueName`. Topic mode uses `TopicName`, and fixed-subscription receives also require `SubscriptionName`.
 - `StorageAccountConfig` only requires container names for the features you use. Blob and table liveness checks rely on `BlobContainerName` and `TableContainerName` respectively.
-- `SqlDatabaseConfig.ContextType` is an assembly-qualified `DbContext` type name. Leave it unset when you register the context through the SQL registry instead.
+- A `DbContext` is registered through the SQL registry and nowhere else. There is no `AddDbContext` beside it
+  and no `ContextType` in configuration: the options handed to your callback already point at the database this
+  run is using, whether you wrote its address down or a container published one while starting.
+
+  ```csharp
+  services.AddSqlArtifactContexts(reg => reg
+      .AddForIdentifier<AppDbContext>("MainSql", options => new AppDbContext(options)));
+  ```
 
 ## Logic App Support Matrix
 
@@ -185,8 +192,7 @@ Example JSON:
     "SqlDatabase": {
         "MainSql": {
             "ConnectionString": "Server=...;Database=AppDb;...",
-            "DatabaseName": "AppDb",
-            "ContextType": "MyProject.Data.AppDbContext, MyProject"
+            "DatabaseName": "AppDb"
         }
     }
 }

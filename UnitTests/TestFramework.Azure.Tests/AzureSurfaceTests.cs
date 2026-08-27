@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -144,24 +144,24 @@ public class AzureSurfaceTests
 
     private sealed class StubCosmosFactory : ICosmosComponentFactory
     {
-        public ICosmosContainerAdapter CreateContainer(Configuration.SpecificConfigs.CosmosContainerDbConfig config) => throw new NotSupportedException();
+        public ICosmosContainerAdapter CreateContainer(Resolved<Configuration.SpecificConfigs.CosmosContainerDbConfig> cosmos) => throw new NotSupportedException();
     }
 
     private sealed class StubBlobFactory : IBlobComponentFactory
     {
-        public IBlobContainerAdapter CreateContainer(Configuration.SpecificConfigs.StorageAccountConfig config) => throw new NotSupportedException();
+        public IBlobContainerAdapter CreateContainer(Resolved<Configuration.SpecificConfigs.StorageAccountConfig> account) => throw new NotSupportedException();
     }
 
     private sealed class StubTableFactory : ITableComponentFactory
     {
-        public ITableAdapter CreateTable(Configuration.SpecificConfigs.StorageAccountConfig config, string tableName) => throw new NotSupportedException();
+        public ITableAdapter CreateTable(Resolved<Configuration.SpecificConfigs.StorageAccountConfig> account, string tableName) => throw new NotSupportedException();
     }
 
     private sealed class StubServiceBusFactory : IServiceBusComponentFactory
     {
-        public IServiceBusSenderAdapter CreateSender(Configuration.SpecificConfigs.ServiceBusConfig config) => throw new NotSupportedException();
-        public IServiceBusMessagePump CreateMessagePump(Configuration.SpecificConfigs.ServiceBusConfig config, string? subscriptionName) => throw new NotSupportedException();
-        public IServiceBusAdministrationAdapter CreateAdministration(Configuration.SpecificConfigs.ServiceBusConfig config) => throw new NotSupportedException();
+        public IServiceBusSenderAdapter CreateSender(Resolved<Configuration.SpecificConfigs.ServiceBusConfig> serviceBus) => throw new NotSupportedException();
+        public IServiceBusMessagePump CreateMessagePump(Resolved<Configuration.SpecificConfigs.ServiceBusConfig> serviceBus, string? subscriptionName) => throw new NotSupportedException();
+        public IServiceBusAdministrationAdapter CreateAdministration(Resolved<Configuration.SpecificConfigs.ServiceBusConfig> serviceBus) => throw new NotSupportedException();
     }
 
     private sealed class StubHttpFactory : IHttpComponentFactory

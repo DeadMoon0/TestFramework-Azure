@@ -231,9 +231,6 @@ public class AzureConfigurationTests
         // pump must never dispose it. If it does, the second Service Bus step of a run gets an
         // ObjectDisposedException out of CreateSender/CreateProcessor.
         await using AzureClientCache clientCache = new();
-        ServiceCollection services = new();
-        await using ServiceProvider provider = services.BuildServiceProvider();
-        DefaultAzureComponentFactory factory = new(provider, clientCache);
 
         ServiceBusConfig config = new()
         {
@@ -244,18 +241,26 @@ public class AzureConfigurationTests
             RequiredSession = false,
         };
 
+        // Through the resolver, because that is now the only way to obtain what a factory takes - and it
+        // resolves to exactly this declaration, since nothing in a detached context published anything.
+        ServiceCollection services = new();
+        services.AddSingleton(ConfigStore<ServiceBusConfig>.Create("orders", config));
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        DefaultAzureComponentFactory factory = new(provider, clientCache);
+        Resolved<ServiceBusConfig> serviceBus = AzureResources.ServiceBus(RunContext.Detached(provider), "orders");
+
         Exception? failure = await Record.ExceptionAsync(async () =>
         {
-            IServiceBusSenderAdapter firstSender = factory.ServiceBus.CreateSender(config);
+            IServiceBusSenderAdapter firstSender = factory.ServiceBus.CreateSender(serviceBus);
             await firstSender.DisposeAsync();
 
-            IServiceBusSenderAdapter secondSender = factory.ServiceBus.CreateSender(config);
+            IServiceBusSenderAdapter secondSender = factory.ServiceBus.CreateSender(serviceBus);
             await secondSender.DisposeAsync();
 
-            IServiceBusMessagePump firstPump = factory.ServiceBus.CreateMessagePump(config, null);
+            IServiceBusMessagePump firstPump = factory.ServiceBus.CreateMessagePump(serviceBus, null);
             await firstPump.DisposeAsync();
 
-            IServiceBusMessagePump secondPump = factory.ServiceBus.CreateMessagePump(config, null);
+            IServiceBusMessagePump secondPump = factory.ServiceBus.CreateMessagePump(serviceBus, null);
             await secondPump.DisposeAsync();
         });
 
@@ -2549,7 +2554,12 @@ public class AzureConfigurationTests
 
         Assert.Contains("'Orders'", exception.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(FunctionAppConfig), exception.Message, StringComparison.Ordinal);
-        Assert.Contains("'billing', 'orders'", exception.Message, StringComparison.Ordinal);
+
+        // The registered identifiers moved out of the sentence and into the exception's Available list, which
+        // is where every other failure in the family puts them and what a reader sees as a list rather than
+        // as one long line.
+        Assert.Equal(["billing", "orders"], exception.AvailableOptions);
+        Assert.Contains("billing", exception.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -2859,7 +2869,7 @@ public class AzureConfigurationTests
 
     private sealed class FakeCosmosComponentFactory(FakeCosmosContainerAdapter container) : ICosmosComponentFactory
     {
-        public ICosmosContainerAdapter CreateContainer(CosmosContainerDbConfig config) => container;
+        public ICosmosContainerAdapter CreateContainer(Resolved<CosmosContainerDbConfig> cosmos) => container;
     }
 
     private sealed class FakeCosmosContainerAdapter : ICosmosContainerAdapter
@@ -2939,7 +2949,7 @@ public class AzureConfigurationTests
 
     private sealed class FakeBlobComponentFactory(FakeBlobContainerAdapter container) : IBlobComponentFactory
     {
-        public IBlobContainerAdapter CreateContainer(StorageAccountConfig config) => container;
+        public IBlobContainerAdapter CreateContainer(Resolved<StorageAccountConfig> account) => container;
     }
 
     private sealed class FakeBlobContainerAdapter : IBlobContainerAdapter
@@ -2995,7 +3005,7 @@ public class AzureConfigurationTests
 
     private sealed class FakeTableComponentFactory(FakeTableAdapter table) : ITableComponentFactory
     {
-        public ITableAdapter CreateTable(StorageAccountConfig config, string tableName)
+        public ITableAdapter CreateTable(Resolved<StorageAccountConfig> account, string tableName)
         {
             table.LastTableName = tableName;
             return table;
@@ -3075,15 +3085,15 @@ public class AzureConfigurationTests
 
         public FakeServiceBusSender Sender => _sender;
 
-        public IServiceBusSenderAdapter CreateSender(ServiceBusConfig config) => _sender;
+        public IServiceBusSenderAdapter CreateSender(Resolved<ServiceBusConfig> serviceBus) => _sender;
 
-        public IServiceBusMessagePump CreateMessagePump(ServiceBusConfig config, string? subscriptionName)
+        public IServiceBusMessagePump CreateMessagePump(Resolved<ServiceBusConfig> serviceBus, string? subscriptionName)
         {
             _pump.SubscriptionName = subscriptionName;
             return _pump;
         }
 
-        public IServiceBusAdministrationAdapter CreateAdministration(ServiceBusConfig config) => _admin;
+        public IServiceBusAdministrationAdapter CreateAdministration(Resolved<ServiceBusConfig> serviceBus) => _admin;
     }
 
     private sealed class FakeServiceBusSender : IServiceBusSenderAdapter
@@ -3364,6 +3374,6 @@ public class AzureConfigurationTests
         public string[] LoadAllServiceBusIdentifier(IConfiguration configuration) => new[] { "bus" };
         public ServiceBusConfig LoadServiceBusConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "Endpoint=sb://bus/", QueueName = "queue", TopicName = null, SubscriptionName = null, RequiredSession = false };
         public string[] LoadAllSqlDatabaseIdentifier(IConfiguration configuration) => new[] { "sql" };
-        public SqlDatabaseConfig LoadSqlDatabaseConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "Server=(localdb)\\MSSQLLocalDB;", DatabaseName = "main", ContextType = null };
+        public SqlDatabaseConfig LoadSqlDatabaseConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "Server=(localdb)\\MSSQLLocalDB;", DatabaseName = "main" };
     }
 }

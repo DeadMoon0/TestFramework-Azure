@@ -55,8 +55,8 @@ public class StorageAccountBlobArtifactDescriber : ArtifactDescriber<StorageAcco
     /// </summary>
     public override async Task Deconstruct(RunContext context, StorageAccountBlobArtifactReference reference)
     {
-        StorageAccountConfig config = StorageAccountResources.Resolve(context, reference.Identifier);
-        IBlobContainerAdapter container = context.Services.GetAzureComponentFactory().Blob.CreateContainer(config);
+        IBlobContainerAdapter container = context.Services.GetAzureComponentFactory()
+            .Blob.CreateContainer(AzureResources.StorageAccount(context, reference.Identifier));
         await container.DeleteBlobAsync(reference.GetPath(context.Variables));
 
         context.Logger.LogInformation($"Blob {reference.GetPath(context.Variables)} deleted.");
@@ -67,8 +67,8 @@ public class StorageAccountBlobArtifactDescriber : ArtifactDescriber<StorageAcco
     /// </summary>
     public override async Task Setup(RunContext context, StorageAccountBlobArtifactData data, StorageAccountBlobArtifactReference reference)
     {
-        StorageAccountConfig config = StorageAccountResources.Resolve(context, reference.Identifier);
-        IBlobContainerAdapter container = context.Services.GetAzureComponentFactory().Blob.CreateContainer(config);
+        IBlobContainerAdapter container = context.Services.GetAzureComponentFactory()
+            .Blob.CreateContainer(AzureResources.StorageAccount(context, reference.Identifier));
         await container.CreateIfNotExistsAsync();
         await container.UploadBlobAsync(reference.GetPath(context.Variables), data.Data, data.MetaData);
 

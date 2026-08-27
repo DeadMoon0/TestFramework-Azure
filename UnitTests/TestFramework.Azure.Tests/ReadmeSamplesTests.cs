@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -566,23 +566,23 @@ public class ReadmeSamplesTests
 
     private sealed class NotSupportedCosmosFactory : ICosmosComponentFactory
     {
-        public ICosmosContainerAdapter CreateContainer(CosmosContainerDbConfig config) => throw new NotSupportedException();
+        public ICosmosContainerAdapter CreateContainer(Resolved<CosmosContainerDbConfig> cosmos) => throw new NotSupportedException();
     }
 
     private sealed class NotSupportedBlobFactory : IBlobComponentFactory
     {
-        public IBlobContainerAdapter CreateContainer(StorageAccountConfig config) => throw new NotSupportedException();
+        public IBlobContainerAdapter CreateContainer(Resolved<StorageAccountConfig> account) => throw new NotSupportedException();
     }
 
     private sealed class NotSupportedTableFactory : ITableComponentFactory
     {
-        public ITableAdapter CreateTable(StorageAccountConfig config, string tableName) => throw new NotSupportedException();
+        public ITableAdapter CreateTable(Resolved<StorageAccountConfig> account, string tableName) => throw new NotSupportedException();
     }
 
     private sealed class NotSupportedServiceBusFactory : IServiceBusComponentFactory
     {
-        public IServiceBusSenderAdapter CreateSender(ServiceBusConfig config) => throw new NotSupportedException();
-        public IServiceBusMessagePump CreateMessagePump(ServiceBusConfig config, string? subscriptionName) => throw new NotSupportedException();
-        public IServiceBusAdministrationAdapter CreateAdministration(ServiceBusConfig config) => throw new NotSupportedException();
+        public IServiceBusSenderAdapter CreateSender(Resolved<ServiceBusConfig> serviceBus) => throw new NotSupportedException();
+        public IServiceBusMessagePump CreateMessagePump(Resolved<ServiceBusConfig> serviceBus, string? subscriptionName) => throw new NotSupportedException();
+        public IServiceBusAdministrationAdapter CreateAdministration(Resolved<ServiceBusConfig> serviceBus) => throw new NotSupportedException();
     }
 }

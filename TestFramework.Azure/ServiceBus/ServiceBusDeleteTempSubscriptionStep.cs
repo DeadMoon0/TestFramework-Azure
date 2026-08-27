@@ -32,9 +32,10 @@ internal class ServiceBusDeleteTempSubscriptionStep(
 
     public override async Task<EmptyStepResultContext?> Execute(RunContext context)
     {
-        ServiceBusConfig config = TestFramework.Azure.ServiceBus.ServiceBusResources.Resolve(context, identifier);
+        Resolved<ServiceBusConfig> serviceBus = AzureResources.ServiceBus(context, identifier);
+        ServiceBusConfig config = serviceBus.Value;
 
-        IServiceBusAdministrationAdapter adminClient = context.Services.GetAzureComponentFactory().ServiceBus.CreateAdministration(config);
+        IServiceBusAdministrationAdapter adminClient = context.Services.GetAzureComponentFactory().ServiceBus.CreateAdministration(serviceBus);
         try
         {
             string topicName = config.TopicName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("A topic name is required for deleting a temporary subscription.");
