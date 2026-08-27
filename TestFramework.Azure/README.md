@@ -59,15 +59,33 @@ Use it to:
 - register extra services
 - build the `IServiceProvider` that you pass into `SetupRun(...)`
 
-`ConfigStore<T>` is not a competing setup API. It is the Azure package's typed runtime registry for named records such as `Default`, `MainDb`, or `MainSql`.
-
 That means the usual shape stays:
 
 1. build the run provider with `ConfigInstance`
-2. let Azure config helpers populate the typed stores inside DI
-3. let Azure triggers, artifacts, or your own services resolve those stores by identifier at runtime
+2. let `LoadAzureConfig()` register the shapes that describe each section
+3. ask the run for a record when a step needs one: `context.Configured<CosmosContainerDbConfig>("MainDb")`
 
-If you see `ConfigStore<T>` in advanced samples, read it as a module-owned lookup service inside the provider, not as a second top-level configuration model you must choose instead of `ConfigInstance`.
+`Configured<T>` is the only way to read a configured resource, and it deliberately does not tell you where the
+answer came from. An entry someone wrote in a file and an address a container published while starting arrive
+the same way, so a timeline that runs against a deployed Cosmos and one that runs against the emulator are the
+same timeline.
+
+### If you are coming from `ConfigStore<T>`
+
+Earlier versions registered a typed `ConfigStore<T>` per record and had you resolve it from the service
+provider. That type is gone. It could only ever hold what someone had written down, so a step reading it got a
+placeholder for anything a container had to start before its address existed.
+
+```csharp
+// before
+var config = provider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig("MainDb");
+
+// now
+var config = context.Configured<CosmosContainerDbConfig>("MainDb");
+```
+
+`LoadAzureConfigs(...)` no longer takes an `IConfiguration` either, for the same reason: the run holds the
+configuration its shapes read.
 
 ## Output Binding Mental Model
 

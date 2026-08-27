@@ -124,7 +124,7 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
 
         ServiceCollection services = new ServiceCollection();
         services.AddSingleton(configuration);
-        services.LoadAzureConfigs(configuration);
+        services.LoadAzureConfigs();
         services.AddSqlArtifactContexts(registry => registry.AddForIdentifier<ProbeContext>(
             "orders",
             options => new ProbeContext(options),

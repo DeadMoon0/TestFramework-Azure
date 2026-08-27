@@ -119,7 +119,7 @@ public class StorageAccountResourceTests(ITestOutputHelper output)
 
         ServiceCollection services = new ServiceCollection();
         services.AddSingleton(configuration);
-        services.LoadAzureConfigs(configuration);
+        services.LoadAzureConfigs();
 
         return services.BuildServiceProvider();
     }

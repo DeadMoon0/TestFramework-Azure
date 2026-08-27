@@ -56,17 +56,6 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public void ConfigStore_AddConfig_LastWriteWins()
-    {
-        ConfigStore<string> store = new();
-
-        store.AddConfig("primary", "first");
-        store.AddConfig("primary", "second");
-
-        Assert.Equal("second", store.GetConfig("primary"));
-    }
-
-    [Fact]
     public void DefaultConfigProvider_LoadsIdentifiersAndTypedValues()
     {
         IConfiguration configuration = BuildConfiguration(new Dictionary<string, string?>
@@ -127,22 +116,36 @@ public class AzureConfigurationTests
         Assert.Contains("BaseUrl", exception.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Every section the loader reads reaches a run, and comes back as the package's own record.
+    /// </summary>
+    /// <remarks>
+    /// This used to resolve six typed stores and read them. The stores are gone - they were filled and never
+    /// read - so the case asks the only question that was ever behind it: having loaded, can a run answer for
+    /// each of these? That is the stronger assertion, because it goes down the whole road the framework uses
+    /// rather than stopping at the container.
+    /// </remarks>
     [Fact]
-    public void ConfigLoader_LoadAllConfigs_RegistersTypedStores()
+    public void ConfigLoader_LoadAllConfigs_LetsARunAnswerForEverySection()
     {
         ServiceCollection services = new();
         ConfigLoader loader = new(new StubConfigProvider());
 
-        loader.LoadAllConfigs(BuildConfiguration(new Dictionary<string, string?>()), services);
+        loader.RegisterShapes(services);
+
+        // The run's own configuration, which is the only one a shape reads.
+        services.AddSingleton(BuildConfiguration(new Dictionary<string, string?>()));
 
         using ServiceProvider provider = services.BuildServiceProvider();
-        Assert.Equal("https://logic.test", provider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig("logic-app").Standard.BaseUrl);
-        Assert.Equal("OrderProcessor", provider.GetRequiredService<ConfigStore<LogicAppConfig>>().GetConfig("logic-app").WorkflowName);
-        Assert.Equal("https://functions.test", provider.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig("func").BaseUrl);
-        Assert.Equal("db", provider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig("cosmos").DatabaseName);
-        Assert.Equal("queue", provider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig("bus").EntityName);
-        Assert.Equal("blob", provider.GetRequiredService<ConfigStore<StorageAccountConfig>>().GetConfig("storage").BlobContainerNameRequired);
-        Assert.Equal("main", provider.GetRequiredService<ConfigStore<SqlDatabaseConfig>>().GetConfig("sql").DatabaseName);
+        RunContext run = RunContext.Detached(provider);
+
+        Assert.Equal("https://logic.test", run.Configured<LogicAppConfig>("logic-app").Standard.BaseUrl);
+        Assert.Equal("OrderProcessor", run.Configured<LogicAppConfig>("logic-app").WorkflowName);
+        Assert.Equal("https://functions.test", run.Configured<FunctionAppConfig>("func").BaseUrl);
+        Assert.Equal("db", run.Configured<CosmosContainerDbConfig>("cosmos").DatabaseName);
+        Assert.Equal("queue", run.Configured<ServiceBusConfig>("bus").EntityName);
+        Assert.Equal("blob", run.Configured<StorageAccountConfig>("storage").BlobContainerNameRequired);
+        Assert.Equal("main", run.Configured<SqlDatabaseConfig>("sql").DatabaseName);
     }
 
     [Fact]
@@ -204,14 +207,14 @@ public class AzureConfigurationTests
         FakeServiceBusSender sender = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("bus", new ServiceBusConfig
+            services.Declare("bus", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
                 RequiredSession = true,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender) });
         });
 
@@ -244,7 +247,7 @@ public class AzureConfigurationTests
         // Through the resolver, because that is now the only way to obtain what a factory takes - and it
         // resolves to exactly this declaration, since nothing in a detached context published anything.
         ServiceCollection services = new();
-        services.Declare(ConfigStore<ServiceBusConfig>.Create("orders", config));
+        services.Declare("orders", config);
         await using ServiceProvider provider = services.BuildServiceProvider();
         DefaultAzureComponentFactory factory = new(provider, clientCache);
         Resolved<ServiceBusConfig> serviceBus = AzureResources.For<ServiceBusConfig>(RunContext.Detached(provider), "orders");
@@ -273,14 +276,14 @@ public class AzureConfigurationTests
         FakeServiceBusSender sender = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("bus", new ServiceBusConfig
+            services.Declare("bus", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
                 RequiredSession = false,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender) });
         });
 
@@ -306,14 +309,14 @@ public class AzureConfigurationTests
         FakeServiceBusSender sender = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("bus", new ServiceBusConfig
+            services.Declare("bus", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
                 RequiredSession = true,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender) });
         });
 
@@ -387,12 +390,12 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(response);
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -422,12 +425,12 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.Accepted));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -460,12 +463,12 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -496,12 +499,12 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -528,12 +531,12 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -564,12 +567,12 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -596,12 +599,12 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "http://localhost:7071/",
                 Code = "secret",
                 AdminCode = null,
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig
             {
                 DoPing = false,
@@ -642,7 +645,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -651,7 +654,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -693,7 +696,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -702,7 +705,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -738,7 +741,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -747,7 +750,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -787,7 +790,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -796,7 +799,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -826,7 +829,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 HostingMode = LogicAppHostingMode.Consumption,
@@ -834,7 +837,7 @@ public class AzureConfigurationTests
                 {
                     InvokeUrl = "https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -860,7 +863,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -869,7 +872,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new RouteAwareHttpComponentFactory(sender) });
         });
 
@@ -899,7 +902,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "NightlyJob",
                 HostingMode = LogicAppHostingMode.Consumption,
@@ -907,7 +910,7 @@ public class AzureConfigurationTests
                 {
                     WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/NightlyJob",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
             services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
         });
@@ -936,7 +939,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "NightlyJob",
                 Standard = new LogicAppStandardConfig
@@ -945,7 +948,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -993,7 +996,7 @@ public class AzureConfigurationTests
 
                 RuntimeContext runtime = RuntimeContext.Create(services =>
                 {
-                        services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+                        services.Declare("logic", new LogicAppConfig
                         {
                                 WorkflowName = "NightlyJob",
                         Standard = new LogicAppStandardConfig
@@ -1002,7 +1005,7 @@ public class AzureConfigurationTests
                             Code = "logic-code",
                             AdminCode = "logic-admin",
                         },
-                        }));
+                        });
                         services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
                 });
 
@@ -1033,7 +1036,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 HostingMode = LogicAppHostingMode.Consumption,
@@ -1041,7 +1044,7 @@ public class AzureConfigurationTests
                 {
                     InvokeUrl = "https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -1092,7 +1095,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 HostingMode = LogicAppHostingMode.Consumption,
@@ -1100,7 +1103,7 @@ public class AzureConfigurationTests
                 {
                     InvokeUrl = "https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -1153,7 +1156,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -1162,7 +1165,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -1239,7 +1242,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -1248,7 +1251,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -1273,7 +1276,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -1282,7 +1285,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -1309,7 +1312,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -1318,7 +1321,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -1356,7 +1359,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -1365,7 +1368,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -1409,7 +1412,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -1418,7 +1421,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -1438,7 +1441,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -1447,7 +1450,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new HangingHttpComponentFactory(sender) });
         });
 
@@ -1469,7 +1472,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "StatelessOrders",
                 Standard = new LogicAppStandardConfig
@@ -1478,7 +1481,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
             services.AddSingleton<ILogicAppWorkflowMetadataProvider>(new StubLogicAppWorkflowMetadataProvider(("logic", "StatelessOrders"), LogicAppWorkflowMode.Stateless));
         });
@@ -1504,7 +1507,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 HostingMode = LogicAppHostingMode.Consumption,
@@ -1512,7 +1515,7 @@ public class AzureConfigurationTests
                 {
                     WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
             services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
         });
@@ -1538,12 +1541,12 @@ public class AzureConfigurationTests
         RecordingRunDebugger debugger = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         }, debugger);
@@ -1568,12 +1571,12 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "function-key",
                 AdminCode = "master-key",
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -1591,12 +1594,12 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.Unauthorized));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "function-key",
                 AdminCode = null,
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -1620,12 +1623,12 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(response);
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -1656,12 +1659,12 @@ public class AzureConfigurationTests
         RecordingRunDebugger debugger = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "function-code",
                 AdminCode = "admin-code",
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         }, debugger);
@@ -1682,12 +1685,12 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(response);
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "function-code",
                 AdminCode = "admin-code",
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -1723,7 +1726,7 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(response);
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 Standard = new LogicAppStandardConfig
@@ -1732,7 +1735,7 @@ public class AzureConfigurationTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -1751,7 +1754,7 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(response);
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 HostingMode = LogicAppHostingMode.Consumption,
@@ -1759,7 +1762,7 @@ public class AzureConfigurationTests
                 {
                     WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
             services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
         });
@@ -1779,7 +1782,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 HostingMode = LogicAppHostingMode.Consumption,
@@ -1787,7 +1790,7 @@ public class AzureConfigurationTests
                 {
                     WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -1813,7 +1816,7 @@ public class AzureConfigurationTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 HostingMode = LogicAppHostingMode.Consumption,
@@ -1821,7 +1824,7 @@ public class AzureConfigurationTests
                 {
                     WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
             services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubLogicAppConsumptionManagementRequestAuthorizer("test-token"));
         });
@@ -1844,12 +1847,12 @@ public class AzureConfigurationTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.NotFound));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("func", new FunctionAppConfig
+            services.Declare("func", new FunctionAppConfig
             {
                 BaseUrl = "https://example.test/",
                 Code = "secret",
                 AdminCode = null,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -1877,14 +1880,14 @@ public class AzureConfigurationTests
         FakeServiceBusAdministrationAdapter administration = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("bus", new ServiceBusConfig
+            services.Declare("bus", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
                 RequiredSession = false,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
         });
 
@@ -1901,14 +1904,14 @@ public class AzureConfigurationTests
         FakeServiceBusAdministrationAdapter administration = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("bus", new ServiceBusConfig
+            services.Declare("bus", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
                 RequiredSession = false,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
         });
 
@@ -1926,13 +1929,13 @@ public class AzureConfigurationTests
         FakeBlobContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
+            services.Declare("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
                 QueueContainerName = null,
                 TableContainerName = "table",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
         });
 
@@ -1949,13 +1952,13 @@ public class AzureConfigurationTests
         FakeBlobContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
+            services.Declare("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
                 QueueContainerName = null,
                 TableContainerName = "table",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
         });
 
@@ -1973,13 +1976,13 @@ public class AzureConfigurationTests
         FakeTableAdapter table = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
+            services.Declare("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
                 QueueContainerName = null,
                 TableContainerName = "table",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
 
@@ -1997,13 +2000,13 @@ public class AzureConfigurationTests
         FakeTableAdapter table = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
+            services.Declare("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
                 QueueContainerName = null,
                 TableContainerName = "table",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
 
@@ -2022,12 +2025,12 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
@@ -2044,12 +2047,12 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
@@ -2069,12 +2072,12 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
@@ -2094,12 +2097,12 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://localhost:8081/;AccountKey=emulator;",
                 DatabaseName = "db",
                 ContainerName = "items",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
@@ -2120,12 +2123,12 @@ public class AzureConfigurationTests
         };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://localhost:8081/;AccountKey=emulator;",
                 DatabaseName = "db",
                 ContainerName = "items",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
@@ -2144,12 +2147,12 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
@@ -2178,12 +2181,12 @@ public class AzureConfigurationTests
         };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
@@ -2206,12 +2209,12 @@ public class AzureConfigurationTests
         container.QueryItems.Add(new TestItem("2", "p2", "Grace"));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<CosmosContainerDbConfig>.Create("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosContainerDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
                 ContainerName = "items",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
@@ -2243,13 +2246,13 @@ public class AzureConfigurationTests
         FakeBlobContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
+            services.Declare("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
                 QueueContainerName = "queue",
                 TableContainerName = "table",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
         });
 
@@ -2276,13 +2279,13 @@ public class AzureConfigurationTests
         };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
+            services.Declare("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
                 QueueContainerName = "queue",
                 TableContainerName = "table",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
         });
 
@@ -2303,13 +2306,13 @@ public class AzureConfigurationTests
         FakeTableAdapter table = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
+            services.Declare("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
                 QueueContainerName = "queue",
                 TableContainerName = "table",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
 
@@ -2336,13 +2339,13 @@ public class AzureConfigurationTests
         };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
+            services.Declare("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
                 QueueContainerName = "queue",
                 TableContainerName = "table",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
 
@@ -2364,13 +2367,13 @@ public class AzureConfigurationTests
         table.QueryResults.Add(new TestTableEntity { PartitionKey = "p2", RowKey = "r2", Name = "Grace" });
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<StorageAccountConfig>.Create("storage", new StorageAccountConfig
+            services.Declare("storage", new StorageAccountConfig
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
                 QueueContainerName = "queue",
                 TableContainerName = "table",
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
 
@@ -2389,14 +2392,14 @@ public class AzureConfigurationTests
         FakeServiceBusAdministrationAdapter administration = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
+            services.Declare("topic", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = "default-sub",
                 RequiredSession = true,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
         });
 
@@ -2417,14 +2420,14 @@ public class AzureConfigurationTests
         FakeServiceBusAdministrationAdapter administration = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
+            services.Declare("topic", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = "default-sub",
                 RequiredSession = false,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
         });
 
@@ -2442,14 +2445,14 @@ public class AzureConfigurationTests
         FakeServiceBusMessagePump pump = new() { MessageToReturn = receivedMessage };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
+            services.Declare("topic", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = "default-sub",
                 RequiredSession = false,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
@@ -2480,14 +2483,14 @@ public class AzureConfigurationTests
         FakeServiceBusComponentFactory serviceBusFactory = new(sender: sender, pump: pump);
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("queue", new ServiceBusConfig
+            services.Declare("queue", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders-queue",
                 TopicName = null,
                 SubscriptionName = null,
                 RequiredSession = false,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = serviceBusFactory });
         });
 
@@ -2513,14 +2516,14 @@ public class AzureConfigurationTests
         FakeServiceBusSender sender = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("queue", new ServiceBusConfig
+            services.Declare("queue", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders-session-queue",
                 TopicName = null,
                 SubscriptionName = null,
                 RequiredSession = true,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender, pump: pump) });
         });
 
@@ -2539,38 +2542,47 @@ public class AzureConfigurationTests
         Assert.Equal("q2", pump.LastRequest!.Value.MessageId);
     }
 
+    /// <summary>
+    /// A mistyped identifier names what the run does have.
+    /// </summary>
+    /// <remarks>
+    /// The store owned this refusal and the one reader owns it now, so the case moved rather than being
+    /// deleted with the type. What it pins is unchanged: the identifiers belong in the exception's Available
+    /// list rather than concatenated into the sentence, because that is what renders as a list.
+    /// </remarks>
     [Fact]
-    public void ConfigStore_NamesTheTypoAndTheRegisteredIdentifiers()
+    public void AMistypedIdentifierNamesWhatTheRunHas()
     {
-        ConfigStore<FunctionAppConfig> store = ConfigStore<FunctionAppConfig>.Create("orders", new FunctionAppConfig
+        RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            BaseUrl = "https://example.test/",
-            Code = "secret",
+            services.Declare("orders", new FunctionAppConfig { BaseUrl = "https://example.test/", Code = "secret" });
+            services.Declare("billing", new FunctionAppConfig { BaseUrl = "https://example.test/", Code = "secret" });
         });
-        store.AddConfig("billing", new FunctionAppConfig { BaseUrl = "https://example.test/", Code = "secret" });
 
         TestFramework.Core.Exceptions.FrameworkConfigurationException exception =
-            Assert.Throws<TestFramework.Core.Exceptions.FrameworkConfigurationException>(() => store.GetConfig("Orders"));
+            Assert.Throws<TestFramework.Core.Exceptions.FrameworkConfigurationException>(
+                () => runtime.Context.Configured<FunctionAppConfig>("Orders"));
 
         Assert.Contains("'Orders'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains(nameof(FunctionAppConfig), exception.Message, StringComparison.Ordinal);
-
-        // The registered identifiers moved out of the sentence and into the exception's Available list, which
-        // is where every other failure in the family puts them and what a reader sees as a list rather than
-        // as one long line.
         Assert.Equal(["billing", "orders"], exception.AvailableOptions);
         Assert.Contains("billing", exception.ToString(), StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A run that was told how to read a record but given none says so.
+    /// </summary>
     [Fact]
-    public void ConfigStore_SaysSoWhenNothingIsRegistered()
+    public void ARunWithNothingConfiguredSaysSo()
     {
-        ConfigStore<FunctionAppConfig> store = new();
+        RuntimeContext runtime = RuntimeContext.Create(
+            services => services.AddSingleton(AzureConfigShapes.For<FunctionAppConfig>()));
 
         TestFramework.Core.Exceptions.FrameworkConfigurationException exception =
-            Assert.Throws<TestFramework.Core.Exceptions.FrameworkConfigurationException>(() => store.GetConfig("orders"));
+            Assert.Throws<TestFramework.Core.Exceptions.FrameworkConfigurationException>(
+                () => runtime.Context.Configured<FunctionAppConfig>("orders"));
 
-        Assert.Contains("no configuration of this type has been registered", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Nothing in this run supplies", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(exception.AvailableOptions);
     }
 
     [Fact]
@@ -2598,14 +2610,14 @@ public class AzureConfigurationTests
         FakeServiceBusMessagePump pump = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("queue", new ServiceBusConfig
+            services.Declare("queue", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders-queue",
                 TopicName = null,
                 SubscriptionName = null,
                 RequiredSession = false,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
@@ -2623,14 +2635,14 @@ public class AzureConfigurationTests
         FakeServiceBusMessagePump pump = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("queue", new ServiceBusConfig
+            services.Declare("queue", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = "orders-queue",
                 TopicName = null,
                 SubscriptionName = null,
                 RequiredSession = false,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
@@ -2648,14 +2660,14 @@ public class AzureConfigurationTests
         FakeServiceBusMessagePump pump = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
+            services.Declare("topic", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = null,
                 RequiredSession = false,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
@@ -2673,14 +2685,14 @@ public class AzureConfigurationTests
         FakeServiceBusMessagePump pump = new() { MessageToReturn = receivedMessage };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
+            services.Declare("topic", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = null,
                 RequiredSession = false,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
@@ -2703,14 +2715,14 @@ public class AzureConfigurationTests
     {
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<ServiceBusConfig>.Create("topic", new ServiceBusConfig
+            services.Declare("topic", new ServiceBusConfig
             {
                 ConnectionString = "Endpoint=sb://orders/",
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = null,
                 RequiredSession = false,
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory());
         });
 

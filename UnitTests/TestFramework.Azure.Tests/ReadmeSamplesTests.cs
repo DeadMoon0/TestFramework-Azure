@@ -45,7 +45,7 @@ public sealed class HttpTriggerAttribute(AuthorizationLevel authLevel, params st
 public class ReadmeSamplesTests
 {
     [Fact]
-    public void MinimalSetup_LoadAzureConfig_RegistersNamedAzureConfigStores()
+    public void MinimalSetup_LoadAzureConfig_LetsARunAnswerForEachSection()
     {
         string tempFile = Path.Combine(Path.GetTempPath(), $"azure-readme-{Guid.NewGuid():N}.json");
 
@@ -80,10 +80,11 @@ public class ReadmeSamplesTests
                 .Build();
 
             using ServiceProvider provider = (ServiceProvider)config.BuildServiceProvider();
+            RunContext run = RunContext.Detached(provider);
 
-            Assert.Equal("https://functions.test/", provider.GetRequiredService<ConfigStore<FunctionAppConfig>>().GetConfig("Default").BaseUrl);
-            Assert.Equal("Orders", provider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig("MainDb").ContainerName);
-            Assert.Equal("orders", provider.GetRequiredService<ConfigStore<ServiceBusConfig>>().GetConfig("MainSBQueue").EntityName);
+            Assert.Equal("https://functions.test/", run.Configured<FunctionAppConfig>("Default").BaseUrl);
+            Assert.Equal("Orders", run.Configured<CosmosContainerDbConfig>("MainDb").ContainerName);
+            Assert.Equal("orders", run.Configured<ServiceBusConfig>("MainSBQueue").EntityName);
         }
         finally
         {
@@ -100,11 +101,11 @@ public class ReadmeSamplesTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.Accepted));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
+            services.Declare("Default", new FunctionAppConfig
             {
                 BaseUrl = "https://functions.test/",
                 Code = "function-key",
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -127,11 +128,11 @@ public class ReadmeSamplesTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
+            services.Declare("Default", new FunctionAppConfig
             {
                 BaseUrl = "https://functions.test/",
                 Code = "function-key",
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -152,12 +153,12 @@ public class ReadmeSamplesTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
+            services.Declare("Default", new FunctionAppConfig
             {
                 BaseUrl = "https://functions.test/",
                 Code = "function-key",
                 RoutePrefix = string.Empty,
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -178,11 +179,11 @@ public class ReadmeSamplesTests
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<FunctionAppConfig>.Create("Default", new FunctionAppConfig
+            services.Declare("Default", new FunctionAppConfig
             {
                 BaseUrl = "https://functions.test/",
                 Code = "function-key",
-            }));
+            });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
@@ -257,7 +258,7 @@ public class ReadmeSamplesTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("logic", new LogicAppConfig
+            services.Declare("logic", new LogicAppConfig
             {
                 WorkflowName = "StatelessOrders",
                 Standard = new LogicAppStandardConfig
@@ -266,7 +267,7 @@ public class ReadmeSamplesTests
                     Code = "logic-code",
                     AdminCode = "logic-admin",
                 },
-            }));
+            });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
@@ -320,7 +321,7 @@ public class ReadmeSamplesTests
 
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare(ConfigStore<LogicAppConfig>.Create("ConsumptionOrders", new LogicAppConfig
+            services.Declare("ConsumptionOrders", new LogicAppConfig
             {
                 WorkflowName = "OrderProcessor",
                 HostingMode = LogicAppHostingMode.Consumption,
@@ -329,7 +330,7 @@ public class ReadmeSamplesTests
                     InvokeUrl = "https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?sig=abc",
                     WorkflowResourceId = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
                 },
-            }));
+            });
             services.AddSingleton<ILogicAppConsumptionManagementRequestAuthorizer>(new StubConsumptionAuthorizer("test-token"));
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new RouteAwareHttpComponentFactory(sender) });
         });
@@ -459,19 +460,19 @@ public class ReadmeSamplesTests
     [Fact]
     public void CosmosClientOptionsNote_RegistersConfiguredClientOptionsProvider()
     {
-        IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
+        // The entry goes on the config instance rather than into a second configuration handed to the loader.
+        // The old shape of this test is why LoadAzureConfigs no longer takes one: it passed a configuration
+        // the run never saw, and only worked because the loader eagerly filled a store from it.
+        ConfigInstance config = ConfigInstance.Create()
+            .OverrideConfig(new Dictionary<string, string?>
             {
                 ["CosmosDb:MainDb:ConnectionString"] = "AccountEndpoint=https://cosmos.test/;",
                 ["CosmosDb:MainDb:DatabaseName"] = "AppDb",
                 ["CosmosDb:MainDb:ContainerName"] = "Orders",
             })
-            .Build();
-
-        ConfigInstance config = ConfigInstance.Create()
-            .AddService((services, _) =>
+            .AddService(services =>
             {
-                services.LoadAzureConfigs(configuration)
+                services.LoadAzureConfigs()
                     .ConfigureCosmosClientOptions(_ => new CosmosClientOptions
                     {
                         ConnectionMode = ConnectionMode.Gateway,
@@ -481,7 +482,7 @@ public class ReadmeSamplesTests
 
         using ServiceProvider provider = (ServiceProvider)config.BuildServiceProvider();
         ICosmosClientOptionsProvider optionsProvider = provider.GetRequiredService<ICosmosClientOptionsProvider>();
-        CosmosContainerDbConfig cosmosConfig = provider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig("MainDb");
+        CosmosContainerDbConfig cosmosConfig = RunContext.Detached(provider).Configured<CosmosContainerDbConfig>("MainDb");
 
         Assert.Equal(ConnectionMode.Gateway, optionsProvider.CreateOptions(cosmosConfig).ConnectionMode);
     }

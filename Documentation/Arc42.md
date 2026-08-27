@@ -196,7 +196,7 @@ graph TB
         end
         subgraph Configuration
             CL[ConfigLoader]
-            CS["ConfigStore&lt;T&gt;"]
+            CS["ConfigShape&lt;T&gt;"]
         end
     end
     ATF --> FHTTP
@@ -824,7 +824,7 @@ mindmap
 |------|-----------|
 | **AzureExt** | Static entry-point class for all Azure operations |
 | **Identifier** | Strongly typed name for an Azure service instance (e.g. `"MainStorage"`) — maps to a JSON config section |
-| **ConfigStore\<T\>** | Dictionary of configs for one service type, keyed by identifier |
+| **ConfigShape\<T\>** | How one configuration section maps to a resource, both ways |
 | **Trigger** | Step that initiates an action in Azure (Function HTTP call, send Service Bus message) |
 | **Artifact** | Managed data object in Azure — automatic setup (create) and deconstruct (delete) |
 | **ArtifactFinder** | Query logic for finding artifacts (Cosmos SQL, EF Core LINQ, OData filter) |
