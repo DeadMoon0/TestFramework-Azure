@@ -20,6 +20,16 @@ public sealed record LogicAppTriggerResult(
     HttpStatusCode StatusCode) : StepResultContext
 {
     /// <summary>
+    /// The callback or management URL that was invoked, with its signature redacted.
+    /// </summary>
+    /// <remarks>
+    /// Redacted by construction like the two sibling result records: a Consumption callback URL's
+    /// <c>sig</c> is a bearer credential, and a result travels into variables, logs and the frozen
+    /// run. This was the one result type that kept the raw URL.
+    /// </remarks>
+    public string CallbackUrl { get; init; } = LogicAppUriRedaction.Redact(CallbackUrl)!;
+
+    /// <summary>
     /// Gets the invoked callback URL using the consumer-facing invoke URI terminology.
     /// </summary>
     public string InvokeUri => CallbackUrl;

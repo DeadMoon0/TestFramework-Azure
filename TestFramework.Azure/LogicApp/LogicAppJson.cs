@@ -3,16 +3,23 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using TestFramework.Core.Json;
 
 namespace TestFramework.Azure.LogicApp;
 
+/// <remarks>
+/// Every parse here goes through the engine's <see cref="WireJson"/>: these payloads are Azure's, and a
+/// startTime read as a string has to still be a string when it is read back. <c>JObject.Parse</c> turned
+/// ISO timestamps into dates, so the "raw" JSON handed onward was re-serialized in .NET's format rather
+/// than being what Azure sent.
+/// </remarks>
 internal static class LogicAppJson
 {
     internal static string ExtractCallbackUrl(string payload)
     {
-        JObject document = JObject.Parse(payload);
-        string? callbackUrl = document["value"]?.Value<string>()
-            ?? document["callbackUrl"]?.Value<string>();
+        JObject? document = WireJson.Parse(payload) as JObject;
+        string? callbackUrl = document?["value"]?.Value<string>()
+            ?? document?["callbackUrl"]?.Value<string>();
 
         return !string.IsNullOrWhiteSpace(callbackUrl)
             ? callbackUrl
@@ -69,7 +76,8 @@ internal static class LogicAppJson
 
     internal static LogicAppRunDetails ParseRunDetails(string workflowName, string runId, string payload)
     {
-        JObject document = JObject.Parse(payload);
+        JObject document = WireJson.Parse(payload) as JObject
+            ?? throw new JsonReaderException("The Logic App run payload was not a JSON object.");
         if (document["value"] is not null)
         {
             LogicAppRunDetails? fromRunsList = TryParseRunDetailsFromRunsList(workflowName, runId, payload);
@@ -93,7 +101,7 @@ internal static class LogicAppJson
 
     internal static LogicAppRunDetails? TryParseRunDetailsFromRunsList(string workflowName, string runId, string payload)
     {
-        JToken document = JToken.Parse(payload);
+        JToken document = WireJson.Parse(payload);
         IEnumerable<JToken> runs = document.Type switch
         {
             JTokenType.Array => document.Children(),

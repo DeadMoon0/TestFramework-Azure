@@ -1,9 +1,11 @@
 ﻿using System;
 using Microsoft.Extensions.Configuration;
+using System.Globalization;
 using System.Linq;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Exceptions;
 using TestFramework.Azure.LogicApp;
+using TestFramework.Core.Exceptions;
 
 namespace TestFramework.Azure.Configuration;
 
@@ -67,9 +69,22 @@ public class DefaultConfigProvider : IConfigProvider
         IConfigurationSection standardSection = logicAppSection.GetSection(nameof(LogicAppConfig.Standard));
         IConfigurationSection consumptionSection = logicAppSection.GetSection(nameof(LogicAppConfig.Consumption));
 
+        // A typo refuses with the option list instead of silently falling back to Standard - the
+        // values-path reader already refuses this way, and two readers for one section must agree.
+        string? declaredMode = logicAppSection.GetSection(nameof(LogicAppConfig.HostingMode)).Value;
+        LogicAppHostingMode hostingMode = LogicAppHostingMode.Standard;
+        if (declaredMode is { Length: > 0 })
+        {
+            hostingMode = Enum.TryParse(declaredMode, ignoreCase: true, out LogicAppHostingMode parsed)
+                ? parsed
+                : throw new FrameworkConfigurationException(
+                    $"'{LogicAppSelector}:{identifier}:{nameof(LogicAppConfig.HostingMode)}' holds '{declaredMode}', which is not a hosting mode.",
+                    [$"Use one of: {string.Join(", ", Enum.GetNames<LogicAppHostingMode>())}."]);
+        }
+
         return new LogicAppConfig
         {
-            HostingMode = Enum.TryParse<LogicAppHostingMode>(logicAppSection.GetSection(nameof(LogicAppConfig.HostingMode)).Value, ignoreCase: true, out LogicAppHostingMode mode) ? mode : LogicAppHostingMode.Standard,
+            HostingMode = hostingMode,
             WorkflowName = logicAppSection.GetSection(nameof(LogicAppConfig.WorkflowName)).Value,
             Standard = new LogicAppStandardConfig
             {
@@ -88,36 +103,57 @@ public class DefaultConfigProvider : IConfigProvider
     /// <inheritdoc />
     public CosmosContainerDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier)
     {
+        IConfigurationSection entry = configuration.GetSection(CosmosDbSelector).GetSection(identifier);
+
         return new CosmosContainerDbConfig
         {
-            ConnectionString = configuration.GetSection(CosmosDbSelector).GetSection(identifier).GetSection(nameof(CosmosContainerDbConfig.ConnectionString)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.ConnectionString)),
-            DatabaseName = configuration.GetSection(CosmosDbSelector).GetSection(identifier).GetSection(nameof(CosmosContainerDbConfig.DatabaseName)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.DatabaseName)),
-            ContainerName = configuration.GetSection(CosmosDbSelector).GetSection(identifier).GetSection(nameof(CosmosContainerDbConfig.ContainerName)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.ContainerName)),
+            ConnectionString = entry.GetSection(nameof(CosmosContainerDbConfig.ConnectionString)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.ConnectionString)),
+            DatabaseName = entry.GetSection(nameof(CosmosContainerDbConfig.DatabaseName)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.DatabaseName)),
+            ContainerName = entry.GetSection(nameof(CosmosContainerDbConfig.ContainerName)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.ContainerName)),
+
+            // Read, not dropped: the record documents that creation "must be opted into explicitly" -
+            // an opt-in that a file cannot express is no opt-in, and a configured throughput that never
+            // reaches container creation is a silently different container.
+            AllowSchemaCreation = ReadOptionalFlag(entry, CosmosDbSelector, identifier, nameof(CosmosContainerDbConfig.AllowSchemaCreation)),
+            ProvisionedThroughput = ReadOptionalCount(entry, CosmosDbSelector, identifier, nameof(CosmosContainerDbConfig.ProvisionedThroughput)),
         };
     }
 
     /// <inheritdoc />
     public ServiceBusConfig LoadServiceBusConfig(IConfiguration configuration, string identifier)
     {
+        IConfigurationSection entry = configuration.GetSection(ServiceBusSelector).GetSection(identifier);
+
         return new ServiceBusConfig
         {
-            ConnectionString = configuration.GetSection(ServiceBusSelector).GetSection(identifier).GetSection(nameof(ServiceBusConfig.ConnectionString)).Value ?? throw new ConfigurationValidationException(nameof(ServiceBusConfig.ConnectionString)),
-            QueueName = configuration.GetSection(ServiceBusSelector).GetSection(identifier).GetSection(nameof(ServiceBusConfig.QueueName)).Value,
-            TopicName = configuration.GetSection(ServiceBusSelector).GetSection(identifier).GetSection(nameof(ServiceBusConfig.TopicName)).Value,
-            SubscriptionName = configuration.GetSection(ServiceBusSelector).GetSection(identifier).GetSection(nameof(ServiceBusConfig.SubscriptionName)).Value,
-            RequiredSession = bool.Parse(configuration.GetSection(ServiceBusSelector).GetSection(identifier).GetSection(nameof(ServiceBusConfig.RequiredSession)).Value ?? bool.FalseString),
+            ConnectionString = entry.GetSection(nameof(ServiceBusConfig.ConnectionString)).Value ?? throw new ConfigurationValidationException(nameof(ServiceBusConfig.ConnectionString)),
+            QueueName = entry.GetSection(nameof(ServiceBusConfig.QueueName)).Value,
+            TopicName = entry.GetSection(nameof(ServiceBusConfig.TopicName)).Value,
+            SubscriptionName = entry.GetSection(nameof(ServiceBusConfig.SubscriptionName)).Value,
+
+            // A named refusal instead of bool.Parse's raw FormatException - the values-path reader
+            // already refuses this way, and two readers for one section must agree.
+            RequiredSession = ReadOptionalFlag(entry, ServiceBusSelector, identifier, nameof(ServiceBusConfig.RequiredSession)),
         };
     }
 
     /// <inheritdoc />
     public FunctionAppConfig LoadFunctionAppConfig(IConfiguration configuration, string identifier)
     {
-        return new FunctionAppConfig
+        IConfigurationSection entry = configuration.GetSection(FunctionAppBaseSelector).GetSection(identifier);
+
+        FunctionAppConfig config = new()
         {
-            BaseUrl = configuration.GetSection(FunctionAppBaseSelector).GetSection(identifier).GetSection(nameof(FunctionAppConfig.BaseUrl)).Value ?? throw new ConfigurationValidationException(nameof(FunctionAppConfig.BaseUrl)),
-            Code = configuration.GetSection(FunctionAppBaseSelector).GetSection(identifier).GetSection(nameof(FunctionAppConfig.Code)).Value ?? throw new ConfigurationValidationException(nameof(FunctionAppConfig.Code)),
-            AdminCode = configuration.GetSection(FunctionAppBaseSelector).GetSection(identifier).GetSection(nameof(FunctionAppConfig.AdminCode)).Value,
+            BaseUrl = entry.GetSection(nameof(FunctionAppConfig.BaseUrl)).Value ?? throw new ConfigurationValidationException(nameof(FunctionAppConfig.BaseUrl)),
+            Code = entry.GetSection(nameof(FunctionAppConfig.Code)).Value ?? throw new ConfigurationValidationException(nameof(FunctionAppConfig.Code)),
+            AdminCode = entry.GetSection(nameof(FunctionAppConfig.AdminCode)).Value,
         };
+
+        // Read, not dropped - and empty is a value: a host running with "routePrefix": "" needs the
+        // prefix declared away, and the record's default ("api") must only apply when the file says
+        // nothing at all.
+        string? routePrefix = entry.GetSection(nameof(FunctionAppConfig.RoutePrefix)).Value;
+        return routePrefix is null ? config : config with { RoutePrefix = routePrefix };
     }
 
     /// <inheritdoc />
@@ -141,4 +177,29 @@ public class DefaultConfigProvider : IConfigProvider
             DatabaseName = configuration.GetSection(SqlDatabaseSelector).GetSection(identifier).GetSection(nameof(SqlDatabaseConfig.DatabaseName)).Value ?? throw new ConfigurationValidationException(nameof(SqlDatabaseConfig.DatabaseName)),
         };
     }
+
+    private static bool ReadOptionalFlag(IConfigurationSection entry, string selector, string identifier, string property)
+    {
+        string? value = entry.GetSection(property).Value;
+        if (value is null or "")
+            return false;
+
+        return bool.TryParse(value, out bool parsed)
+            ? parsed
+            : throw Unreadable(selector, identifier, property, value, "'true' or 'false'");
+    }
+
+    private static int? ReadOptionalCount(IConfigurationSection entry, string selector, string identifier, string property)
+    {
+        string? value = entry.GetSection(property).Value;
+        if (value is null or "")
+            return null;
+
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed)
+            ? parsed
+            : throw Unreadable(selector, identifier, property, value, "a whole number");
+    }
+
+    private static FrameworkConfigurationException Unreadable(string selector, string identifier, string property, string value, string expected)
+        => new($"'{selector}:{identifier}:{property}' holds '{value}', which cannot be read as {expected}.", ["Correct the configuration entry."]);
 }

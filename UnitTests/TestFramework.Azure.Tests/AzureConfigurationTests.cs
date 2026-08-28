@@ -2673,6 +2673,9 @@ public class AzureConfigurationTests
 
         ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic", correlationId: Var.Const("c1"), createTempSubscription: true);
 
+        // Planning first, like the runner: the pre-step decision arms the temporary subscription, and
+        // polling refuses a flag that differs from what planning saw.
+        ((IHasPreStep)receiveEvent).CreatePreStep(runtime.VariableStore);
         await receiveEvent.DoEventPolling(runtime.Context);
 
         Assert.False(pump.LastRequest!.Value.AbandonNonMatching);
@@ -2927,21 +2930,21 @@ public class AzureConfigurationTests
             return Task.CompletedTask;
         }
 
-        public Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey)
+        public Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey, CancellationToken cancellationToken)
         {
             DeletedId = id;
             DeletedPartitionKey = partitionKey;
             return Task.CompletedTask;
         }
 
-        public Task UpsertItemAsync<TItem>(TItem item, PartitionKey partitionKey)
+        public Task UpsertItemAsync<TItem>(TItem item, PartitionKey partitionKey, CancellationToken cancellationToken)
         {
             UpsertedItem = item as TestItem;
             UpsertedPartitionKey = partitionKey;
             return Task.CompletedTask;
         }
 
-        public Task<CosmosReadResponse> ReadItemAsync(string id, PartitionKey partitionKey)
+        public Task<CosmosReadResponse> ReadItemAsync(string id, PartitionKey partitionKey, CancellationToken cancellationToken)
         {
             ReadId = id;
             ReadPartitionKey = partitionKey;
@@ -2988,19 +2991,19 @@ public class AzureConfigurationTests
             return Task.CompletedTask;
         }
 
-        public Task CreateIfNotExistsAsync()
+        public Task CreateIfNotExistsAsync(CancellationToken cancellationToken)
         {
             CreateCalled = true;
             return Task.CompletedTask;
         }
 
-        public Task DeleteBlobAsync(string path)
+        public Task DeleteBlobAsync(string path, CancellationToken cancellationToken)
         {
             DeletedPath = path;
             return Task.CompletedTask;
         }
 
-        public Task UploadBlobAsync(string path, byte[] data, IReadOnlyDictionary<string, string> metadata)
+        public Task UploadBlobAsync(string path, byte[] data, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
         {
             UploadedPath = path;
             UploadedData = data;
@@ -3008,7 +3011,7 @@ public class AzureConfigurationTests
             return Task.CompletedTask;
         }
 
-        public Task<BlobReadResponse> ReadBlobAsync(string path)
+        public Task<BlobReadResponse> ReadBlobAsync(string path, CancellationToken cancellationToken)
         {
             ReadPath = path;
             return Task.FromResult(ReadResponse);
@@ -3049,25 +3052,25 @@ public class AzureConfigurationTests
             return Task.CompletedTask;
         }
 
-        public Task CreateIfNotExistsAsync()
+        public Task CreateIfNotExistsAsync(CancellationToken cancellationToken)
         {
             CreateCalled = true;
             return Task.CompletedTask;
         }
 
-        public Task UpsertEntityAsync<T>(T entity) where T : class, ITableEntity
+        public Task UpsertEntityAsync<T>(T entity, CancellationToken cancellationToken) where T : class, ITableEntity
         {
             UpsertedEntity = entity;
             return Task.CompletedTask;
         }
 
-        public Task DeleteEntityAsync(string partitionKey, string rowKey)
+        public Task DeleteEntityAsync(string partitionKey, string rowKey, CancellationToken cancellationToken)
         {
             DeletedEntity = (partitionKey, rowKey);
             return Task.CompletedTask;
         }
 
-        public Task<TableReadResponse<T>> GetEntityAsync<T>(string partitionKey, string rowKey) where T : class, ITableEntity
+        public Task<TableReadResponse<T>> GetEntityAsync<T>(string partitionKey, string rowKey, CancellationToken cancellationToken) where T : class, ITableEntity
         {
             ReadKeys = (partitionKey, rowKey);
             return Task.FromResult(ReadEntity is T entity

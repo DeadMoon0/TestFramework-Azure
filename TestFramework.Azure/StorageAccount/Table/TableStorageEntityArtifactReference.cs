@@ -72,7 +72,7 @@ public class TableStorageEntityArtifactReference<T>
     {
         ITableAdapter tableClient = context.Services.GetAzureComponentFactory()
             .Table.CreateTable(AzureResources.For<StorageAccountConfig>(context, Identifier), GetTableName(context.Variables));
-        TableReadResponse<T> response = await tableClient.GetEntityAsync<T>(GetPartitionKey(context.Variables), GetRowKey(context.Variables));
+        TableReadResponse<T> response = await tableClient.GetEntityAsync<T>(GetPartitionKey(context.Variables), GetRowKey(context.Variables), context.Deadline.Token);
         if (response.Found)
         {
             return new ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>

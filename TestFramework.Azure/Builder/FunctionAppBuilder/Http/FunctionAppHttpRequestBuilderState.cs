@@ -13,14 +13,18 @@ internal sealed class FunctionAppHttpRequestBuilderState
     private readonly List<VariableReference<Dictionary<string, string>>> _headersDicts = [];
     private readonly List<VariableReference<Dictionary<string, string[]>>> _headersDictMultis = [];
 
+    // One body, last call wins whichever shape it had - like every other fluent setter. Before the
+    // sibling was cleared, a text body silently beat a bytes body regardless of call order.
     public void SetBody(VariableReference<string> text)
     {
         _bodyText = text;
+        _bodyBytes = null;
     }
 
     public void SetBody(VariableReference<byte[]> data)
     {
         _bodyBytes = data;
+        _bodyText = null;
     }
 
     public void AddHeader(VariableReference<string> key, VariableReference<string> value)

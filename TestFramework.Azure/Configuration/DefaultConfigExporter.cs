@@ -29,7 +29,8 @@ public sealed class DefaultConfigExporter : IConfigExporter
             identifier,
             (nameof(FunctionAppConfig.BaseUrl), config.BaseUrl),
             (nameof(FunctionAppConfig.Code), config.Code),
-            (nameof(FunctionAppConfig.AdminCode), config.AdminCode));
+            (nameof(FunctionAppConfig.AdminCode), config.AdminCode),
+            (nameof(FunctionAppConfig.RoutePrefix), config.RoutePrefix));
 
     /// <inheritdoc />
     public IReadOnlyDictionary<string, string> ExportStorageAccountConfig(string identifier, StorageAccountConfig config) =>
@@ -48,7 +49,9 @@ public sealed class DefaultConfigExporter : IConfigExporter
             identifier,
             (nameof(CosmosContainerDbConfig.ConnectionString), config.ConnectionString),
             (nameof(CosmosContainerDbConfig.DatabaseName), config.DatabaseName),
-            (nameof(CosmosContainerDbConfig.ContainerName), config.ContainerName));
+            (nameof(CosmosContainerDbConfig.ContainerName), config.ContainerName),
+            (nameof(CosmosContainerDbConfig.AllowSchemaCreation), config.AllowSchemaCreation ? bool.TrueString : null),
+            (nameof(CosmosContainerDbConfig.ProvisionedThroughput), config.ProvisionedThroughput?.ToString(System.Globalization.CultureInfo.InvariantCulture)));
 
     /// <inheritdoc />
     public IReadOnlyDictionary<string, string> ExportServiceBusConfig(string identifier, ServiceBusConfig config) =>

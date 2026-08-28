@@ -66,7 +66,7 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
         ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory()
             .Cosmos.CreateContainer(AzureResources.For<CosmosContainerDbConfig>(context, DbIdentifier));
 
-        CosmosReadResponse itemResp = await container.ReadItemAsync(GetId(context.Variables), GetPartitionKey(context.Variables));
+        CosmosReadResponse itemResp = await container.ReadItemAsync(GetId(context.Variables), GetPartitionKey(context.Variables), context.Deadline.Token);
         if (!itemResp.Found)
             return new ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>> { Found = false };
 

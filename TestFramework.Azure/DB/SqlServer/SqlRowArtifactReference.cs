@@ -87,11 +87,11 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
     public override async Task<ArtifactResolveResult<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
-        DbContext dbContext = resolver.Resolve(context, DbIdentifier);
+        await using DbContext dbContext = resolver.Resolve(context, DbIdentifier);
         await resolver.EnsureReadyAsync(dbContext, DbIdentifier, context.Logger);
 
         object[] keyValues = GetTypedKeyValues(dbContext, context.Variables);
-        TRow? row = await dbContext.Set<TRow>().FindAsync(keyValues);
+        TRow? row = await dbContext.Set<TRow>().FindAsync(keyValues, context.Deadline.Token);
 
         if (row is null)
             return new ArtifactResolveResult<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>> { Found = false };
@@ -127,7 +127,20 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
         for (int i = 0; i < rawValues.Length; i++)
         {
             Type clrType = keyProperties[i].ClrType;
-            keyValues[i] = Convert.ChangeType(rawValues[i], clrType);
+
+            // Guid is not IConvertible, so Convert.ChangeType surfaced a raw InvalidCastException for
+            // the most common non-primitive key type; anything else unconvertible refuses by name.
+            try
+            {
+                keyValues[i] = clrType == typeof(Guid)
+                    ? Guid.Parse(rawValues[i])
+                    : Convert.ChangeType(rawValues[i], clrType);
+            }
+            catch (Exception exception) when (exception is InvalidCastException or FormatException or OverflowException)
+            {
+                throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
+                    $"The primary key value '{rawValues[i]}' for '{typeof(TRow).Name}.{keyProperties[i].Name}' cannot be read as {clrType.Name}.");
+            }
         }
         return keyValues;
     }

@@ -131,7 +131,12 @@ public static class AzureEnvironmentResourceKinds
     /// </remarks>
     public static readonly ResourceKind LogicAppKind = ResourceKind
         .Named(LogicApp)
-        .OffersPerVantage(ValueNames.BaseUrl, optional: true)
+        // Secret although it is an address, because for a Consumption workflow the address IS the
+        // credential: the invoke URL's sig is a bearer token, and the package's result records redact
+        // it by construction - a listing must not be the second channel that hands it out raw. The
+        // Standard host URL gets redacted along with it, which costs a reader an address that never
+        // authenticated anyone; the alternative cost was a replayable invoke URL in every snapshot.
+        .OffersPerVantage(ValueNames.BaseUrl, optional: true, secret: true)
         .Offers("HostingMode", optional: true)
         .Offers("WorkflowName", optional: true)
         .Offers("Standard:Code", optional: true, secret: true)

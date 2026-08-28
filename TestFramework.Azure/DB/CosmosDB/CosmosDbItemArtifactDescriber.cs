@@ -58,7 +58,7 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
         ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory()
             .Cosmos.CreateContainer(AzureResources.For<CosmosContainerDbConfig>(context, reference.DbIdentifier));
 
-        await container.DeleteItemAsync<TItem>(reference.GetId(context.Variables), reference.GetPartitionKey(context.Variables));
+        await container.DeleteItemAsync<TItem>(reference.GetId(context.Variables), reference.GetPartitionKey(context.Variables), context.Deadline.Token);
 
         context.Logger.LogInformation($"Deleted item from Cosmos DB: {reference.GetId(context.Variables)} {reference.GetPartitionKey(context.Variables)}");
     }
@@ -76,12 +76,10 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
         reference.SetIdentifier(resolver.ResolveId(data.Item), resolver.ResolvePartitionKey(data.Item));
 
         context.Logger.LogInformation($"Ensuring Cosmos container exists: {config.DatabaseName}/{config.ContainerName}");
-        // ArtifactDescriber.Setup carries no CancellationToken, so the step's real token cannot reach
-        // this call yet; the adapter and REST client now accept one for when Core supplies it.
-        await container.EnsureContainerExistsAsync(data.Item, CancellationToken.None);
+        await container.EnsureContainerExistsAsync(data.Item, context.Deadline.Token);
 
         context.Logger.LogInformation($"Upserting Cosmos item: {reference.GetId(context.Variables)} {reference.GetPartitionKey(context.Variables)}");
-        await container.UpsertItemAsync(data.Item, reference.GetPartitionKey(context.Variables));
+        await container.UpsertItemAsync(data.Item, reference.GetPartitionKey(context.Variables), context.Deadline.Token);
 
         context.Logger.LogInformation($"Upserted item to Cosmos DB: {reference.GetId(context.Variables)} {reference.GetPartitionKey(context.Variables)}");
     }

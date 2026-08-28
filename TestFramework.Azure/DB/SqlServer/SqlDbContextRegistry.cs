@@ -131,8 +131,9 @@ public class SqlDbContextRegistry
 
     /// <summary>
     /// When set, the framework will apply any pending EF Core migrations (or call EnsureCreated
-    /// for contexts with no migrations) the first time each identifier is accessed.
-    /// On every access, it will also validate that no migrations are pending.
+    /// for contexts with no migrations) the first time each identifier is accessed. That first
+    /// access also validates that no migrations remain pending; later accesses return on the
+    /// process-wide fast path and validate nothing.
     /// </summary>
     public void ApplyMigrationsOnFirstUse()
     {

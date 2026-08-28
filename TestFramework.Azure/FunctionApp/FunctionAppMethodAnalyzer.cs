@@ -30,6 +30,16 @@ internal static class FunctionAppMethodAnalyzer
             string[]? methods = attrType.GetProperty("Methods")?.GetValue(httpAttr) as string[];
             string? route = attrType.GetProperty("Route")?.GetValue(httpAttr) as string;
 
+            // Two declared methods for one call is a stated error, never array order: picking
+            // methods[0] silently called a "get","post" trigger with GET whatever the author meant.
+            // No declared methods means the trigger accepts them all, and GET is the canonical probe.
+            if (methods is { Length: > 1 })
+            {
+                throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
+                    $"Method '{methodName}' on '{typeof(TFunctionType).Name}' accepts {string.Join(", ", methods)}, so which one to call is ambiguous.",
+                    ["State the verb explicitly with SelectEndpoint(path, method) or SelectFunction(name, method)."]);
+            }
+
             HttpMethod httpMethod = methods is { Length: > 0 }
                 ? new HttpMethod(methods[0])
                 : HttpMethod.Get;

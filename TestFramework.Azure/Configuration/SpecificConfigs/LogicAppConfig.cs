@@ -99,7 +99,8 @@ public record LogicAppStandardConfig
     public string? Code { get; init; }
 
     /// <summary>
-    /// Optional host-level admin key used for Standard management endpoints.
+    /// Optional host-level admin key used for Standard management endpoints. When absent, management
+    /// requests fall back to <see cref="Code"/>, because a locally hosted runtime accepts either.
     /// </summary>
     public string? AdminCode { get; init; }
 }

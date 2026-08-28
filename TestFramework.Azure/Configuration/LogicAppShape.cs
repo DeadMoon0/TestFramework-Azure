@@ -6,6 +6,7 @@ using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.LogicApp;
 using TestFramework.Config.Configuration;
 using TestFramework.Core.Environment.Graph;
+using static TestFramework.Azure.Configuration.ShapeValues;
 
 namespace TestFramework.Azure.Configuration;
 
@@ -147,7 +148,4 @@ internal sealed class LogicAppShape(IConfigProvider provider) : ConfigShape<Logi
             values[new ValueKey(valueName)] = value;
         }
     }
-
-    private static string? Text(IReadOnlyDictionary<string, string> values, string valueName)
-        => values.TryGetValue(valueName, out string? value) && value is { Length: > 0 } ? value : null;
 }

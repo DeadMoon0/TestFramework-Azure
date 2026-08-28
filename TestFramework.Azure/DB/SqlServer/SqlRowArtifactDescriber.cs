@@ -71,12 +71,15 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
     public override async Task Setup(RunContext context, SqlRowArtifactData<TRow> data, SqlRowArtifactReference<TRow> reference)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
-        DbContext dbContext = resolver.Resolve(context, reference.DbIdentifier);
+
+        // Disposed here because Resolve creates a fresh context per call, and a context nobody
+        // disposes holds its connection until the GC gets around to it.
+        await using DbContext dbContext = resolver.Resolve(context, reference.DbIdentifier);
         await resolver.EnsureReadyAsync(dbContext, reference.DbIdentifier, context.Logger);
 
         object[] keyValues = reference.GetTypedKeyValues(dbContext, context.Variables);
 
-        TRow? existing = await dbContext.Set<TRow>().FindAsync(keyValues);
+        TRow? existing = await dbContext.Set<TRow>().FindAsync(keyValues, context.Deadline.Token);
         if (existing is not null)
         {
             // Detach before attaching the new version to avoid tracking conflict
@@ -90,7 +93,7 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
             context.Logger.LogInformation($"Inserting new SQL row '{typeof(TRow).Name}' ({FormatKeys(keyValues)}).");
         }
 
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(context.Deadline.Token);
 
         // Detach after save so the entity is not tracked between test stages
         dbContext.Entry(data.Row).State = EntityState.Detached;
@@ -104,12 +107,12 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
     public override async Task Deconstruct(RunContext context, SqlRowArtifactReference<TRow> reference)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
-        DbContext dbContext = resolver.Resolve(context, reference.DbIdentifier);
+        await using DbContext dbContext = resolver.Resolve(context, reference.DbIdentifier);
         await resolver.EnsureReadyAsync(dbContext, reference.DbIdentifier, context.Logger);
 
         object[] keyValues = reference.GetTypedKeyValues(dbContext, context.Variables);
 
-        TRow? row = await dbContext.Set<TRow>().FindAsync(keyValues);
+        TRow? row = await dbContext.Set<TRow>().FindAsync(keyValues, context.Deadline.Token);
         if (row is null)
         {
             context.Logger.LogInformation($"SQL row '{typeof(TRow).Name}' ({FormatKeys(keyValues)}) not found during cleanup — already deleted.");
@@ -117,7 +120,7 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
         }
 
         dbContext.Set<TRow>().Remove(row);
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(context.Deadline.Token);
 
         context.Logger.LogInformation($"SQL row '{typeof(TRow).Name}' deleted. DB: {reference.DbIdentifier}, Key: ({FormatKeys(keyValues)}).");
     }

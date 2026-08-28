@@ -34,12 +34,15 @@ internal interface IBlobComponentFactory
 
 internal interface IBlobContainerAdapter
 {
+    // Every operation takes the caller's token: the callers all hold context.Deadline.Token, and an
+    // adapter without the parameter was the one thing keeping it from the SDK - a hung endpoint then
+    // retried on the SDK's schedule while the step's deadline had long fired.
     Task ValidateServiceConnectionAsync(CancellationToken cancellationToken);
     Task ValidateConnectionAsync(CancellationToken cancellationToken);
-    Task CreateIfNotExistsAsync();
-    Task DeleteBlobAsync(string path);
-    Task UploadBlobAsync(string path, byte[] data, IReadOnlyDictionary<string, string> metadata);
-    Task<BlobReadResponse> ReadBlobAsync(string path);
+    Task CreateIfNotExistsAsync(CancellationToken cancellationToken);
+    Task DeleteBlobAsync(string path, CancellationToken cancellationToken);
+    Task UploadBlobAsync(string path, byte[] data, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken);
+    Task<BlobReadResponse> ReadBlobAsync(string path, CancellationToken cancellationToken);
 }
 
 internal readonly record struct BlobReadResponse(bool Found, byte[]? Data, IReadOnlyDictionary<string, string>? Metadata);
@@ -53,10 +56,10 @@ internal interface ITableAdapter
 {
     Task ValidateServiceConnectionAsync(CancellationToken cancellationToken);
     Task ValidateConnectionAsync(CancellationToken cancellationToken);
-    Task CreateIfNotExistsAsync();
-    Task UpsertEntityAsync<T>(T entity) where T : class, ITableEntity;
-    Task DeleteEntityAsync(string partitionKey, string rowKey);
-    Task<TableReadResponse<T>> GetEntityAsync<T>(string partitionKey, string rowKey) where T : class, ITableEntity;
+    Task CreateIfNotExistsAsync(CancellationToken cancellationToken);
+    Task UpsertEntityAsync<T>(T entity, CancellationToken cancellationToken) where T : class, ITableEntity;
+    Task DeleteEntityAsync(string partitionKey, string rowKey, CancellationToken cancellationToken);
+    Task<TableReadResponse<T>> GetEntityAsync<T>(string partitionKey, string rowKey, CancellationToken cancellationToken) where T : class, ITableEntity;
     IAsyncEnumerable<T> QueryEntitiesAsync<T>(string filter, CancellationToken cancellationToken) where T : class, ITableEntity;
 }
 
@@ -73,9 +76,9 @@ internal interface ICosmosContainerAdapter
     Task ValidateAccountConnectionAsync(CancellationToken cancellationToken);
     Task ValidateConnectionAsync(CancellationToken cancellationToken);
     Task EnsureContainerExistsAsync<TItem>(TItem item, CancellationToken cancellationToken);
-    Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey);
-    Task UpsertItemAsync<TItem>(TItem item, PartitionKey partitionKey);
-    Task<CosmosReadResponse> ReadItemAsync(string id, PartitionKey partitionKey);
+    Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey, CancellationToken cancellationToken);
+    Task UpsertItemAsync<TItem>(TItem item, PartitionKey partitionKey, CancellationToken cancellationToken);
+    Task<CosmosReadResponse> ReadItemAsync(string id, PartitionKey partitionKey, CancellationToken cancellationToken);
     IAsyncEnumerable<TItem> QueryItemsAsync<TItem>(QueryDefinition query, CancellationToken cancellationToken);
 }
 
@@ -212,27 +215,27 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
             }
         }
 
-        public Task CreateIfNotExistsAsync() => container.CreateIfNotExistsAsync();
+        public Task CreateIfNotExistsAsync(CancellationToken cancellationToken) => container.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
 
-        public Task DeleteBlobAsync(string path) => container.DeleteBlobAsync(path, DeleteSnapshotsOption.IncludeSnapshots);
+        public Task DeleteBlobAsync(string path, CancellationToken cancellationToken) => container.DeleteBlobAsync(path, DeleteSnapshotsOption.IncludeSnapshots, cancellationToken: cancellationToken);
 
-        public async Task UploadBlobAsync(string path, byte[] data, IReadOnlyDictionary<string, string> metadata)
+        public async Task UploadBlobAsync(string path, byte[] data, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
         {
             BlobClient blob = container.GetBlobClient(path);
-            await blob.UploadAsync(new BinaryData(data), true);
-            await blob.SetMetadataAsync(new Dictionary<string, string>(metadata));
+            await blob.UploadAsync(new BinaryData(data), true, cancellationToken);
+            await blob.SetMetadataAsync(new Dictionary<string, string>(metadata), cancellationToken: cancellationToken);
         }
 
-        public async Task<BlobReadResponse> ReadBlobAsync(string path)
+        public async Task<BlobReadResponse> ReadBlobAsync(string path, CancellationToken cancellationToken)
         {
             BlobClient blob = container.GetBlobClient(path);
-            if (!await blob.ExistsAsync())
+            if (!await blob.ExistsAsync(cancellationToken))
             {
                 return new BlobReadResponse(false, null, null);
             }
 
-            BlobDownloadResult content = (await blob.DownloadContentAsync()).Value;
-            BlobProperties properties = (await blob.GetPropertiesAsync()).Value;
+            BlobDownloadResult content = (await blob.DownloadContentAsync(cancellationToken)).Value;
+            BlobProperties properties = (await blob.GetPropertiesAsync(cancellationToken: cancellationToken)).Value;
             return new BlobReadResponse(true, content.Content.ToArray(), new Dictionary<string, string>(properties.Metadata));
         }
     }
@@ -269,17 +272,17 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
             }
         }
 
-        public Task CreateIfNotExistsAsync() => tableClient.CreateIfNotExistsAsync();
+        public Task CreateIfNotExistsAsync(CancellationToken cancellationToken) => tableClient.CreateIfNotExistsAsync(cancellationToken);
 
-        public Task UpsertEntityAsync<T>(T entity) where T : class, ITableEntity => tableClient.UpsertEntityAsync(entity);
+        public Task UpsertEntityAsync<T>(T entity, CancellationToken cancellationToken) where T : class, ITableEntity => tableClient.UpsertEntityAsync(entity, cancellationToken: cancellationToken);
 
-        public Task DeleteEntityAsync(string partitionKey, string rowKey) => tableClient.DeleteEntityAsync(partitionKey, rowKey);
+        public Task DeleteEntityAsync(string partitionKey, string rowKey, CancellationToken cancellationToken) => tableClient.DeleteEntityAsync(partitionKey, rowKey, cancellationToken: cancellationToken);
 
-        public async Task<TableReadResponse<T>> GetEntityAsync<T>(string partitionKey, string rowKey) where T : class, ITableEntity
+        public async Task<TableReadResponse<T>> GetEntityAsync<T>(string partitionKey, string rowKey, CancellationToken cancellationToken) where T : class, ITableEntity
         {
             try
             {
-                global::Azure.Response<T> response = await tableClient.GetEntityAsync<T>(partitionKey, rowKey);
+                global::Azure.Response<T> response = await tableClient.GetEntityAsync<T>(partitionKey, rowKey, cancellationToken: cancellationToken);
                 return new TableReadResponse<T>(true, response.Value);
             }
             catch (RequestFailedException exception) when (exception.Status == 404)
@@ -327,19 +330,19 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
             await CosmosSchemaRestClient.EnsureDatabaseAndContainerExistAsync(config, partitionKeyPath, cancellationToken);
         }
 
-        public async Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey)
+        public async Task DeleteItemAsync<TItem>(string id, PartitionKey partitionKey, CancellationToken cancellationToken)
         {
-            await GetContainer().DeleteItemAsync<TItem>(id, partitionKey);
+            await GetContainer().DeleteItemAsync<TItem>(id, partitionKey, cancellationToken: cancellationToken);
         }
 
-        public async Task UpsertItemAsync<TItem>(TItem item, PartitionKey partitionKey)
+        public async Task UpsertItemAsync<TItem>(TItem item, PartitionKey partitionKey, CancellationToken cancellationToken)
         {
-            await GetContainer().UpsertItemAsync(item, partitionKey);
+            await GetContainer().UpsertItemAsync(item, partitionKey, cancellationToken: cancellationToken);
         }
 
-        public async Task<CosmosReadResponse> ReadItemAsync(string id, PartitionKey partitionKey)
+        public async Task<CosmosReadResponse> ReadItemAsync(string id, PartitionKey partitionKey, CancellationToken cancellationToken)
         {
-            using ResponseMessage response = await GetContainer().ReadItemStreamAsync(id, partitionKey);
+            using ResponseMessage response = await GetContainer().ReadItemStreamAsync(id, partitionKey, cancellationToken: cancellationToken);
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 return new CosmosReadResponse(false, null);
@@ -348,7 +351,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
             response.EnsureSuccessStatusCode();
 
             MemoryStream buffer = new MemoryStream();
-            await response.Content.CopyToAsync(buffer);
+            await response.Content.CopyToAsync(buffer, cancellationToken);
             buffer.Position = 0;
             return new CosmosReadResponse(true, buffer);
         }

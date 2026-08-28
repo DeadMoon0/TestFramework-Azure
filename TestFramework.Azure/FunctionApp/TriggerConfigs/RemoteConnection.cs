@@ -14,11 +14,17 @@ internal record RemoteConnection(Uri BasePath)
     /// ICMP echo against the host. Only useful for self-hosted targets: Azure's front doors do not
     /// answer ICMP at all, and many Linux CI containers lack the raw-socket capability it needs.
     /// </summary>
-    internal async Task EnsurePingAsync()
+    /// <param name="probeTimeout">
+    /// How long to wait for the echo. A non-positive value falls back to the OS-typical five seconds,
+    /// because an ICMP echo cannot be unbounded.
+    /// </param>
+    /// <param name="cancellationToken">The step's cancellation token.</param>
+    internal async Task EnsurePingAsync(TimeSpan probeTimeout, CancellationToken cancellationToken)
     {
-        Ping pingSender = new Ping();
+        using Ping pingSender = new Ping();
 
-        PingReply reply = await pingSender.SendPingAsync(BasePath.Host);
+        TimeSpan timeout = probeTimeout > TimeSpan.Zero ? probeTimeout : TimeSpan.FromSeconds(5);
+        PingReply reply = await pingSender.SendPingAsync(BasePath.Host, timeout, null, null, cancellationToken);
         if (reply.Status != IPStatus.Success)
         {
             throw new FunctionAppPingException("Ping was not Successful with Status: " + reply.Status, null);

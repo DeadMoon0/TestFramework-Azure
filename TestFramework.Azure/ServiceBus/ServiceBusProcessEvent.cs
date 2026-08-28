@@ -89,10 +89,16 @@ public class ServiceBusProcessEvent(
         }
     }
 
+    // Whether planning armed the temporary subscription, so polling listens on what was actually
+    // created rather than re-asking a variable that may have changed since.
+    private bool _tempSubscriptionArmed;
+
     // ── IHasPreStep ───────────────────────────────────────────────────────────
     StepGeneric? IHasPreStep.CreatePreStep(VariableStore variableStore)
     {
         if (createTempSubscription?.GetValue(variableStore) != true) return null;
+
+        _tempSubscriptionArmed = true;
 
         // The store must be the real one: the default timeout happens to be a ConstVariable that
         // ignores it, but a variable-backed timeout would dereference null here.
@@ -125,7 +131,18 @@ public class ServiceBusProcessEvent(
     {
         Resolved<ServiceBusConfig> serviceBus = AzureResources.For<ServiceBusConfig>(context, identifier);
         ServiceBusConfig config = serviceBus.Value;
+
+        // The flag was already read at planning time, where it decided whether the create/delete
+        // steps exist. A value that changed since would aim the pump at a subscription that was never
+        // created (or ignore one that was), failing later as a bare SDK error - so a flip between the
+        // two reads is refused here by name instead.
         bool useTempSubscription = createTempSubscription?.GetValue(context.Variables) == true;
+        if (useTempSubscription != _tempSubscriptionArmed)
+        {
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
+                $"'createTempSubscription' for '{identifier}' changed between planning and polling ({_tempSubscriptionArmed} -> {useTempSubscription}).",
+                ["The temporary subscription is created by a pre-step, so the flag must hold one value for the whole run."]);
+        }
 
         ServiceBusConfigReceiveMode receiveMode = config.GetReceiveMode(useTempSubscription);
         string? subscriptionName = receiveMode switch

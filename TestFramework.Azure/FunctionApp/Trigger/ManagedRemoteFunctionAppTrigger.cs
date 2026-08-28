@@ -42,7 +42,7 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
         FunctionAppTriggerConfig config = context.Services.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
         FunctionAppConfig functionConfig = context.Configured<FunctionAppConfig>(appIdentifier);
         RemoteConnection remoteConnection = new RemoteConnection(new Uri(functionConfig.BaseUrl));
-        if (config.DoPing) await remoteConnection.EnsurePingAsync();
+        if (config.DoPing) await remoteConnection.EnsurePingAsync(config.ReachabilityProbeTimeout, context.Deadline.Token);
         Uri fullTriggerUri = new Uri(remoteConnection.BasePath, $"{AdminFunctionsUri}/{_trigger.Name}");
         using HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Post, fullTriggerUri);
 

@@ -156,7 +156,7 @@ internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier,
         if (triggerConfig.DoPing)
         {
             context.Logger.LogInformation("FunctionApp IsLive '{0}' pre-pinging '{1}' before authenticated host-status probe.", identifier, remoteConnection.BasePath);
-            await remoteConnection.EnsurePingAsync();
+            await remoteConnection.EnsurePingAsync(triggerConfig.ReachabilityProbeTimeout, context.Deadline.Token);
         }
 
         using HttpRequestMessage request = new(HttpMethod.Get, new Uri(remoteConnection.BasePath, HostStatusUri));
@@ -405,7 +405,7 @@ internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier,
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
-        DbContext dbContext = resolver.Resolve(context, identifier);
+        await using DbContext dbContext = resolver.Resolve(context, identifier);
         if (!await dbContext.Database.CanConnectAsync(context.Deadline.Token))
         {
             throw new TestFramework.Core.Exceptions.FrameworkStateException($"Could not connect to SQL database '{identifier}'.");

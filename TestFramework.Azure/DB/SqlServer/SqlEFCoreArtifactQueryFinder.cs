@@ -31,7 +31,10 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
     public override async Task<ArtifactFinderResult?> FindAsync(RunContext context)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
-        DbContext dbContext = resolver.Resolve(context, dbIdentifier);
+
+        // Disposed here because Resolve creates a fresh context per call, and a context nobody
+        // disposes holds its connection until the GC gets around to it.
+        await using DbContext dbContext = resolver.Resolve(context, dbIdentifier);
         await resolver.EnsureReadyAsync(dbContext, dbIdentifier, context.Logger);
 
         TRow? entity = await queryModifier(dbContext.Set<TRow>()).FirstOrDefaultAsync(context.Deadline.Token);
@@ -47,7 +50,7 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
     public override async Task<ArtifactFinderResultMulti> FindMultiAsync(RunContext context)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
-        DbContext dbContext = resolver.Resolve(context, dbIdentifier);
+        await using DbContext dbContext = resolver.Resolve(context, dbIdentifier);
         await resolver.EnsureReadyAsync(dbContext, dbIdentifier, context.Logger);
 
         List<TRow> entities = await queryModifier(dbContext.Set<TRow>()).ToListAsync(context.Deadline.Token);

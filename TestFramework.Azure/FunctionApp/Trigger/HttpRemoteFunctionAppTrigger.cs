@@ -41,7 +41,7 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
         FunctionAppTriggerConfig config = context.Services.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
         FunctionAppConfig functionConfig = context.Configured<FunctionAppConfig>(appIdentifier);
         RemoteConnection remoteConnection = new RemoteConnection(new Uri(functionConfig.BaseUrl));
-        if (config.DoPing) await remoteConnection.EnsurePingAsync();
+        if (config.DoPing) await remoteConnection.EnsurePingAsync(config.ReachabilityProbeTimeout, context.Deadline.Token);
         Uri fullTriggerUri = BuildTriggerUri(remoteConnection.BasePath, functionConfig.RoutePrefix, _trigger.Path);
         IHttpRequestSender sender = context.Services.GetAzureComponentFactory().Http.CreateSender();
         context.Logger.LogInformation("FunctionApp HTTP '{0}' -> {1} {2}", appIdentifier, _trigger.Method, fullTriggerUri);
