@@ -20,6 +20,7 @@ using TestFramework.Azure.Runtime;
 using TestFramework.Azure.ServiceBus;
 using TestFramework.Config;
 using TestFramework.Core.Environment;
+using TestFramework.Core.Exceptions;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Timelines;
 using TestFramework.Core.Variables;
@@ -118,6 +119,55 @@ public class ReadmeSamplesTests
 
         run.EnsureRanToCompletion();
         Assert.NotNull(sender.Request);
+    }
+
+    [Fact]
+    public void FunctionAppHttpCall_MultiVerbTrigger_RefusesToGuessTheVerb()
+    {
+        FrameworkConfigurationException error = Assert.Throws<FrameworkConfigurationException>(() =>
+            AzureExt.Trigger.FunctionApp.Http("Default")
+                .SelectEndpointWithMethod<ReadmeMultiVerbHttpFunction>(nameof(ReadmeMultiVerbHttpFunction.Run)));
+
+        Assert.Contains("get, post", error.Message, StringComparison.Ordinal);
+        Assert.Contains("ambiguous", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FunctionAppHttpCall_StatedVerbTheTriggerDoesNotDeclare_IsRefused()
+    {
+        FrameworkConfigurationException error = Assert.Throws<FrameworkConfigurationException>(() =>
+            AzureExt.Trigger.FunctionApp.Http("Default")
+                .SelectEndpointWithMethod<ReadmeMultiVerbHttpFunction>(nameof(ReadmeMultiVerbHttpFunction.Run), HttpMethod.Delete));
+
+        Assert.Contains("not DELETE", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FunctionAppHttpCall_MultiVerbTrigger_TakesTheRouteFromMetadataAndTheVerbFromTheCaller()
+    {
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.Declare("Default", new FunctionAppConfig
+            {
+                BaseUrl = "https://functions.test/",
+                Code = "function-key",
+            });
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        });
+
+        TimelineRun run = await Timeline.Create()
+            .Trigger(AzureExt.Trigger.FunctionApp.Http("Default")
+                .SelectEndpointWithMethod<ReadmeMultiVerbHttpFunction>(nameof(ReadmeMultiVerbHttpFunction.Run), HttpMethod.Post)
+                .Call())
+            .Build()
+            .SetupRun(runtime.ServiceProvider)
+            .RunAsync();
+
+        run.EnsureRanToCompletion();
+        Assert.Equal(new Uri("https://functions.test/api/orders"), sender.Request!.RequestUri);
+        Assert.Equal(HttpMethod.Post, sender.Request!.Method);
     }
 
     [Fact]
@@ -501,6 +551,14 @@ public class ReadmeSamplesTests
     {
         [Function("Run")]
         public void Run([HttpTrigger(AuthorizationLevel.Function, "post", Route = "orders")] object request)
+        {
+        }
+    }
+
+    private sealed class ReadmeMultiVerbHttpFunction
+    {
+        [Function("Run")]
+        public void Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = "orders")] object request)
         {
         }
     }

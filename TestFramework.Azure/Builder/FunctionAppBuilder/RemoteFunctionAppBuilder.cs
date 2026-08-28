@@ -25,6 +25,13 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
         return this;
     }
 
+    public IFunctionAppHttpPayloadStage SelectEndpointWithMethod<TFunctionType>(string methodName, HttpMethod method)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        _routing = FunctionAppMethodAnalyzer.GetHttpTriggerRouting<TFunctionType>(methodName, method);
+        return this;
+    }
+
     public IFunctionAppHttpPayloadStage SelectEndpoint(VariableReference<string> subPath, VariableReference<HttpMethod> method)
     {
         _routing = new ComposedRoutingVariable(subPath, method);
