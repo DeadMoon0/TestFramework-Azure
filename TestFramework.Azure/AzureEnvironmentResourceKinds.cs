@@ -107,7 +107,11 @@ public static class AzureEnvironmentResourceKinds
     /// Function keys are deliberately absent, and that is the line for every kind here: a coordinate says
     /// where something is and travels with the resource; a credential says who you are and stays in the typed
     /// configuration the steps already read. A connection string is on the coordinate side of that line even
-    /// though it embeds a secret, because it cannot be divided - the address <em>is</em> the string.
+    /// though it embeds a secret, because it cannot be divided - the address <em>is</em> the string. It is
+    /// still declared <c>secret</c>: the flag keeps the value offered to every reader while the bulk
+    /// listings a run can snapshot and log show it redacted, which is exactly the shape an
+    /// address-that-carries-a-password needs. The containerised SQL emulator's <c>sa</c> password rides
+    /// these strings, and a caller may pin a real one.
     /// </para>
     /// </remarks>
     public static readonly ResourceKind FunctionAppKind = ResourceKind
@@ -140,7 +144,7 @@ public static class AzureEnvironmentResourceKinds
     /// </summary>
     public static readonly ResourceKind ServiceBusKind = ResourceKind
         .Named(ServiceBus)
-        .OffersPerVantage(ValueNames.ConnectionString)
+        .OffersPerVantage(ValueNames.ConnectionString, optional: false, secret: true)
         .Offers(QueueNameValue, optional: true)
         .Offers(TopicNameValue, optional: true)
         .Offers(SubscriptionNameValue, optional: true)
@@ -152,7 +156,7 @@ public static class AzureEnvironmentResourceKinds
     /// </summary>
     public static readonly ResourceKind StorageKind = ResourceKind
         .Named(Storage)
-        .OffersPerVantage(ValueNames.ConnectionString)
+        .OffersPerVantage(ValueNames.ConnectionString, optional: false, secret: true)
         .Offers(QueueNameValue, optional: true)
         .Offers(BlobContainerNameValue, optional: true)
         .Offers(TableContainerNameValue, optional: true)
@@ -163,7 +167,7 @@ public static class AzureEnvironmentResourceKinds
     /// </summary>
     public static readonly ResourceKind CosmosKind = ResourceKind
         .Named(Cosmos)
-        .OffersPerVantage(ValueNames.ConnectionString)
+        .OffersPerVantage(ValueNames.ConnectionString, optional: false, secret: true)
         .Offers(DatabaseNameValue)
         .Offers(ContainerNameValue)
         .Offers(ProvisionedThroughputValue, optional: true)
@@ -175,7 +179,7 @@ public static class AzureEnvironmentResourceKinds
     /// </summary>
     public static readonly ResourceKind SqlKind = ResourceKind
         .Named(Sql)
-        .OffersPerVantage(ValueNames.ConnectionString)
+        .OffersPerVantage(ValueNames.ConnectionString, optional: false, secret: true)
         .Offers(DatabaseNameValue)
         .Build();
 }
