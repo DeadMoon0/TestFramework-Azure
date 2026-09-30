@@ -1775,6 +1775,62 @@ public class AzureConfigurationTests
         Assert.Equal("Bearer", sender.Request.Headers.Authorization!.Scheme);
     }
 
+    private const string InvokeOnlySignature = "invoke-only-signature-value";
+
+    private static LogicAppConfig InvokeOnlyConsumptionLogicApp() => new()
+    {
+        WorkflowName = "OrderProcessor",
+        HostingMode = LogicAppHostingMode.Consumption,
+        Consumption = new LogicAppConsumptionConfig
+        {
+            InvokeUrl = $"https://logic-consumption.test/workflows/OrderProcessor/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig={InvokeOnlySignature}",
+        },
+    };
+
+    [Fact]
+    public async Task LogicAppIsLiveTrigger_NeverPrintsTheInvokeSignature_WhenAReachableProbeFails()
+    {
+        // For an invoke-only Consumption entry the probe target is the invoke URL itself, and its sig
+        // is the credential. A probe that times out must say which host did not answer without handing
+        // the signature to the log or to the failure a run keeps.
+        RecordingRunDebugger debugger = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.Declare("logic", InvokeOnlyConsumptionLogicApp());
+            services.AddSingleton(new FunctionAppTriggerConfig { ReachabilityProbeTimeout = TimeSpan.FromMilliseconds(50) });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new HangingHttpComponentFactory(new HangingHttpRequestSender()) });
+        }, debugger);
+
+        Exception failure = await Assert.ThrowsAnyAsync<Exception>(
+            () => AzureExt.Trigger.IsLive.LogicApp("logic", AlivenessLevel.Reachable).Execute(runtime.Context));
+
+        Assert.Contains("logic-consumption.test", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(InvokeOnlySignature, failure.ToString(), StringComparison.Ordinal);
+
+        Assert.True(await debugger.WaitForLogAsync(entry => DebugLogTemplate.Render(entry).Contains("using reachable probe", StringComparison.Ordinal)), $"Expected log entry was not delivered. Delivered: {debugger.Delivered}");
+        Assert.DoesNotContain(debugger.LogEntries, entry => DebugLogTemplate.Render(entry).Contains(InvokeOnlySignature, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task LogicAppIsLiveTrigger_SendsButNeverLogsTheInvokeSignature_WhenProbingTheResource()
+    {
+        // The probe needs the real URL to be answered at all; only what is written about it is redacted.
+        HttpResponseMessage response = new(HttpStatusCode.OK);
+        FakeHttpRequestSender sender = new(response);
+        RecordingRunDebugger debugger = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.Declare("logic", InvokeOnlyConsumptionLogicApp());
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+        }, debugger);
+
+        await AzureExt.Trigger.IsLive.LogicApp("logic").Execute(runtime.Context);
+
+        Assert.Contains(InvokeOnlySignature, sender.Request!.RequestUri!.ToString(), StringComparison.Ordinal);
+        Assert.True(await debugger.WaitForLogAsync(entry => DebugLogTemplate.Render(entry).Contains("probing", StringComparison.Ordinal)), $"Expected log entry was not delivered. Delivered: {debugger.Delivered}");
+        Assert.DoesNotContain(debugger.LogEntries, entry => DebugLogTemplate.Render(entry).Contains(InvokeOnlySignature, StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task LogicAppIsLiveTrigger_ThrowsHelpfulMessage_WhenConsumptionManagementCapabilityIsMissing()
     {

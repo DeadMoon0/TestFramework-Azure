@@ -194,7 +194,7 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
         RemoteConnection remoteConnection = new(probeBaseUri);
         if (currentAlivenessLevel == AlivenessLevel.Reachable)
         {
-            context.Logger.LogInformation("LogicApp IsLive '{0}' using reachable probe against '{1}' in {2} mode.", identifier, remoteConnection.BasePath, logicAppConfig.HostingMode);
+            context.Logger.LogInformation("LogicApp IsLive '{0}' using reachable probe against '{1}' in {2} mode.", identifier, remoteConnection.DisplayPath, logicAppConfig.HostingMode);
             FunctionAppTriggerConfig probeConfig = context.Services.GetService<FunctionAppTriggerConfig>() ?? new FunctionAppTriggerConfig();
             await remoteConnection.EnsureReachableAsync(
                 context.Services.GetAzureComponentFactory().Http.CreateSender(),
@@ -219,7 +219,7 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
         }
 
         IHttpRequestSender sender = context.Services.GetAzureComponentFactory().Http.CreateSender();
-        context.Logger.LogInformation("LogicApp IsLive '{0}' probing '{1}' in {2} mode.", identifier, request.RequestUri?.ToString() ?? "(unknown)", logicAppConfig.HostingMode);
+        context.Logger.LogInformation("LogicApp IsLive '{0}' probing '{1}' in {2} mode.", identifier, LogicAppUriRedaction.Redact(request.RequestUri?.ToString()) ?? "(unknown)", logicAppConfig.HostingMode);
         using HttpResponseMessage response = await sender.SendAsync(request, context.Deadline.Token);
         if (logicAppConfig.HostingMode == LogicAppHostingMode.Consumption)
         {
