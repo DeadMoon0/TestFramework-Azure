@@ -71,13 +71,6 @@ public interface ILogicAppExecutionStage
     /// <returns>The Logic App execution step.</returns>
     /// <remarks><c>Call</c> is the shared verb across the Azure builders - see <c>ICallAction.Call</c>.</remarks>
     Step<LogicAppExecutionResult> Call();
-
-    /// <summary>
-    /// Finalizes the request and returns the executable Logic App step.
-    /// </summary>
-    /// <returns>The Logic App execution step.</returns>
-    [System.Obsolete("Renamed to Call() to match the Function App builders and the documentation. This bridge will be removed in a future release.")]
-    Step<LogicAppExecutionResult> Execute() => Call();
 }
 
 /// <summary>
@@ -90,13 +83,6 @@ public interface ILogicAppHttpPayloadStage : ILogicAppExecutionStage
     /// </summary>
     /// <returns>The Logic App execution step.</returns>
     Step<LogicAppExecutionResult> CallAndCapture();
-
-    /// <summary>
-    /// Finalizes the request and captures the callback response directly.
-    /// </summary>
-    /// <returns>The Logic App execution step.</returns>
-    [System.Obsolete("Renamed to CallAndCapture() to match the documentation. This bridge will be removed in a future release.")]
-    Step<LogicAppExecutionResult> CaptureResponse() => CallAndCapture();
 
     /// <summary>
     /// Sets a string request body.

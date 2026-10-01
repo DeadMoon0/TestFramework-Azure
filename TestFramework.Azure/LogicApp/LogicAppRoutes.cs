@@ -156,7 +156,7 @@ internal static class LogicAppRoutes
         if (string.IsNullOrWhiteSpace(template))
             throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
                 $"Logic App Consumption invoke operations require '{propertyName}'. "
-                + "Configure it for Manual().Execute(), CaptureResponse(), and invoke-only liveness.");
+                + "Configure it for Manual().Call(), CallAndCapture(), and invoke-only liveness.");
 
         string resolved = template
             .Replace("{workflowName}", Uri.EscapeDataString(workflowName), StringComparison.Ordinal)

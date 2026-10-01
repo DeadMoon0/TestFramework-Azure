@@ -168,7 +168,7 @@ public sealed class LogicAppRunEvent(
         {
             throw new TestFramework.Core.Exceptions.UnsupportedFrameworkValueException(
                 $"Logic App workflow '{resolvedWorkflowName}' on '{identifier}' is stateless and does not support managed run polling through RunCompleted/RunReachedStatus. "
-                + "Use CaptureResponse() for stateless workflows instead.");
+                + "Use CallAndCapture() for stateless workflows instead.");
         }
     }
 }

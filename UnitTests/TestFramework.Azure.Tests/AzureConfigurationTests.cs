@@ -1492,9 +1492,13 @@ public class AzureConfigurationTests
             evt.DoEventPolling(runtime.Context));
 
         Assert.Contains("stateless", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("CaptureResponse", exception.Message, StringComparison.Ordinal);
+
+        // The verb the message hands over has to be one that compiles.
+        Assert.Contains("CallAndCapture()", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("CaptureResponse()", exception.Message, StringComparison.Ordinal);
         Assert.Empty(sender.Requests);
     }
+
 
     [Fact]
     public async Task LogicAppRunEvent_UsesConsumptionWorkflowResourceId()
