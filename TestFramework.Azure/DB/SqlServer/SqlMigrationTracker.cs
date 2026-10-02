@@ -39,7 +39,7 @@ internal class SqlMigrationTracker
     ///   <item>Every call: validates that no migrations are pending.</item>
     /// </list>
     /// </summary>
-    internal async Task EnsureReadyAsync(DbContext context, SqlDatabaseIdentifier identifier, ScopedLogger logger)
+    internal async Task EnsureReadyAsync(DbContext context, SqlDatabaseIdentifier identifier, ScopedLogger logger, CancellationToken cancellationToken)
     {
         string connectionString = context.Database.GetConnectionString() ?? identifier.Identifier;
         string key = $"{connectionString}|{identifier.Identifier}";
@@ -49,7 +49,7 @@ internal class SqlMigrationTracker
             return;
 
         SemaphoreSlim semaphore = _locks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
-        await semaphore.WaitAsync();
+        await semaphore.WaitAsync(cancellationToken);
         try
         {
             // Double-check inside the lock.
@@ -63,13 +63,13 @@ internal class SqlMigrationTracker
                 if (allMigrations.Count == 0)
                 {
                     logger.LogInformation($"[SQL Migration] No migrations defined for '{identifier}' — calling EnsureCreated.");
-                    bool created = await context.Database.EnsureCreatedAsync();
+                    bool created = await context.Database.EnsureCreatedAsync(cancellationToken);
                     if (!created)
                     {
                         // DB already exists (e.g. shared with another DbContext).
                         // Create any model tables that are missing, ignoring tables that already exist.
                         var creator = context.Database.GetService<IRelationalDatabaseCreator>();
-                        try { await creator.CreateTablesAsync(); }
+                        try { await creator.CreateTablesAsync(cancellationToken); }
                         catch (Exception ex) when (IsTableAlreadyExistsException(ex))
                         {
                             // SQL Server error 2714: one or more tables already exist — expected when
@@ -81,7 +81,7 @@ internal class SqlMigrationTracker
                 else
                 {
                     logger.LogInformation($"[SQL Migration] Applying pending migrations for '{identifier}'...");
-                    await context.Database.MigrateAsync();
+                    await context.Database.MigrateAsync(cancellationToken);
                     logger.LogInformation($"[SQL Migration] Migrations applied for '{identifier}'.");
                 }
             }
@@ -90,7 +90,7 @@ internal class SqlMigrationTracker
             // Contexts with no migrations defined return empty — OK.
             if (allMigrations.Count > 0)
             {
-                IReadOnlyList<string> pending = (await context.Database.GetPendingMigrationsAsync()).ToList();
+                IReadOnlyList<string> pending = (await context.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
                 if (pending.Count > 0)
                 {
                     throw new TestFramework.Core.Exceptions.FrameworkStateException(

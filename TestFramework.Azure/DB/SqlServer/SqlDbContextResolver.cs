@@ -31,6 +31,10 @@ internal class SqlDbContextResolver(SqlDbContextRegistry registry, SqlMigrationT
         };
     }
 
-    public Task EnsureReadyAsync(DbContext context, SqlDatabaseIdentifier identifier, ScopedLogger logger)
-        => migrationTracker.EnsureReadyAsync(context, identifier, logger);
+    public Task EnsureReadyAsync(RunContext context, DbContext dbContext, SqlDatabaseIdentifier identifier)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        return migrationTracker.EnsureReadyAsync(dbContext, identifier, context.Logger, context.Deadline.Token);
+    }
 }

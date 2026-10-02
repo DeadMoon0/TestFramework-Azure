@@ -170,6 +170,24 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
         Assert.Throws<FrameworkConfigurationException>(() => provider.GetRequiredService<SqlDbContextRegistry>());
     }
 
+    [Fact]
+    public async Task ReadinessIsBoundByTheRunsDeadline()
+    {
+        // A migration is the longest thing a step does to a database, and it ran with no token: a run past its budget
+        // could not stop it. With the run's deadline gone, readiness stops before it reaches the database at all.
+        using System.Threading.CancellationTokenSource expired = new();
+        expired.Cancel();
+        RunContext run = RunContext.Detached(new DetachedContextOptions { CancellationToken = expired.Token });
+
+        ISqlDbContextResolver resolver = new SqlDbContextResolver(new SqlDbContextRegistry(), new SqlMigrationTracker(applyOnFirstUse: true));
+        using ProbeContext database = new(new DbContextOptionsBuilder<ProbeContext>().UseSqlServer("Server=127.0.0.1,1;Database=never;Connect Timeout=30").Options);
+
+        System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => resolver.EnsureReadyAsync(run, database, "orders"));
+
+        Assert.True(elapsed.Elapsed < TimeSpan.FromSeconds(5), $"readiness ran for {elapsed.Elapsed} with the deadline already gone");
+    }
+
     private async Task<TimelineRun> Run(
         PublishingEnvironment? environment,
         string resolves = "orders",

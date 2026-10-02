@@ -35,7 +35,7 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
         // Disposed here because Resolve creates a fresh context per call, and a context nobody
         // disposes holds its connection until the GC gets around to it.
         await using DbContext dbContext = resolver.Resolve(context, dbIdentifier);
-        await resolver.EnsureReadyAsync(dbContext, dbIdentifier, context.Logger);
+        await resolver.EnsureReadyAsync(context, dbContext, dbIdentifier);
 
         TRow? entity = await queryModifier(dbContext.Set<TRow>()).FirstOrDefaultAsync(context.Deadline.Token);
         if (entity is null) return null;
@@ -51,7 +51,7 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
         await using DbContext dbContext = resolver.Resolve(context, dbIdentifier);
-        await resolver.EnsureReadyAsync(dbContext, dbIdentifier, context.Logger);
+        await resolver.EnsureReadyAsync(context, dbContext, dbIdentifier);
 
         List<TRow> entities = await queryModifier(dbContext.Set<TRow>()).ToListAsync(context.Deadline.Token);
 

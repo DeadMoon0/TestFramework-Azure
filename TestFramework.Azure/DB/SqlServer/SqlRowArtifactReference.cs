@@ -87,7 +87,7 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
         await using DbContext dbContext = resolver.Resolve(context, DbIdentifier);
-        await resolver.EnsureReadyAsync(dbContext, DbIdentifier, context.Logger);
+        await resolver.EnsureReadyAsync(context, dbContext, DbIdentifier);
 
         object[] keyValues = GetTypedKeyValues(dbContext, context.Variables);
         TRow? row = await dbContext.Set<TRow>().FindAsync(keyValues, context.Deadline.Token);

@@ -75,7 +75,7 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
         // Disposed here because Resolve creates a fresh context per call, and a context nobody
         // disposes holds its connection until the GC gets around to it.
         await using DbContext dbContext = resolver.Resolve(context, reference.DbIdentifier);
-        await resolver.EnsureReadyAsync(dbContext, reference.DbIdentifier, context.Logger);
+        await resolver.EnsureReadyAsync(context, dbContext, reference.DbIdentifier);
 
         object[] keyValues = reference.GetTypedKeyValues(dbContext, context.Variables);
 
@@ -108,7 +108,7 @@ public class SqlRowArtifactDescriber<TRow> : ArtifactDescriber<SqlRowArtifactDes
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
         await using DbContext dbContext = resolver.Resolve(context, reference.DbIdentifier);
-        await resolver.EnsureReadyAsync(dbContext, reference.DbIdentifier, context.Logger);
+        await resolver.EnsureReadyAsync(context, dbContext, reference.DbIdentifier);
 
         object[] keyValues = reference.GetTypedKeyValues(dbContext, context.Variables);
 

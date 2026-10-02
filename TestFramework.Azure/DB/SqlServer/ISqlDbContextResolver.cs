@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using TestFramework.Azure.Identifier;
-using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
 
 namespace TestFramework.Azure.DB.SqlServer;
@@ -36,9 +35,13 @@ public interface ISqlDbContextResolver
     /// Validates (and optionally applies) migrations for the given context.
     /// Must be called before every database operation.
     /// </summary>
-    /// <param name="context">The context instance.</param>
+    /// <remarks>
+    /// Takes the run, as <see cref="Resolve"/> does: a migration is the longest thing a step can do to a database,
+    /// and with only a logger it ran without the step's deadline, so a run past its budget could not stop it.
+    /// </remarks>
+    /// <param name="context">The run, whose deadline bounds the migration and whose logger reports it.</param>
+    /// <param name="dbContext">The context instance.</param>
     /// <param name="identifier">The SQL database identifier requested by the DSL.</param>
-    /// <param name="logger">The logger used to report migration actions.</param>
     /// <returns>A task that completes when the context is ready for use.</returns>
-    Task EnsureReadyAsync(DbContext context, SqlDatabaseIdentifier identifier, ScopedLogger logger);
+    Task EnsureReadyAsync(RunContext context, DbContext dbContext, SqlDatabaseIdentifier identifier);
 }
