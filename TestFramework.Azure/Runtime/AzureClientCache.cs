@@ -13,8 +13,13 @@ namespace TestFramework.Azure.Runtime;
 /// particular is a documented singleton that owns a connection pool and, before this cache, was
 /// created per operation and never disposed. Only the underlying clients live here - senders,
 /// processors and pumps are still created per operation, because they carry per-operation state.
+/// <para>
+/// Disposable both ways, because the service provider that owns it may be disposed either way. A synchronous
+/// <c>using</c> - the common shape in a test - used to throw from the container once a client existed, naming this
+/// internal type and no fix, while the asynchronous road was the only one that worked.
+/// </para>
 /// </remarks>
-internal sealed class AzureClientCache : IAsyncDisposable
+internal sealed class AzureClientCache : IAsyncDisposable, IDisposable
 {
     private readonly ConcurrentDictionary<(Type ClientType, object Key), object> clients = new();
     private int disposed;
@@ -39,13 +44,7 @@ internal sealed class AzureClientCache : IAsyncDisposable
     /// </summary>
     public async ValueTask DisposeAsync()
     {
-        if (System.Threading.Interlocked.Exchange(ref disposed, 1) != 0)
-            return;
-
-        List<object> entries = new(clients.Values);
-        clients.Clear();
-
-        foreach (object entry in entries)
+        foreach (object entry in TakeEntries())
         {
             switch (entry)
             {
@@ -57,5 +56,39 @@ internal sealed class AzureClientCache : IAsyncDisposable
                     break;
             }
         }
+    }
+
+    /// <summary>
+    /// Disposes every cached client synchronously, for a service provider disposed with a plain <c>using</c>.
+    /// </summary>
+    /// <remarks>
+    /// A client that is only asynchronously disposable - the Service Bus client - is waited for here. Its disposal
+    /// closes AMQP links and does not need the caller's synchronization context, so blocking on it is safe; it is the
+    /// one cost of disposing synchronously, and <c>await using</c> avoids it.
+    /// </remarks>
+    public void Dispose()
+    {
+        foreach (object entry in TakeEntries())
+        {
+            switch (entry)
+            {
+                case IDisposable disposable:
+                    disposable.Dispose();
+                    break;
+                case IAsyncDisposable asyncDisposable:
+                    asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                    break;
+            }
+        }
+    }
+
+    private List<object> TakeEntries()
+    {
+        if (System.Threading.Interlocked.Exchange(ref disposed, 1) != 0)
+            return [];
+
+        List<object> entries = new(clients.Values);
+        clients.Clear();
+        return entries;
     }
 }

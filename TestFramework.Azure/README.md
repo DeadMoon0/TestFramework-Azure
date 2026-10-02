@@ -226,7 +226,9 @@ Timeline timeline = Timeline.Create()
     .Trigger(AzureExt.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<HttpTests>(nameof(HttpTests.Run)).Call())
     .Build();
 
-TimelineRun run = await timeline.SetupRun(config.BuildServiceProvider()).RunAsync();
+// The provider owns the cached Azure SDK clients - a Service Bus connection, a Cosmos pool - so dispose it.
+await using ServiceProvider services = config.BuildServiceProvider();
+TimelineRun run = await timeline.SetupRun(services).RunAsync();
 
 run.EnsureRanToCompletion();
 ```
@@ -301,7 +303,9 @@ Timeline timeline = Timeline.Create()
     .Name("logic-call")
     .Build();
 
-TimelineRun run = await timeline.SetupRun(config.BuildServiceProvider()).RunAsync();
+// The provider owns the cached Azure SDK clients - a Service Bus connection, a Cosmos pool - so dispose it.
+await using ServiceProvider services = config.BuildServiceProvider();
+TimelineRun run = await timeline.SetupRun(services).RunAsync();
 
 run.EnsureRanToCompletion();
 LogicAppExecutionResult result = Assert.IsType<LogicAppExecutionResult>(run.Step("logic-call").LastResult.Result);
