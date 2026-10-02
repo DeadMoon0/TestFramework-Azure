@@ -32,8 +32,13 @@ namespace TestFramework.Azure.DB.SqlServer;
 /// instance would change it underneath whoever resolved it first.
 /// </para>
 /// </remarks>
-public class SqlDbContextRegistry
+public sealed class SqlDbContextRegistry
 {
+    /// <summary>
+    /// Handed to the callback of <c>AddSqlArtifactContexts</c>, the one way to declare contexts.
+    /// </summary>
+    internal SqlDbContextRegistry() { }
+
     private readonly Dictionary<string, Func<RunContext, SqlDatabaseIdentifier, DbContext>> _identifierMap = [];
     private Func<RunContext, SqlDatabaseIdentifier, DbContext>? _default;
 
@@ -60,6 +65,9 @@ public class SqlDbContextRegistry
         where TContext : DbContext
     {
         ArgumentNullException.ThrowIfNull(create);
+
+        if (_default is not null)
+            throw TwoDefaults();
 
         _default = (run, identifier) => Build(run, identifier, create, configure);
     }
@@ -91,7 +99,8 @@ public class SqlDbContextRegistry
         ArgumentNullException.ThrowIfNull(identifier);
         ArgumentNullException.ThrowIfNull(create);
 
-        _identifierMap[identifier.Identifier] = (run, resolved) => Build(run, resolved, create, configure);
+        if (!_identifierMap.TryAdd(identifier.Identifier, (run, resolved) => Build(run, resolved, create, configure)))
+            throw TwoForOneIdentifier(identifier.Identifier);
     }
 
     internal bool TryCreateByIdentifier(RunContext run, SqlDatabaseIdentifier identifier, out DbContext? context)
@@ -157,4 +166,51 @@ public class SqlDbContextRegistry
     }
 
     internal bool AutoMigrateOnFirstUse { get; private set; }
+
+    /// <summary>
+    /// Every <c>AddSqlArtifactContexts</c> call together.
+    /// </summary>
+    /// <remarks>
+    /// Each call is a declaration of its own - one project's contexts, another's - and none replaces another, so a
+    /// second call no longer drops the first project's contexts without a word. Two that claim the same thing are
+    /// refused by name instead, because only their authors know which was meant.
+    /// </remarks>
+    /// <param name="declarations">The registry each call configured, in registration order.</param>
+    /// <returns>One registry holding all of them.</returns>
+    internal static SqlDbContextRegistry Combine(IEnumerable<SqlDbContextRegistry> declarations)
+    {
+        SqlDbContextRegistry combined = new();
+        foreach (SqlDbContextRegistry declaration in declarations)
+        {
+            if (declaration._default is { } create)
+            {
+                if (combined._default is not null)
+                    throw TwoDefaults();
+
+                combined._default = create;
+            }
+
+            foreach ((string identifier, Func<RunContext, SqlDatabaseIdentifier, DbContext> build) in declaration._identifierMap)
+            {
+                if (!combined._identifierMap.TryAdd(identifier, build))
+                    throw TwoForOneIdentifier(identifier);
+            }
+
+            combined.AutoMigrateOnFirstUse |= declaration.AutoMigrateOnFirstUse;
+        }
+
+        return combined;
+    }
+
+    private static TestFramework.Core.Exceptions.FrameworkConfigurationException TwoDefaults()
+        => new("Two default SQL contexts are registered, and only one can serve an identifier nothing else claims.")
+        {
+            RecoverySteps = ["Keep one AddDefault, and register the other context for its identifier with AddForIdentifier."],
+        };
+
+    private static TestFramework.Core.Exceptions.FrameworkConfigurationException TwoForOneIdentifier(string identifier)
+        => new($"Two SQL contexts are registered for '{identifier}', and only one can serve it.")
+        {
+            RecoverySteps = [$"Keep one AddForIdentifier(\"{identifier}\", ...) across every AddSqlArtifactContexts call."],
+        };
 }

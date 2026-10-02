@@ -109,6 +109,67 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
         Assert.Contains("AddForIdentifier", failure.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task TwoCallsAddUp_SoOneProjectsContextsSurviveAnothers()
+    {
+        // A second AddSqlArtifactContexts replaced the first project's registry without a word, and the first project's
+        // identifier then failed as "nobody registered it".
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(
+            [
+                new KeyValuePair<string, string?>("SqlDatabase:orders:ConnectionString", "Server=localhost,1433;Database=orders"),
+                new KeyValuePair<string, string?>("SqlDatabase:orders:DatabaseName", "orders"),
+                new KeyValuePair<string, string?>("SqlDatabase:invoices:ConnectionString", "Server=localhost,1433;Database=invoices"),
+                new KeyValuePair<string, string?>("SqlDatabase:invoices:DatabaseName", "invoices"),
+            ])
+            .Build();
+
+        ServiceCollection services = new ServiceCollection();
+        services.AddSingleton(configuration);
+        services.LoadAzureConfigs();
+        services.AddSqlArtifactContexts(registry => registry.AddForIdentifier<ProbeContext>("orders", options => new ProbeContext(options)));
+        services.AddSqlArtifactContexts(registry => registry.AddForIdentifier<ProbeContext>("invoices", options => new ProbeContext(options)));
+
+        TimelineRun run = await Timeline.Create()
+            .Trigger(new BuildsContextStep("orders")).Name("orders")
+            .Trigger(new BuildsContextStep("invoices")).Name("invoices")
+            .Build()
+            .SetupRun(services.BuildServiceProvider(), output.WriteLine)
+            .RunAsync();
+
+        run.EnsureRanToCompletion();
+        Assert.Contains("Database=invoices", run.VariableStore.GetVariable<string>("connection")!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TwoRegistrationsForOneIdentifier_AreRefusedByName_WithinACallOrAcrossTwo()
+    {
+        Assert.Throws<FrameworkConfigurationException>(() => new ServiceCollection().AddSqlArtifactContexts(registry =>
+        {
+            registry.AddForIdentifier<ProbeContext>("orders", options => new ProbeContext(options));
+            registry.AddForIdentifier<ProbeContext>("orders", options => new ProbeContext(options));
+        }));
+
+        ServiceCollection services = new ServiceCollection();
+        services.AddSqlArtifactContexts(registry => registry.AddForIdentifier<ProbeContext>("orders", options => new ProbeContext(options)));
+        services.AddSqlArtifactContexts(registry => registry.AddForIdentifier<ProbeContext>("orders", options => new ProbeContext(options)));
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        FrameworkConfigurationException refusal = Assert.Throws<FrameworkConfigurationException>(() => provider.GetRequiredService<SqlDbContextRegistry>());
+        Assert.Contains("Two SQL contexts are registered for 'orders'", refusal.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TwoDefaults_AreRefused()
+    {
+        ServiceCollection services = new ServiceCollection();
+        services.AddSqlArtifactContexts(registry => registry.AddDefault<ProbeContext>(options => new ProbeContext(options)));
+        services.AddSqlArtifactContexts(registry => registry.AddDefault<ProbeContext>(options => new ProbeContext(options)));
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        Assert.Throws<FrameworkConfigurationException>(() => provider.GetRequiredService<SqlDbContextRegistry>());
+    }
+
     private async Task<TimelineRun> Run(
         PublishingEnvironment? environment,
         string resolves = "orders",
