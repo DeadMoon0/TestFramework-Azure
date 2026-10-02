@@ -102,7 +102,7 @@ public sealed class CosmosDbItemArtifactReference<TItem> : ArtifactReference<Cos
 
         if (itemResp.Content is not null)
         {
-            CosmosDbItemArtifactData<TItem> data = new CosmosDbItemArtifactData<TItem>(FromStream<TItem>(itemResp.Content)) { Identifier = versionIdentifier };
+            CosmosDbItemArtifactData<TItem> data = new CosmosDbItemArtifactData<TItem>(CosmosJson.ReadItem<TItem>(itemResp.Content)) { Identifier = versionIdentifier };
             return new ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>,
                 CosmosDbItemArtifactReference<TItem>>
             {
@@ -159,24 +159,6 @@ public sealed class CosmosDbItemArtifactReference<TItem> : ArtifactReference<Cos
         CanDeconstruct = true;
     }
 
-    private static T FromStream<T>(Stream stream)
-    {
-        using (stream)
-        {
-            if (typeof(Stream).IsAssignableFrom(typeof(T)))
-            {
-                return (T)(object)stream;
-            }
-
-            using (StreamReader sr = new StreamReader(stream))
-            {
-                using (JsonTextReader jsonTextReader = new JsonTextReader(sr))
-                {
-                    return JsonSerializer.CreateDefault().Deserialize<T>(jsonTextReader) ?? throw new TestFramework.Core.Exceptions.FrameworkStateException("Could not read and parse JSON from CosmosDb.");
-                }
-            }
-        }
-    }
 
     /// <summary>
     /// Returns a readable string representation of the reference.

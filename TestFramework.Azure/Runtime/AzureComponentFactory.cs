@@ -360,10 +360,18 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
         public async IAsyncEnumerable<TItem> QueryItemsAsync<TItem>(QueryDefinition query, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            FeedIterator<TItem> iterator = GetContainer().GetItemQueryIterator<TItem>(query);
+            // The stream iterator and the family's serializer, as ReadItemAsync does: one record, one way of reading it.
+            using FeedIterator iterator = GetContainer().GetItemQueryStreamIterator(query);
             while (iterator.HasMoreResults)
             {
-                foreach (TItem item in await iterator.ReadNextAsync(cancellationToken))
+                using ResponseMessage page = await iterator.ReadNextAsync(cancellationToken);
+                page.EnsureSuccessStatusCode();
+
+                MemoryStream buffer = new MemoryStream();
+                await page.Content.CopyToAsync(buffer, cancellationToken);
+                buffer.Position = 0;
+
+                foreach (TItem item in TestFramework.Azure.DB.CosmosDB.CosmosJson.ReadQueryPage<TItem>(buffer))
                 {
                     yield return item;
                 }
