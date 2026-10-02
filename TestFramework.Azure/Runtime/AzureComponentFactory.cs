@@ -427,17 +427,19 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
         public DefaultServiceBusMessagePump(ServiceBusClient client, ServiceBusConfig config, string? subscriptionName)
         {
+            // Queue first, as the receive mode decides: the entry names one entity, and this asks the same question
+            // the mode did rather than a second one that could answer differently.
             if (config.RequiredSession)
             {
-                _sessionProcessor = config.IsTopic
-                    ? client.CreateSessionProcessor(config.TopicName, subscriptionName, new ServiceBusSessionProcessorOptions { AutoCompleteMessages = false })
-                    : client.CreateSessionProcessor(config.EntityName, new ServiceBusSessionProcessorOptions { AutoCompleteMessages = false });
+                _sessionProcessor = config.IsQueue
+                    ? client.CreateSessionProcessor(config.QueueName, new ServiceBusSessionProcessorOptions { AutoCompleteMessages = false })
+                    : client.CreateSessionProcessor(config.TopicName, subscriptionName, new ServiceBusSessionProcessorOptions { AutoCompleteMessages = false });
             }
             else
             {
-                _processor = config.IsTopic
-                    ? client.CreateProcessor(config.TopicName, subscriptionName, new ServiceBusProcessorOptions { AutoCompleteMessages = false })
-                    : client.CreateProcessor(config.EntityName, new ServiceBusProcessorOptions { AutoCompleteMessages = false });
+                _processor = config.IsQueue
+                    ? client.CreateProcessor(config.QueueName, new ServiceBusProcessorOptions { AutoCompleteMessages = false })
+                    : client.CreateProcessor(config.TopicName, subscriptionName, new ServiceBusProcessorOptions { AutoCompleteMessages = false });
             }
         }
 

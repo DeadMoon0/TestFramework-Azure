@@ -103,7 +103,7 @@ internal sealed class ServiceBusShape(IConfigProvider provider) : ConfigShape<Se
             TopicName = Text(values, AzureEnvironmentResourceKinds.TopicNameValue),
             SubscriptionName = Text(values, AzureEnvironmentResourceKinds.SubscriptionNameValue),
             RequiredSession = Flag(values, AzureEnvironmentResourceKinds.RequiredSessionValue, identifier, fallback: false),
-        };
+        }.EnsureNamesOneEntity(identifier);
     }
 
 }

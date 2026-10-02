@@ -79,6 +79,31 @@ public sealed record ServiceBusConfig
     }
 
     /// <summary>
+    /// Refuses an entry that names both a queue and a topic.
+    /// </summary>
+    /// <remarks>
+    /// Both readers call this - the settings file's and the run's - so a record built in code is held to it too: a run
+    /// reads every record back through its shape. With both names set, the receive mode said queue while the receiver
+    /// was built for the topic, and the wait failed with a bare SDK error about a null subscription. An entry naming
+    /// neither is a namespace - a container environment declares one - and is refused where an entity is needed.
+    /// </remarks>
+    /// <param name="identifier">The entry's identifier, for the message.</param>
+    /// <returns>This record.</returns>
+    internal ServiceBusConfig EnsureNamesOneEntity(string identifier)
+    {
+        if (IsQueue && IsTopic)
+        {
+            throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
+                $"Service Bus entry '{identifier}' names both a queue ('{QueueName}') and a topic ('{TopicName}'); an entry addresses one entity.")
+            {
+                RecoverySteps = ["Keep QueueName or TopicName, and declare the other as an entry of its own."],
+            };
+        }
+
+        return this;
+    }
+
+    /// <summary>
     /// Gets a value indicating whether this configuration targets a topic.
     /// </summary>
     public bool IsTopic => !string.IsNullOrEmpty(TopicName);

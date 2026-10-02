@@ -136,7 +136,7 @@ public class DefaultConfigProvider : IConfigProvider
             // A named refusal instead of bool.Parse's raw FormatException - the values-path reader
             // already refuses this way, and two readers for one section must agree.
             RequiredSession = ReadOptionalFlag(entry, ServiceBusSelector, identifier, nameof(ServiceBusConfig.RequiredSession)),
-        };
+        }.EnsureNamesOneEntity(identifier);
     }
 
     /// <inheritdoc />
