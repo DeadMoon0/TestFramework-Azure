@@ -82,7 +82,7 @@
     - If the user's project already has its own config naming or section layout, implement a project-specific IConfigProvider that translates the user's layout into TestFramework.Azure config objects.
     - If no project-specific mapping for a field is needed, map that field exactly like the default package behavior would map it.
     - Only override the fields or section names that actually differ from the default contract; do not rewrite the whole provider just because one or two fields are different.
-    - The normal integration point is a common shared project that exposes one extension method which calls LoadAzureConfig(customProvider) or services.LoadAzureConfigs(configuration, customProvider).
+    - The normal integration point is a common shared project that exposes one extension method which calls LoadAzureConfig(customProvider) or services.LoadAzureConfigs(customProvider); the run supplies the configuration, so neither takes one.
     - That shared extension should become the single project-level adapter so test code keeps calling one project-specific method instead of repeating provider wiring everywhere.
 
     Naming guidance:
@@ -131,7 +131,7 @@
     Project adapter pattern:
     - create one shared project extension method in the user's common project
     - inside it, instantiate or resolve the project's custom IConfigProvider
-    - call LoadAzureConfig(customProvider) or LoadAzureConfigs(configuration, customProvider)
+    - call LoadAzureConfig(customProvider) or services.LoadAzureConfigs(customProvider)
     - let unchanged fields fall through to the same semantics as DefaultConfigProvider
     - keep raw section-name translation inside that adapter, not in the individual tests
 </sample_patterns>

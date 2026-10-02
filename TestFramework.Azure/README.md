@@ -403,9 +403,9 @@ using TestFramework.Config;
 using TestFramework.Core.Timelines;
 
 ConfigInstance config = ConfigInstance.FromJsonFile("local.testSettings.json")
-    .AddService((services, configuration) =>
+    .AddService(services =>
     {
-        services.LoadAzureConfigs(configuration)
+        services.LoadAzureConfigs()
             .ConfigureCosmosClientOptions(_ => new CosmosClientOptions
             {
                 ConnectionMode = ConnectionMode.Gateway,

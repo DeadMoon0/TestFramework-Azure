@@ -433,11 +433,19 @@ public class ReadmeSamplesTests
     [InlineData("CallForRunContext")]
     [InlineData("LogicAppCapturedResult")]
     [InlineData(".GetCallbackUrl(")]
+    [InlineData("LoadAzureConfigs(configuration")]
+    [InlineData("createTempSubscription:")]
+    [InlineData("completeMessage:")]
+    [InlineData(".GetSuccess(")]
     public void PackedReadme_DoesNotAdvertiseApisThatDoNotExist(string inventedApi)
     {
-        string readme = File.ReadAllText(FindPackedReadme());
+        // The README ships in the package and the skill file is what an assistant writes code from, so neither may
+        // name an API a stranger's compiler then refuses.
+        string readme = FindPackedReadme();
+        string skill = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(readme)!)!, "AI", "TestFramework.Azure.SKILL.md");
 
-        Assert.DoesNotContain(inventedApi, readme, StringComparison.Ordinal);
+        foreach (string document in new[] { readme, skill })
+            Assert.DoesNotContain(inventedApi, File.ReadAllText(document), StringComparison.Ordinal);
     }
 
     private static string FindPackedReadme()
