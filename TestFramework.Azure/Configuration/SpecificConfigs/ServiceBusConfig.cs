@@ -30,11 +30,15 @@ public enum ServiceBusConfigReceiveMode
 /// The identifier maps to a named entry under the <c>ServiceBus</c> section.
 /// Configure either <see cref="QueueName"/> for queue-backed usage or <see cref="TopicName"/> for topic-backed usage, but not both.
 /// </remarks>
-public record ServiceBusConfig
+public sealed record ServiceBusConfig
 {
+    // Its text redacts its credentials; see ConfigRecordText.
+    private bool PrintMembers(System.Text.StringBuilder builder) => ConfigRecordText.PrintMembers(this, builder);
+
     /// <summary>
     /// Shared connection string for the Service Bus namespace.
     /// </summary>
+    [Secret]
     public required string ConnectionString { get; init; }
 
     /// <summary>

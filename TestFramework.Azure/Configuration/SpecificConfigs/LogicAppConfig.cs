@@ -10,8 +10,11 @@ namespace TestFramework.Azure.Configuration.SpecificConfigs;
 /// The identifier maps to a named entry under the <c>LogicApp</c> section.
 /// Standard and Consumption settings are modeled separately so callers only provide values for the hosting model they use.
 /// </remarks>
-public record LogicAppConfig
+public sealed record LogicAppConfig
 {
+    // Its text redacts its credentials; see ConfigRecordText.
+    private bool PrintMembers(System.Text.StringBuilder builder) => ConfigRecordText.PrintMembers(this, builder);
+
     /// <summary>
     /// Selects whether the configured Logic App uses the Standard host model or the Consumption callback-url model.
     /// </summary>
@@ -86,8 +89,11 @@ public record LogicAppConfig
 /// <summary>
 /// Standard-hosted Logic App connection settings.
 /// </summary>
-public record LogicAppStandardConfig
+public sealed record LogicAppStandardConfig
 {
+    // Its text redacts its credentials; see ConfigRecordText.
+    private bool PrintMembers(System.Text.StringBuilder builder) => ConfigRecordText.PrintMembers(this, builder);
+
     /// <summary>
     /// Absolute Logic App host URL, for example <c>https://my-logic.azurewebsites.net/</c>.
     /// </summary>
@@ -96,24 +102,30 @@ public record LogicAppStandardConfig
     /// <summary>
     /// Optional runtime key used for Standard invocation helpers.
     /// </summary>
+    [Secret]
     public string? Code { get; init; }
 
     /// <summary>
     /// Optional host-level admin key used for Standard management endpoints. When absent, management
     /// requests fall back to <see cref="Code"/>, because a locally hosted runtime accepts either.
     /// </summary>
+    [Secret]
     public string? AdminCode { get; init; }
 }
 
 /// <summary>
 /// Consumption-hosted Logic App connection settings.
 /// </summary>
-public record LogicAppConsumptionConfig
+public sealed record LogicAppConsumptionConfig
 {
+    // Its text redacts its credentials; see ConfigRecordText.
+    private bool PrintMembers(System.Text.StringBuilder builder) => ConfigRecordText.PrintMembers(this, builder);
+
     /// <summary>
     /// Direct invoke URL for request-trigger execution.
     /// Supports <c>{workflowName}</c> and <c>{triggerName}</c> tokens.
     /// </summary>
+    [SignedUrl]
     public string? InvokeUrl { get; init; }
 
     /// <summary>

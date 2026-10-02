@@ -6,11 +6,15 @@
 /// <remarks>
 /// The identifier maps to a named entry under the <c>SqlDatabase</c> section.
 /// </remarks>
-public record SqlDatabaseConfig
+public sealed record SqlDatabaseConfig
 {
+    // Its text redacts its credentials; see ConfigRecordText.
+    private bool PrintMembers(System.Text.StringBuilder builder) => ConfigRecordText.PrintMembers(this, builder);
+
     /// <summary>
     /// Connection string used by the resolved <c>DbContext</c>.
     /// </summary>
+    [Secret]
     public required string ConnectionString { get; init; }
 
     /// <summary>

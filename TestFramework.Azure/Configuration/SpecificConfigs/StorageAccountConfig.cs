@@ -9,11 +9,15 @@ namespace TestFramework.Azure.Configuration.SpecificConfigs;
 /// The identifier maps to a named entry under the <c>StorageAccount</c> section.
 /// <see cref="ConnectionString"/> is always required. Container/table names are required only for the Azure features that use them.
 /// </remarks>
-public record StorageAccountConfig
+public sealed record StorageAccountConfig
 {
+    // Its text redacts its credentials; see ConfigRecordText.
+    private bool PrintMembers(System.Text.StringBuilder builder) => ConfigRecordText.PrintMembers(this, builder);
+
     /// <summary>
     /// Storage account connection string.
     /// </summary>
+    [Secret]
     public required string ConnectionString { get; init; }
 
     /// <summary>
