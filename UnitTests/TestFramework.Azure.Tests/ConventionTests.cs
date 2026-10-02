@@ -96,4 +96,17 @@ public class ConventionTests(ITestOutputHelper output)
 
         output.WriteLine(report.ToString());
     }
+
+    [Fact]
+    public void EveryExceptionThisPackageThrowsIsAFrameworkException()
+    {
+        // One base, so a failure always carries its recovery steps and reads the same way in a run's failure detail.
+        // Two used to derive from bare Exception, and one of them said only "Code cannot be Empty or Null".
+        string[] strays = [.. typeof(CosmosModelSchemaResolver).Assembly.GetTypes()
+            .Where(type => type.IsPublic && typeof(System.Exception).IsAssignableFrom(type))
+            .Where(type => !typeof(TestFramework.Core.Exceptions.TimelineFrameworkException).IsAssignableFrom(type))
+            .Select(type => type.FullName!)];
+
+        Assert.Empty(strays);
+    }
 }

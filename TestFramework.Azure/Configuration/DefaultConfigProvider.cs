@@ -109,9 +109,9 @@ public class DefaultConfigProvider : IConfigProvider
 
         return new CosmosContainerDbConfig
         {
-            ConnectionString = entry.GetSection(nameof(CosmosContainerDbConfig.ConnectionString)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.ConnectionString)),
-            DatabaseName = entry.GetSection(nameof(CosmosContainerDbConfig.DatabaseName)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.DatabaseName)),
-            ContainerName = entry.GetSection(nameof(CosmosContainerDbConfig.ContainerName)).Value ?? throw new ConfigurationValidationException(nameof(CosmosContainerDbConfig.ContainerName)),
+            ConnectionString = Required(entry, CosmosDbSelector, identifier, nameof(CosmosContainerDbConfig.ConnectionString)),
+            DatabaseName = Required(entry, CosmosDbSelector, identifier, nameof(CosmosContainerDbConfig.DatabaseName)),
+            ContainerName = Required(entry, CosmosDbSelector, identifier, nameof(CosmosContainerDbConfig.ContainerName)),
 
             // Read, not dropped: the record documents that creation "must be opted into explicitly" -
             // an opt-in that a file cannot express is no opt-in, and a configured throughput that never
@@ -128,7 +128,7 @@ public class DefaultConfigProvider : IConfigProvider
 
         return new ServiceBusConfig
         {
-            ConnectionString = entry.GetSection(nameof(ServiceBusConfig.ConnectionString)).Value ?? throw new ConfigurationValidationException(nameof(ServiceBusConfig.ConnectionString)),
+            ConnectionString = Required(entry, ServiceBusSelector, identifier, nameof(ServiceBusConfig.ConnectionString)),
             QueueName = entry.GetSection(nameof(ServiceBusConfig.QueueName)).Value,
             TopicName = entry.GetSection(nameof(ServiceBusConfig.TopicName)).Value,
             SubscriptionName = entry.GetSection(nameof(ServiceBusConfig.SubscriptionName)).Value,
@@ -146,7 +146,7 @@ public class DefaultConfigProvider : IConfigProvider
 
         FunctionAppConfig config = new()
         {
-            BaseUrl = entry.GetSection(nameof(FunctionAppConfig.BaseUrl)).Value ?? throw new ConfigurationValidationException(nameof(FunctionAppConfig.BaseUrl)),
+            BaseUrl = Required(entry, FunctionAppBaseSelector, identifier, nameof(FunctionAppConfig.BaseUrl)),
             Code = entry.GetSection(nameof(FunctionAppConfig.Code)).Value,
             AdminCode = entry.GetSection(nameof(FunctionAppConfig.AdminCode)).Value,
         };
@@ -163,7 +163,7 @@ public class DefaultConfigProvider : IConfigProvider
     {
         return new StorageAccountConfig
         {
-            ConnectionString = configuration.GetSection(StorageAccountSelector).GetSection(identifier).GetSection(nameof(StorageAccountConfig.ConnectionString)).Value ?? throw new ConfigurationValidationException(nameof(StorageAccountConfig.ConnectionString)),
+            ConnectionString = Required(configuration.GetSection(StorageAccountSelector).GetSection(identifier), StorageAccountSelector, identifier, nameof(StorageAccountConfig.ConnectionString)),
             BlobContainerName = configuration.GetSection(StorageAccountSelector).GetSection(identifier).GetSection(nameof(StorageAccountConfig.BlobContainerName)).Value,
             QueueContainerName = configuration.GetSection(StorageAccountSelector).GetSection(identifier).GetSection(nameof(StorageAccountConfig.QueueContainerName)).Value,
             TableContainerName = configuration.GetSection(StorageAccountSelector).GetSection(identifier).GetSection(nameof(StorageAccountConfig.TableContainerName)).Value,
@@ -175,8 +175,8 @@ public class DefaultConfigProvider : IConfigProvider
     {
         return new SqlDatabaseConfig
         {
-            ConnectionString = configuration.GetSection(SqlDatabaseSelector).GetSection(identifier).GetSection(nameof(SqlDatabaseConfig.ConnectionString)).Value ?? throw new ConfigurationValidationException(nameof(SqlDatabaseConfig.ConnectionString)),
-            DatabaseName = configuration.GetSection(SqlDatabaseSelector).GetSection(identifier).GetSection(nameof(SqlDatabaseConfig.DatabaseName)).Value ?? throw new ConfigurationValidationException(nameof(SqlDatabaseConfig.DatabaseName)),
+            ConnectionString = Required(configuration.GetSection(SqlDatabaseSelector).GetSection(identifier), SqlDatabaseSelector, identifier, nameof(SqlDatabaseConfig.ConnectionString)),
+            DatabaseName = Required(configuration.GetSection(SqlDatabaseSelector).GetSection(identifier), SqlDatabaseSelector, identifier, nameof(SqlDatabaseConfig.DatabaseName)),
         };
     }
 
@@ -200,6 +200,29 @@ public class DefaultConfigProvider : IConfigProvider
         return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed)
             ? parsed
             : throw Unreadable(selector, identifier, property, value, "a whole number");
+    }
+
+    /// <summary>
+    /// Reads a setting the entry cannot do without, refusing it by its full path when it is absent or empty.
+    /// </summary>
+    /// <remarks>
+    /// The path is the thing to open: with six sections and several entries each, "ConnectionString cannot be Empty
+    /// or Null" did not say which file entry to fix.
+    /// </remarks>
+    private static string Required(IConfigurationSection entry, string selector, string identifier, string property)
+    {
+        string? value = entry.GetSection(property).Value;
+        if (value is { Length: > 0 })
+            return value;
+
+        string path = $"{selector}:{identifier}:{property}";
+        throw new FrameworkConfigurationException(
+            entry.Exists()
+                ? $"'{path}' is missing, and the '{selector}:{identifier}' entry needs it."
+                : $"'{path}' is missing: there is no '{selector}:{identifier}' entry in the configuration.")
+        {
+            RecoverySteps = [$"Set it in the configuration, for example \"{selector}\": {{ \"{identifier}\": {{ \"{property}\": \"...\" }} }} in the test settings file."],
+        };
     }
 
     private static FrameworkConfigurationException Unreadable(string selector, string identifier, string property, string value, string expected)

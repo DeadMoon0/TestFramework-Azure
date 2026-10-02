@@ -104,6 +104,28 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public void AMissingEntry_IsNamedAsMissingRatherThanAsOneMissingSetting()
+    {
+        DefaultConfigProvider provider = new();
+
+        FrameworkConfigurationException exception = Assert.Throws<FrameworkConfigurationException>(
+            () => provider.LoadServiceBusConfig(BuildConfiguration([]), "orders"));
+
+        Assert.Contains("there is no 'ServiceBus:orders' entry", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnEmptyRequiredSetting_IsRefusedLikeAnAbsentOne()
+    {
+        DefaultConfigProvider provider = new();
+
+        FrameworkConfigurationException exception = Assert.Throws<FrameworkConfigurationException>(
+            () => provider.LoadSqlDatabaseConfig(BuildConfiguration(new Dictionary<string, string?> { ["SqlDatabase:main:ConnectionString"] = "", ["SqlDatabase:main:DatabaseName"] = "db" }), "main"));
+
+        Assert.Contains("ConnectionString' is missing", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DefaultConfigProvider_ThrowsWhenRequiredFieldIsMissing()
     {
         IConfiguration configuration = BuildConfiguration(new Dictionary<string, string?>
@@ -113,9 +135,11 @@ public class AzureConfigurationTests
 
         DefaultConfigProvider provider = new();
 
-        ConfigurationValidationException exception = Assert.Throws<ConfigurationValidationException>(() => provider.LoadFunctionAppConfig(configuration, "notify"));
+        FrameworkConfigurationException exception = Assert.Throws<FrameworkConfigurationException>(() => provider.LoadFunctionAppConfig(configuration, "notify"));
 
-        Assert.Contains("BaseUrl", exception.Message, StringComparison.Ordinal);
+        // The full path, so the entry to open is named, and the shape to write.
+        Assert.Contains("'FunctionApp:notify:BaseUrl' is missing", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(exception.RecoverySteps, step => step.Contains("\"FunctionApp\": { \"notify\": { \"BaseUrl\"", StringComparison.Ordinal));
     }
 
     /// <summary>

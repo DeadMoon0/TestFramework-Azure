@@ -38,7 +38,10 @@ internal record RemoteConnection(Uri BasePath)
         PingReply reply = await pingSender.SendPingAsync(BasePath.Host, timeout, null, null, cancellationToken);
         if (reply.Status != IPStatus.Success)
         {
-            throw new FunctionAppPingException("Ping was not Successful with Status: " + reply.Status, null);
+            throw new FunctionAppPingException(
+                $"'{DisplayPath}' did not answer a ping: {reply.Status}.",
+                ["Check the Function App's BaseUrl.", "A host that drops ICMP answers HTTP still: set FunctionAppTriggerConfig.DoPing = false."],
+                null);
         }
     }
 
@@ -67,12 +70,14 @@ internal record RemoteConnection(Uri BasePath)
         {
             throw new FunctionAppPingException(
                 $"'{DisplayPath}' did not answer an HTTP probe within {probeTimeout}. The host is unreachable or is black-holing traffic.",
+                ["Check that the host at the Function App's BaseUrl is running and reachable from this machine.", "A slow host needs a longer FunctionAppTriggerConfig.ReachabilityProbeTimeout."],
                 null);
         }
         catch (HttpRequestException exception)
         {
             throw new FunctionAppPingException(
                 $"'{DisplayPath}' could not be reached over HTTP: {LogicAppUriRedaction.Redact(exception.Message)}",
+                ["Check the Function App's BaseUrl, and that the host is running and reachable from this machine."],
                 exception);
         }
     }
