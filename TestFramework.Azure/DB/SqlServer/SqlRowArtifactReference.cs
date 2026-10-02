@@ -61,8 +61,7 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
     public override void DeclareIO(StepIOContract contract)
     {
         foreach (var pkRef in _primaryKeyValues)
-            if (pkRef.HasIdentifier)
-                contract.Inputs.Add(new StepIOEntry(pkRef.Identifier!.Identifier, StepIOKind.Variable, true, typeof(string)));
+            contract.Input(pkRef);
     }
 
     internal string[] GetPrimaryKeyValues(VariableStore variableStore)

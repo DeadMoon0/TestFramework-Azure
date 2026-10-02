@@ -78,8 +78,10 @@ public class DefaultConfigProvider : IConfigProvider
             hostingMode = Enum.TryParse(declaredMode, ignoreCase: true, out LogicAppHostingMode parsed)
                 ? parsed
                 : throw new FrameworkConfigurationException(
-                    $"'{LogicAppSelector}:{identifier}:{nameof(LogicAppConfig.HostingMode)}' holds '{declaredMode}', which is not a hosting mode.",
-                    [$"Use one of: {string.Join(", ", Enum.GetNames<LogicAppHostingMode>())}."]);
+                    $"'{LogicAppSelector}:{identifier}:{nameof(LogicAppConfig.HostingMode)}' holds '{declaredMode}', which is not a hosting mode.")
+                {
+                    RecoverySteps = [$"Use one of: {string.Join(", ", Enum.GetNames<LogicAppHostingMode>())}."],
+                };
         }
 
         return new LogicAppConfig
@@ -201,5 +203,8 @@ public class DefaultConfigProvider : IConfigProvider
     }
 
     private static FrameworkConfigurationException Unreadable(string selector, string identifier, string property, string value, string expected)
-        => new($"'{selector}:{identifier}:{property}' holds '{value}', which cannot be read as {expected}.", ["Correct the configuration entry."]);
+        => new($"'{selector}:{identifier}:{property}' holds '{value}', which cannot be read as {expected}.")
+        {
+            RecoverySteps = ["Correct the configuration entry."],
+        };
 }

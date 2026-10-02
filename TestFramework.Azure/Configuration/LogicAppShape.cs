@@ -117,8 +117,10 @@ internal sealed class LogicAppShape(IConfigProvider provider) : ConfigShape<Logi
             hostingMode = Enum.TryParse(declaredMode, ignoreCase: true, out LogicAppHostingMode parsed)
                 ? parsed
                 : throw new FrameworkConfigurationException(
-                    $"The run holds '{declaredMode}' as {nameof(LogicAppConfig.HostingMode)} for Logic App '{identifier}', which is not a hosting mode.",
-                    [$"Use one of: {string.Join(", ", Enum.GetNames<LogicAppHostingMode>())}."]);
+                    $"The run holds '{declaredMode}' as {nameof(LogicAppConfig.HostingMode)} for Logic App '{identifier}', which is not a hosting mode.")
+                {
+                    RecoverySteps = [$"Use one of: {string.Join(", ", Enum.GetNames<LogicAppHostingMode>())}."],
+                };
         }
 
         string? address = Text(values, ValueNames.BaseUrl);

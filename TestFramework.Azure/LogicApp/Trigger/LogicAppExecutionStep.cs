@@ -52,12 +52,9 @@ internal sealed class LogicAppExecutionStep(
 
     public override void DeclareIO(StepIOContract contract)
     {
-        if (request.WorkflowName is not null && request.WorkflowName.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(request.WorkflowName.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
-        if (request.TriggerName.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(request.TriggerName.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
-        if (request.Request is not null && request.Request.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(request.Request.Identifier!.Identifier, StepIOKind.Variable, true, typeof(CommonHttpRequest)));
+        contract.OptionalInput(request.WorkflowName);
+        contract.OptionalInput(request.TriggerName);
+        contract.Input(request.Request);
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)

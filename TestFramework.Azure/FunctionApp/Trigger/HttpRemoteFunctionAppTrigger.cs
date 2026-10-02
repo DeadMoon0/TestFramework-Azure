@@ -126,10 +126,8 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
 
     public override void DeclareIO(StepIOContract contract)
     {
-        if (trigger.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(trigger.Identifier!.Identifier, StepIOKind.Variable, true, typeof(TriggerHttpRouting)));
-        if (request.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(request.Identifier!.Identifier, StepIOKind.Variable, true, typeof(CommonHttpRequest)));
+        contract.Input(trigger);
+        contract.Input(request);
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)

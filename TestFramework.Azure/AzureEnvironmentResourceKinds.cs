@@ -117,9 +117,9 @@ public static class AzureEnvironmentResourceKinds
     public static readonly ResourceKind FunctionAppKind = ResourceKind
         .Named(FunctionApp)
         .OffersPerVantage(ValueNames.BaseUrl)
-        .Offers(RoutePrefixValue, optional: true)
-        .Offers(CodeValue, optional: true, secret: true)
-        .Offers(AdminCodeValue, optional: true, secret: true)
+        .Offers(RoutePrefixValue, ValueTraits.Optional)
+        .Offers(CodeValue, ValueTraits.Optional | ValueTraits.Secret)
+        .Offers(AdminCodeValue, ValueTraits.Optional | ValueTraits.Secret)
         .Build();
 
     /// <summary>
@@ -136,12 +136,12 @@ public static class AzureEnvironmentResourceKinds
         // it by construction - a listing must not be the second channel that hands it out raw. The
         // Standard host URL gets redacted along with it, which costs a reader an address that never
         // authenticated anyone; the alternative cost was a replayable invoke URL in every snapshot.
-        .OffersPerVantage(ValueNames.BaseUrl, optional: true, secret: true)
-        .Offers("HostingMode", optional: true)
-        .Offers("WorkflowName", optional: true)
-        .Offers("Standard:Code", optional: true, secret: true)
-        .Offers("Standard:AdminCode", optional: true, secret: true)
-        .Offers("Consumption:WorkflowResourceId", optional: true)
+        .OffersPerVantage(ValueNames.BaseUrl, ValueTraits.Optional | ValueTraits.Secret)
+        .Offers("HostingMode", ValueTraits.Optional)
+        .Offers("WorkflowName", ValueTraits.Optional)
+        .Offers("Standard:Code", ValueTraits.Optional | ValueTraits.Secret)
+        .Offers("Standard:AdminCode", ValueTraits.Optional | ValueTraits.Secret)
+        .Offers("Consumption:WorkflowResourceId", ValueTraits.Optional)
         .Build();
 
     /// <summary>
@@ -149,11 +149,11 @@ public static class AzureEnvironmentResourceKinds
     /// </summary>
     public static readonly ResourceKind ServiceBusKind = ResourceKind
         .Named(ServiceBus)
-        .OffersPerVantage(ValueNames.ConnectionString, optional: false, secret: true)
-        .Offers(QueueNameValue, optional: true)
-        .Offers(TopicNameValue, optional: true)
-        .Offers(SubscriptionNameValue, optional: true)
-        .Offers(RequiredSessionValue, optional: true)
+        .OffersPerVantage(ValueNames.ConnectionString, ValueTraits.Secret)
+        .Offers(QueueNameValue, ValueTraits.Optional)
+        .Offers(TopicNameValue, ValueTraits.Optional)
+        .Offers(SubscriptionNameValue, ValueTraits.Optional)
+        .Offers(RequiredSessionValue, ValueTraits.Optional)
         .Build();
 
     /// <summary>
@@ -161,10 +161,10 @@ public static class AzureEnvironmentResourceKinds
     /// </summary>
     public static readonly ResourceKind StorageKind = ResourceKind
         .Named(Storage)
-        .OffersPerVantage(ValueNames.ConnectionString, optional: false, secret: true)
-        .Offers(QueueNameValue, optional: true)
-        .Offers(BlobContainerNameValue, optional: true)
-        .Offers(TableContainerNameValue, optional: true)
+        .OffersPerVantage(ValueNames.ConnectionString, ValueTraits.Secret)
+        .Offers(QueueNameValue, ValueTraits.Optional)
+        .Offers(BlobContainerNameValue, ValueTraits.Optional)
+        .Offers(TableContainerNameValue, ValueTraits.Optional)
         .Build();
 
     /// <summary>
@@ -172,11 +172,11 @@ public static class AzureEnvironmentResourceKinds
     /// </summary>
     public static readonly ResourceKind CosmosKind = ResourceKind
         .Named(Cosmos)
-        .OffersPerVantage(ValueNames.ConnectionString, optional: false, secret: true)
+        .OffersPerVantage(ValueNames.ConnectionString, ValueTraits.Secret)
         .Offers(DatabaseNameValue)
         .Offers(ContainerNameValue)
-        .Offers(ProvisionedThroughputValue, optional: true)
-        .Offers(AllowSchemaCreationValue, optional: true)
+        .Offers(ProvisionedThroughputValue, ValueTraits.Optional)
+        .Offers(AllowSchemaCreationValue, ValueTraits.Optional)
         .Build();
 
     /// <summary>
@@ -184,7 +184,7 @@ public static class AzureEnvironmentResourceKinds
     /// </summary>
     public static readonly ResourceKind SqlKind = ResourceKind
         .Named(Sql)
-        .OffersPerVantage(ValueNames.ConnectionString, optional: false, secret: true)
+        .OffersPerVantage(ValueNames.ConnectionString, ValueTraits.Secret)
         .Offers(DatabaseNameValue)
         .Build();
 }

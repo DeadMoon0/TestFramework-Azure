@@ -79,8 +79,7 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
 
     public override void DeclareIO(StepIOContract contract)
     {
-        if (trigger.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(trigger.Identifier!.Identifier, StepIOKind.Variable, true, typeof(TriggerRouting)));
+        contract.Input(trigger);
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)

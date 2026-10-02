@@ -34,10 +34,8 @@ internal class ServiceBusCreateTempSubscriptionStep(
 
     public override void DeclareIO(StepIOContract contract)
     {
-        if (messageId is not null && messageId.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(messageId.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
-        if (correlationId is not null && correlationId.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(correlationId.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
+        contract.OptionalInput(messageId);
+        contract.OptionalInput(correlationId);
     }
 
     public override async Task<EmptyStepResultContext?> Execute(RunContext context)

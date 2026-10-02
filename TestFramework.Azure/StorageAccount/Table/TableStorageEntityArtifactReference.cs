@@ -93,12 +93,9 @@ public class TableStorageEntityArtifactReference<T>
     /// </summary>
     public override void DeclareIO(StepIOContract contract)
     {
-        if (_tableName.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(_tableName.Identifier!.Identifier, StepIOKind.Variable, true, typeof(string)));
-        if (_partitionKey.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(_partitionKey.Identifier!.Identifier, StepIOKind.Variable, true, typeof(string)));
-        if (_rowKey.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(_rowKey.Identifier!.Identifier, StepIOKind.Variable, true, typeof(string)));
+        contract.Input(_tableName);
+        contract.Input(_partitionKey);
+        contract.Input(_rowKey);
     }
 
             /// <summary>

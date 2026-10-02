@@ -25,8 +25,10 @@ internal static class FunctionAppMethodAnalyzer
         if (trigger.Methods is { Length: > 1 })
         {
             throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
-                $"Method '{methodName}' on '{typeof(TFunctionType).Name}' accepts {string.Join(", ", trigger.Methods)}, so which one to call is ambiguous.",
-                ["State the verb explicitly with SelectEndpointWithMethod(methodName, method), SelectEndpoint(path, method) or SelectFunction(name, method)."]);
+                $"Method '{methodName}' on '{typeof(TFunctionType).Name}' accepts {string.Join(", ", trigger.Methods)}, so which one to call is ambiguous.")
+            {
+                RecoverySteps = ["State the verb explicitly with SelectEndpointWithMethod(methodName, method), SelectEndpoint(path, method) or SelectFunction(name, method)."],
+            };
         }
 
         HttpMethod httpMethod = trigger.Methods is { Length: > 0 }
@@ -47,8 +49,10 @@ internal static class FunctionAppMethodAnalyzer
             && !trigger.Methods.Any(m => string.Equals(m, httpMethod.Method, StringComparison.OrdinalIgnoreCase)))
         {
             throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
-                $"Method '{methodName}' on '{typeof(TFunctionType).Name}' accepts {string.Join(", ", trigger.Methods)}, not {httpMethod.Method}.",
-                ["State one of the verbs the trigger declares, or widen the [HttpTrigger] attribute."]);
+                $"Method '{methodName}' on '{typeof(TFunctionType).Name}' accepts {string.Join(", ", trigger.Methods)}, not {httpMethod.Method}.")
+            {
+                RecoverySteps = ["State one of the verbs the trigger declares, or widen the [HttpTrigger] attribute."],
+            };
         }
 
         return new TriggerHttpRouting(trigger.Path, httpMethod, null!);

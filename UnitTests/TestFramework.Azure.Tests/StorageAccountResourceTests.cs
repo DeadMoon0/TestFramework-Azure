@@ -96,7 +96,7 @@ public class StorageAccountResourceTests(ITestOutputHelper output)
             .Trigger(new ResolvesStorageStep("files")).Name("resolves")
             .Build();
 
-        ITimelineRunBuilder builder = timeline.SetupRun(Configured(configured), output);
+        ITimelineRunBuilder builder = timeline.SetupRun(Configured(configured), output.WriteLine);
 
         if (environment is not null)
         {

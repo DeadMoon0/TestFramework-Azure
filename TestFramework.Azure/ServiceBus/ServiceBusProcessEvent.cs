@@ -59,14 +59,10 @@ public class ServiceBusProcessEvent(
     /// <param name="contract">The I/O contract being populated.</param>
     public override void DeclareIO(StepIOContract contract)
     {
-        if (messageId is not null && messageId.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(messageId.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
-        if (correlationId is not null && correlationId.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(correlationId.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
-        if (predicate is not null && predicate.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(predicate.Identifier!.Identifier, StepIOKind.Variable, false));
-        if (createTempSubscription is not null && createTempSubscription.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(createTempSubscription.Identifier!.Identifier, StepIOKind.Variable, false, typeof(bool)));
+        contract.OptionalInput(messageId);
+        contract.OptionalInput(correlationId);
+        contract.OptionalInput(predicate);
+        contract.OptionalInput(createTempSubscription);
     }
 
     /// <summary>
@@ -140,8 +136,10 @@ public class ServiceBusProcessEvent(
         if (useTempSubscription != _tempSubscriptionArmed)
         {
             throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
-                $"'createTempSubscription' for '{identifier}' changed between planning and polling ({_tempSubscriptionArmed} -> {useTempSubscription}).",
-                ["The temporary subscription is created by a pre-step, so the flag must hold one value for the whole run."]);
+                $"'createTempSubscription' for '{identifier}' changed between planning and polling ({_tempSubscriptionArmed} -> {useTempSubscription}).")
+            {
+                RecoverySteps = ["The temporary subscription is created by a pre-step, so the flag must hold one value for the whole run."],
+            };
         }
 
         ServiceBusConfigReceiveMode receiveMode = config.GetReceiveMode(useTempSubscription);

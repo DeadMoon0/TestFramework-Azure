@@ -40,8 +40,7 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
 
     public override void DeclareIO(StepIOContract contract)
     {
-        if (request.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(request.Identifier!.Identifier, StepIOKind.Variable, true, typeof(CommonHttpRequest)));
+        contract.Input(request);
     }
 
     public override async Task<HttpResponseResultContext?> Execute(RunContext context)

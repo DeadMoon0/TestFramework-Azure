@@ -118,8 +118,7 @@ internal abstract class AzureIsLiveTriggerBase(string resourceKind, string resou
 
     public override void DeclareIO(StepIOContract contract)
     {
-        if (AlivenessLevelReference.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(AlivenessLevelReference.Identifier!.Identifier, StepIOKind.Variable, false, typeof(AlivenessLevel)));
+        contract.OptionalInput(AlivenessLevelReference);
     }
 
     public override StepInstance<Step<AzureIsLiveResult>, AzureIsLiveResult> GetInstance() =>

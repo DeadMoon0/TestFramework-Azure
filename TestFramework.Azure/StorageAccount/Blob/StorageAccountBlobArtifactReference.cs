@@ -62,8 +62,7 @@ public class StorageAccountBlobArtifactReference(StorageAccountIdentifier identi
     /// </summary>
     public override void DeclareIO(StepIOContract contract)
     {
-        if (path.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(path.Identifier!.Identifier, StepIOKind.Variable, true, typeof(string)));
+        contract.Input(path);
     }
 
     /// <summary>

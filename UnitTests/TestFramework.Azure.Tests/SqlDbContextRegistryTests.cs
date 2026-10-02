@@ -134,7 +134,7 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
             .Trigger(new BuildsContextStep(resolves)).Name("builds")
             .Build();
 
-        ITimelineRunBuilder builder = timeline.SetupRun(services.BuildServiceProvider(), output);
+        ITimelineRunBuilder builder = timeline.SetupRun(services.BuildServiceProvider(), output.WriteLine);
 
         if (environment is not null)
         {

@@ -21,12 +21,14 @@ internal class SqlDbContextResolver(SqlDbContextRegistry registry, SqlMigrationT
             return byDefault;
 
         throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
-            $"No DbContext is registered for SqlDatabase identifier '{identifier}'.",
-            [
+            $"No DbContext is registered for SqlDatabase identifier '{identifier}'.")
+        {
+            RecoverySteps = [
                 $"Register one: AddSqlArtifactContexts(reg => reg.AddForIdentifier<MyDbContext>(\"{identifier}\", options => new MyDbContext(options)))",
                 "Or register a fallback for every identifier: reg.AddDefault<MyDbContext>(options => new MyDbContext(options))",
             ],
-            [.. registry.RegisteredIdentifiers]);
+            AvailableOptions = [.. registry.RegisteredIdentifiers],
+        };
     }
 
     public Task EnsureReadyAsync(DbContext context, SqlDatabaseIdentifier identifier, ScopedLogger logger)

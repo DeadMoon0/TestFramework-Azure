@@ -89,10 +89,8 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
     /// </summary>
     public override void DeclareIO(StepIOContract contract)
     {
-        if (_partitionKey is not null && _partitionKey.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(_partitionKey.Identifier!.Identifier, StepIOKind.Variable, false));
-        if (_id is not null && _id.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(_id.Identifier!.Identifier, StepIOKind.Variable, false));
+        contract.OptionalInput(_partitionKey);
+        contract.OptionalInput(_id);
     }
 
     internal PartitionKey GetPartitionKey(VariableStore variableStore)

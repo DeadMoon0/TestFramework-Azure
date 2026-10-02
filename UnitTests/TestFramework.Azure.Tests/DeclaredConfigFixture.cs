@@ -55,6 +55,6 @@ internal static class DeclaredConfigFixture
         public override string SourceName => "test fixture";
 
         protected override IEnumerable<DeclaredResource> Declarations =>
-            [new DeclaredResource(shape.Kind, identifier, shape.Values(config), this.SourceName)];
+            [new DeclaredResource { Kind = shape.Kind, Identifier = identifier, Values = shape.Values(config), DeclaredBy = this.SourceName }];
     }
 }

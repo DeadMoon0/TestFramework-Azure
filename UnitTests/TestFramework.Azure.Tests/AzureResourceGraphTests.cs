@@ -206,7 +206,7 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
             .Trigger(new ReadsValueStep(AzureEnvironmentResourceKinds.FunctionApp, "orders-fn", ValueNames.BaseUrl, ResourceVantage.Host)).Name("reads")
             .Build();
 
-        TimelineRun run = await timeline.SetupRun(Configured(configured), output).RunAsync();
+        TimelineRun run = await timeline.SetupRun(Configured(configured), output.WriteLine).RunAsync();
 
         run.EnsureRanToCompletion();
 
@@ -224,7 +224,7 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
             .Trigger(new ReadsValueStep(kind, identifier, valueName, vantage)).Name("reads")
             .Build();
 
-        TimelineRun run = await timeline.SetupRun(Configured(configured), output).RunAsync();
+        TimelineRun run = await timeline.SetupRun(Configured(configured), output.WriteLine).RunAsync();
 
         run.EnsureRanToCompletion();
 

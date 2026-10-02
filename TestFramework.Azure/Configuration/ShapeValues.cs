@@ -40,19 +40,23 @@ internal static class ShapeValues
     /// </summary>
     internal static FrameworkConfigurationException Unreadable(string value, string identifier, string valueName, string expected)
         => new FrameworkConfigurationException(
-            $"The run holds '{value}' as {valueName} for '{identifier}', which cannot be read as {expected}.",
-            [
+            $"The run holds '{value}' as {valueName} for '{identifier}', which cannot be read as {expected}.")
+        {
+            RecoverySteps = [
                 $"Correct the configuration entry, or the environment component that publishes it.",
-            ]);
+            ],
+        };
 
     /// <summary>
     /// The refusal for a required value the run does not hold, listing what it does.
     /// </summary>
     internal static FrameworkConfigurationException Missing(string valueName, string identifier, IReadOnlyDictionary<string, string> values)
         => new FrameworkConfigurationException(
-            $"The run has no {valueName} for '{identifier}'.",
-            [
+            $"The run has no {valueName} for '{identifier}'.")
+        {
+            RecoverySteps = [
                 "Add it to the configuration entry, or include the definition that provisions the resource.",
             ],
-            [.. values.Keys]);
+            AvailableOptions = [.. values.Keys],
+        };
 }

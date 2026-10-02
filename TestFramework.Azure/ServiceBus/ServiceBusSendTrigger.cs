@@ -52,8 +52,7 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
     /// <param name="contract">The I/O contract being populated.</param>
     public override void DeclareIO(StepIOContract contract)
     {
-        if (message.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(message.Identifier!.Identifier, StepIOKind.Variable, true, typeof(ServiceBusMessage)));
+        contract.Input(message);
     }
 
     /// <summary>

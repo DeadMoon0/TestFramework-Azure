@@ -61,22 +61,15 @@ public sealed class LogicAppRunEvent(
     {
         if (projectedSourceReference is not null && projectedSourceReference.HasIdentifier)
         {
-            contract.Inputs.Add(new StepIOEntry(
-                projectedSourceReference.Identifier!.Identifier,
-                StepIOKind.Variable,
-                false,
-                projectedSourceType ?? typeof(object)));
+            contract.OptionalInput(projectedSourceReference);
         }
         else
         {
-            if (workflowName is not null && workflowName.HasIdentifier)
-                contract.Inputs.Add(new StepIOEntry(workflowName.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
-            if (runId.HasIdentifier)
-                contract.Inputs.Add(new StepIOEntry(runId.Identifier!.Identifier, StepIOKind.Variable, false, typeof(string)));
+            contract.OptionalInput(workflowName);
+            contract.OptionalInput(runId);
         }
 
-        if (expectedStatus is not null && expectedStatus.HasIdentifier)
-            contract.Inputs.Add(new StepIOEntry(expectedStatus.Identifier!.Identifier, StepIOKind.Variable, false, typeof(LogicAppRunStatus)));
+        contract.OptionalInput(expectedStatus);
     }
 
     /// <summary>
