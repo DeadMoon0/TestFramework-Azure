@@ -16,6 +16,8 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.DB.CosmosDB;
 
+using TestFramework.Azure.ServiceBus;
+
 namespace TestFramework.Azure.Runtime;
 
 internal interface IAzureComponentFactory
@@ -104,7 +106,7 @@ internal interface IServiceBusSenderAdapter : IAsyncDisposable
 /// Whether non-matching messages are abandoned so their lock is released immediately. False for a
 /// temporary subscription, which filters server-side and therefore never sees a non-matching message.
 /// </param>
-/// <param name="Warn">Receives a one-off warning the first time a message is abandoned.</param>
+/// <param name="Warn">Receives a one-off warning the first time a message is abandoned, and each transient error the processor retries.</param>
 internal readonly record struct ServiceBusReceiveRequest(
     string? MessageId,
     string? CorrelationId,
@@ -424,6 +426,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         private readonly ServiceBusProcessor? _processor;
         private readonly ServiceBusSessionProcessor? _sessionProcessor;
         private int _abandonWarningIssued;
+        private int _receiving;
 
         public DefaultServiceBusMessagePump(ServiceBusClient client, ServiceBusConfig config, string? subscriptionName)
         {
@@ -445,6 +448,11 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
         public async Task<ServiceBusReceivedMessage> ReceiveMessageAsync(ServiceBusReceiveRequest request, CancellationToken cancellationToken)
         {
+            // Handlers attach to the processor, so a second receive would add a second pair beside the first and both
+            // would settle every message. A pump serves one wait.
+            if (Interlocked.Exchange(ref _receiving, 1) != 0)
+                throw new TestFramework.Core.Exceptions.FrameworkStateException("A Service Bus message pump serves one wait; create another for the next one.");
+
             TaskCompletionSource<ServiceBusReceivedMessage> completionSource = new();
 
             if (_sessionProcessor is not null)
@@ -456,11 +464,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
                     (message, token) => args.CompleteMessageAsync(message, token),
                     (message, token) => args.AbandonMessageAsync(message, null, token),
                     cancellationToken);
-                _sessionProcessor.ProcessErrorAsync += args =>
-                {
-                    completionSource.TrySetException(args.Exception);
-                    return Task.CompletedTask;
-                };
+                _sessionProcessor.ProcessErrorAsync += args => OnProcessorError(request, completionSource, args.Exception);
 
                 await _sessionProcessor.StartProcessingAsync(cancellationToken);
                 return await completionSource.Task.WaitAsync(cancellationToken);
@@ -478,11 +482,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
                 (message, token) => args.CompleteMessageAsync(message, token),
                 (message, token) => args.AbandonMessageAsync(message, null, token),
                 cancellationToken);
-            _processor.ProcessErrorAsync += args =>
-            {
-                completionSource.TrySetException(args.Exception);
-                return Task.CompletedTask;
-            };
+            _processor.ProcessErrorAsync += args => OnProcessorError(request, completionSource, args.Exception);
 
             await _processor.StartProcessingAsync(cancellationToken);
             return await completionSource.Task.WaitAsync(cancellationToken);
@@ -506,38 +506,43 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
             Func<ServiceBusReceivedMessage, CancellationToken, Task> abandonAsync,
             CancellationToken cancellationToken)
         {
-            if (!Matches(request, message))
+            bool matches = ServiceBusSettlement.Matches(request, message.MessageId, message.CorrelationId, predicate => predicate(message));
+
+            switch (ServiceBusSettlement.Decide(request, matches))
             {
-                if (!request.AbandonNonMatching)
-                {
+                case ServiceBusSettlementAction.Ignore:
                     return;
-                }
 
-                if (Interlocked.Exchange(ref _abandonWarningIssued, 1) == 0)
-                {
-                    request.Warn?.Invoke(
-                        "Abandoning a non-matching Service Bus message so its lock is released for concurrent runs. " +
-                        "This increases the message's DeliveryCount and moves it closer to dead-lettering.");
-                }
+                case ServiceBusSettlementAction.Abandon:
+                    if (Interlocked.Exchange(ref _abandonWarningIssued, 1) == 0)
+                    {
+                        request.Warn?.Invoke(
+                            "Abandoning a non-matching Service Bus message so its lock is released for concurrent runs. " +
+                            "This increases the message's DeliveryCount and moves it closer to dead-lettering.");
+                    }
 
-                await abandonAsync(message, cancellationToken);
-                return;
+                    await abandonAsync(message, cancellationToken);
+                    return;
+
+                case ServiceBusSettlementAction.Complete:
+                    await completeAsync(message, cancellationToken);
+                    completionSource.TrySetResult(message);
+                    return;
+
+                case ServiceBusSettlementAction.AcceptWithoutCompleting:
+                    completionSource.TrySetResult(message);
+                    return;
             }
-
-            if (request.CompleteMessage)
-            {
-                await completeAsync(message, cancellationToken);
-            }
-
-            completionSource.TrySetResult(message);
         }
 
-        private static bool Matches(ServiceBusReceiveRequest request, ServiceBusReceivedMessage message)
+        private static Task OnProcessorError(ServiceBusReceiveRequest request, TaskCompletionSource<ServiceBusReceivedMessage> completionSource, Exception exception)
         {
-            if (request.MessageId is { } messageId && message.MessageId != messageId) return false;
-            if (request.CorrelationId is { } correlationId && message.CorrelationId != correlationId) return false;
-            if (request.Predicate is { } predicate && !predicate(message)) return false;
-            return true;
+            if (ServiceBusSettlement.EndsTheWait(exception))
+                completionSource.TrySetException(exception);
+            else
+                request.Warn?.Invoke($"A transient Service Bus error was reported and the processor retries it: {exception.Message}");
+
+            return Task.CompletedTask;
         }
 
         public async ValueTask DisposeAsync()
