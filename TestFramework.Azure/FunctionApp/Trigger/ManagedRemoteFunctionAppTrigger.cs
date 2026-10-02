@@ -48,7 +48,8 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
 
         // The admin endpoint authenticates with the MASTER key, not a function key. Fall back to Code
         // only because a locally hosted host accepts anything.
-        message.Headers.Add("x-functions-key", functionConfig.AdminCode ?? functionConfig.Code);
+        if ((functionConfig.AdminCode ?? functionConfig.Code) is { } hostKey)
+            message.Headers.Add("x-functions-key", hostKey);
         message.Content = new StringContent("{}", new System.Net.Http.Headers.MediaTypeHeaderValue(MediaTypeNames.Application.Json));
         IHttpRequestSender sender = context.Services.GetAzureComponentFactory().Http.CreateSender();
         context.Logger.LogInformation("FunctionApp managed '{0}' -> POST {1} (function: {2})", appIdentifier, fullTriggerUri, _trigger.Name);

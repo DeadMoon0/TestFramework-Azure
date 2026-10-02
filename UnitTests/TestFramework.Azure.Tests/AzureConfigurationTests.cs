@@ -17,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using TestFramework.Azure.Configuration;
+using TestFramework.Azure.Extensions;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.DB.CosmosDB;
 using TestFramework.Azure.DB.SqlServer;
@@ -31,6 +32,7 @@ using TestFramework.Azure.Runtime;
 using TestFramework.Azure.ServiceBus;
 using TestFramework.Azure.StorageAccount.Blob;
 using TestFramework.Azure.StorageAccount.Table;
+using TestFramework.Config;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Debugger;
 using TestFramework.Core.Exceptions;
@@ -381,6 +383,50 @@ public class AzureConfigurationTests
         Assert.Equal(2, applicationProperties["attempt"]);
         Assert.True(run.VariableStore.TryGetVariable<DateTimeOffset>("sentScheduledEnqueueTime", out DateTimeOffset scheduledEnqueueTime));
         Assert.Equal(new DateTimeOffset(2026, 05, 26, 12, 30, 00, TimeSpan.Zero), scheduledEnqueueTime);
+    }
+
+    [Fact]
+    public async Task AnEmptyFunctionKeyInTheSettings_IsNoKey_AndTheCallGoesOutWithoutOne()
+    {
+        // Anonymous and locally hosted Function Apps take no key, and a settings file says so with "Code": "".
+        // The provider accepted it, the run's shape dropped it, and rebuilding the record then refused it as missing -
+        // so every call failed with "no Code" for a key the file plainly stated.
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.Accepted));
+        ConfigInstance config = ConfigInstance.Create()
+            .OverrideConfig(new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["FunctionApp:local:BaseUrl"] = "http://localhost:7071/",
+                ["FunctionApp:local:Code"] = "",
+            })
+            .LoadAzureConfig()
+            .AddService(services =>
+            {
+                services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+                services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
+            })
+            .Build();
+
+        TimelineRun run = await Timeline.Create()
+            .Trigger(new HttpRemoteFunctionAppTrigger("local", Var.Const(new TriggerHttpRouting("orders", HttpMethod.Post)), Var.Const(new CommonHttpRequest())))
+            .Build()
+            .SetupRun(config)
+            .RunAsync();
+
+        run.EnsureRanToCompletion();
+        Assert.Equal("http://localhost:7071/api/orders", sender.Request!.RequestUri!.ToString());
+        Assert.False(sender.Request.Headers.Contains("x-functions-key"));
+    }
+
+    [Fact]
+    public void AnEmptyKeyIsHeldAsNoKey_HoweverTheRecordIsBuilt()
+    {
+        FunctionAppConfig function = new() { BaseUrl = "http://localhost:7071/", Code = "", AdminCode = "" };
+        LogicAppStandardConfig logicApp = new() { Code = "", AdminCode = "" };
+
+        Assert.Null(function.Code);
+        Assert.Null(function.AdminCode);
+        Assert.Null(logicApp.Code);
+        Assert.Null(logicApp.AdminCode);
     }
 
     [Fact]

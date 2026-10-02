@@ -106,7 +106,7 @@ Supported record types:
 
 | Section | Record type | Required fields | Optional fields | Used by |
 |---------|-------------|-----------------|-----------------|---------|
-| `FunctionApp:{identifier}` | `FunctionAppConfig` | `BaseUrl`, `Code` | `AdminCode`, `RoutePrefix` | Remote Function App HTTP triggers and Function App liveness checks |
+| `FunctionApp:{identifier}` | `FunctionAppConfig` | `BaseUrl` | `Code` (absent or `""` sends no key, for an anonymous or locally hosted app), `AdminCode`, `RoutePrefix` | Remote Function App HTTP triggers and Function App liveness checks |
 | `LogicApp:{identifier}` | `LogicAppConfig` | no single global required field | `HostingMode`, `WorkflowName`, nested `Standard` and `Consumption` settings | Logic App request triggers, timer triggers, run events, and Logic App liveness checks |
 | `CosmosDb:{identifier}` | `CosmosContainerDbConfig` | `ConnectionString`, `DatabaseName`, `ContainerName` | None | Cosmos artifacts, query finders, and Cosmos liveness checks |
 | `ServiceBus:{identifier}` | `ServiceBusConfig` | `ConnectionString` plus either `QueueName` or `TopicName` | `SubscriptionName`, `RequiredSession` | Service Bus send triggers and message-received events |

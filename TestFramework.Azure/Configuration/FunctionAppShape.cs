@@ -102,7 +102,7 @@ internal sealed class FunctionAppShape(IConfigProvider provider) : ConfigShape<F
         FunctionAppConfig config = new FunctionAppConfig
         {
             BaseUrl = Text(values, ValueNames.BaseUrl) ?? throw Missing(ValueNames.BaseUrl, identifier, values),
-            Code = Text(values, AzureEnvironmentResourceKinds.CodeValue) ?? throw Missing(AzureEnvironmentResourceKinds.CodeValue, identifier, values),
+            Code = Text(values, AzureEnvironmentResourceKinds.CodeValue),
             AdminCode = Text(values, AzureEnvironmentResourceKinds.AdminCodeValue),
         };
 

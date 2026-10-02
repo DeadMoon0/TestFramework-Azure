@@ -147,7 +147,7 @@ public class DefaultConfigProvider : IConfigProvider
         FunctionAppConfig config = new()
         {
             BaseUrl = entry.GetSection(nameof(FunctionAppConfig.BaseUrl)).Value ?? throw new ConfigurationValidationException(nameof(FunctionAppConfig.BaseUrl)),
-            Code = entry.GetSection(nameof(FunctionAppConfig.Code)).Value ?? throw new ConfigurationValidationException(nameof(FunctionAppConfig.Code)),
+            Code = entry.GetSection(nameof(FunctionAppConfig.Code)).Value,
             AdminCode = entry.GetSection(nameof(FunctionAppConfig.AdminCode)).Value,
         };
 

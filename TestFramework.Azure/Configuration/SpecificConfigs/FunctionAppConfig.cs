@@ -5,7 +5,8 @@
 /// </summary>
 /// <remarks>
 /// The identifier maps to a named entry under the <c>FunctionApp</c> section.
-/// <see cref="BaseUrl"/> and <see cref="Code"/> are required for all remote calls.
+/// <see cref="BaseUrl"/> is required for all remote calls. <see cref="Code"/> is the function key: leave it out, or
+/// empty, for a Function App that takes none - an anonymous or a locally hosted one - and no key is sent.
 /// </remarks>
 public sealed record FunctionAppConfig
 {
@@ -37,11 +38,26 @@ public sealed record FunctionAppConfig
     /// Function key used for normal trigger invocations.
     /// </summary>
     [Secret]
-    public required string Code { get; init; }
+    public string? Code
+    {
+        get => code;
+        init => code = NoKeyIfEmpty(value);
+    }
 
     /// <summary>
     /// Optional admin key used for host-level health checks. When absent, <see cref="Code"/> is reused.
     /// </summary>
     [Secret]
-    public string? AdminCode { get; init; }
+    public string? AdminCode
+    {
+        get => adminCode;
+        init => adminCode = NoKeyIfEmpty(value);
+    }
+
+    private readonly string? code;
+    private readonly string? adminCode;
+
+    // An empty key in a settings file means "no key", and is held as one: two spellings of one state would leave
+    // every reader to agree on it, and the one that did not sent an empty x-functions-key header.
+    private static string? NoKeyIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
 }

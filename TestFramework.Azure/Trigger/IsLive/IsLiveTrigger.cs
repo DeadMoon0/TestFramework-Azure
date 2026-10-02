@@ -208,7 +208,8 @@ internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier,
         }
 
         using HttpRequestMessage request = new(HttpMethod.Get, new Uri(remoteConnection.BasePath, HostStatusUri));
-        request.Headers.Add("x-functions-key", functionConfig.AdminCode ?? functionConfig.Code);
+        if ((functionConfig.AdminCode ?? functionConfig.Code) is { } hostKey)
+            request.Headers.Add("x-functions-key", hostKey);
         context.Logger.LogInformation("FunctionApp IsLive '{0}' probing host status at '{1}'.", identifier, request.RequestUri?.ToString() ?? "(unknown)");
 
         IHttpRequestSender sender = context.Services.GetAzureComponentFactory().Http.CreateSender();

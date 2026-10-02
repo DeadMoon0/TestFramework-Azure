@@ -103,14 +103,28 @@ public sealed record LogicAppStandardConfig
     /// Optional runtime key used for Standard invocation helpers.
     /// </summary>
     [Secret]
-    public string? Code { get; init; }
+    public string? Code
+    {
+        get => code;
+        init => code = NoKeyIfEmpty(value);
+    }
 
     /// <summary>
     /// Optional host-level admin key used for Standard management endpoints. When absent, management
     /// requests fall back to <see cref="Code"/>, because a locally hosted runtime accepts either.
     /// </summary>
     [Secret]
-    public string? AdminCode { get; init; }
+    public string? AdminCode
+    {
+        get => adminCode;
+        init => adminCode = NoKeyIfEmpty(value);
+    }
+
+    private readonly string? code;
+    private readonly string? adminCode;
+
+    // An empty key means "no key", as it does for a Function App.
+    private static string? NoKeyIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
 }
 
 /// <summary>

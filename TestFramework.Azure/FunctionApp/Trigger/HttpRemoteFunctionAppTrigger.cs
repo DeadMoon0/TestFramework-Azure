@@ -94,7 +94,8 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
     {
         HttpRequestMessage message = new(method, fullTriggerUri);
         await request.ApplyToHttpRequestMessageAsync(message, cancellationToken).ConfigureAwait(false);
-        message.Headers.Add("x-functions-key", functionConfig.Code);
+        if (functionConfig.Code is { } functionKey)
+            message.Headers.Add("x-functions-key", functionKey);
         return message;
     }
 
