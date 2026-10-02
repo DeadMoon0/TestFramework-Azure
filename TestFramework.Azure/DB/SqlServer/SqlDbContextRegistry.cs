@@ -40,21 +40,40 @@ public class SqlDbContextRegistry
     /// <summary>
     /// Registers the context used when no identifier-specific registration matches.
     /// </summary>
+    /// <remarks>Uses <c>null</c> for <c>configure</c>; the other overload states it.</remarks>
+    /// <typeparam name="TContext">The context type.</typeparam>
+    /// <param name="create">Constructs the context from options pointing at the run's database.</param>
+    public void AddDefault<TContext>(Func<DbContextOptions<TContext>, TContext> create)
+        where TContext : DbContext
+        => this.AddDefault<TContext>(create, null);
+
+    /// <summary>
+    /// Registers the context used when no identifier-specific registration matches.
+    /// </summary>
     /// <typeparam name="TContext">The context type.</typeparam>
     /// <param name="create">Constructs the context from options pointing at the run's database.</param>
     /// <param name="configure">
     /// Anything else the options should carry - logging, proxies, interceptors. The connection is already set
     /// and overwriting it is the one thing this cannot usefully do.
     /// </param>
-    public void AddDefault<TContext>(
-        Func<DbContextOptions<TContext>, TContext> create,
-        Action<IServiceProvider, DbContextOptionsBuilder<TContext>>? configure = null)
+    public void AddDefault<TContext>(Func<DbContextOptions<TContext>, TContext> create, Action<IServiceProvider, DbContextOptionsBuilder<TContext>>? configure)
         where TContext : DbContext
     {
         ArgumentNullException.ThrowIfNull(create);
 
         _default = (run, identifier) => Build(run, identifier, create, configure);
     }
+
+    /// <summary>
+    /// Registers the context for one SQL identifier.
+    /// </summary>
+    /// <remarks>Uses <c>null</c> for <c>configure</c>; the other overload states it.</remarks>
+    /// <typeparam name="TContext">The context type.</typeparam>
+    /// <param name="identifier">The SQL identifier this context serves.</param>
+    /// <param name="create">Constructs the context from options pointing at the run's database.</param>
+    public void AddForIdentifier<TContext>(SqlDatabaseIdentifier identifier, Func<DbContextOptions<TContext>, TContext> create)
+        where TContext : DbContext
+        => this.AddForIdentifier<TContext>(identifier, create, null);
 
     /// <summary>
     /// Registers the context for one SQL identifier.
@@ -66,10 +85,7 @@ public class SqlDbContextRegistry
     /// Anything else the options should carry - logging, proxies, interceptors. The connection is already set
     /// and overwriting it is the one thing this cannot usefully do.
     /// </param>
-    public void AddForIdentifier<TContext>(
-        SqlDatabaseIdentifier identifier,
-        Func<DbContextOptions<TContext>, TContext> create,
-        Action<IServiceProvider, DbContextOptionsBuilder<TContext>>? configure = null)
+    public void AddForIdentifier<TContext>(SqlDatabaseIdentifier identifier, Func<DbContextOptions<TContext>, TContext> create, Action<IServiceProvider, DbContextOptionsBuilder<TContext>>? configure)
         where TContext : DbContext
     {
         ArgumentNullException.ThrowIfNull(identifier);

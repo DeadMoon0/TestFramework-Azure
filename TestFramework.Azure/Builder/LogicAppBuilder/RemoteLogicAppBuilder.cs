@@ -26,7 +26,10 @@ internal sealed class RemoteLogicAppBuilder(LogicAppIdentifier appIdentifier)
         return this;
     }
 
-    public ILogicAppHttpPayloadStage Manual(string triggerName = "manual") => Manual(Var.Const(triggerName));
+    public ILogicAppHttpPayloadStage Manual()
+        => this.Manual("manual");
+
+    public ILogicAppHttpPayloadStage Manual(string triggerName) => Manual(Var.Const(triggerName));
 
     public ILogicAppHttpPayloadStage Manual(VariableReference<string> triggerName)
     {
@@ -35,7 +38,10 @@ internal sealed class RemoteLogicAppBuilder(LogicAppIdentifier appIdentifier)
         return this;
     }
 
-    public ILogicAppExecutionStage Timer(string triggerName = "Recurrence") => Timer(Var.Const(triggerName));
+    public ILogicAppExecutionStage Timer()
+        => this.Timer("Recurrence");
+
+    public ILogicAppExecutionStage Timer(string triggerName) => Timer(Var.Const(triggerName));
 
     public ILogicAppExecutionStage Timer(VariableReference<string> triggerName)
     {

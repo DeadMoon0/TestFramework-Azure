@@ -38,9 +38,4 @@ public record FunctionAppTriggerConfig
     /// far longer than the old ICMP probe did.
     /// </remarks>
     public TimeSpan ReachabilityProbeTimeout { get; set; } = TimeSpan.FromSeconds(10);
-
-    /// <summary>
-    /// Default HTTP method used when a function trigger does not expose one explicitly.
-    /// </summary>
-    public HttpMethod DefaultMethod { get; set; } = HttpMethod.Get;
 }

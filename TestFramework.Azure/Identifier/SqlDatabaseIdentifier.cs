@@ -1,10 +1,13 @@
+using TestFramework.Core.Conventions;
+
 namespace TestFramework.Azure.Identifier;
 
 /// <summary>
 /// Logical identifier used to resolve a configured SQL database.
 /// </summary>
 /// <param name="Identifier">The configuration key that names the SQL database entry.</param>
-public record SqlDatabaseIdentifier(string Identifier)
+[ClosedShape("An identifier is its name; anything more about a database belongs in its configuration.")]
+public sealed record SqlDatabaseIdentifier(string Identifier)
 {
     /// <summary>
     /// Converts a typed identifier to its raw string representation.

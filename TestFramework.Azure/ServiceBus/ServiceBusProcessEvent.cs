@@ -21,25 +21,114 @@ namespace TestFramework.Azure.ServiceBus;
 /// <summary>
 /// Async event that waits for a matching Azure Service Bus message.
 /// </summary>
-/// <param name="identifier">The Service Bus identifier to resolve.</param>
-/// <param name="messageId">Optional message id filter.</param>
-/// <param name="correlationId">Optional correlation id filter.</param>
-/// <param name="predicate">Optional custom predicate applied to received messages.</param>
-/// <param name="completeMessage">
-/// Whether a matching message is completed. Defaults to <see langword="true"/> when unspecified;
-/// pass <see langword="false"/> explicitly to leave the message on the entity. Note that an
-/// uncompleted message becomes visible again and can satisfy a later run's wait.
-/// </param>
-/// <param name="createTempSubscription">Whether a temporary subscription should be created for topic-backed receive flows.</param>
-public class ServiceBusProcessEvent(
-    ServiceBusIdentifier identifier,
-    VariableReference<string>? messageId = null,
-    VariableReference<string>? correlationId = null,
-    VariableReference<Func<ServiceBusReceivedMessage, bool>>? predicate = null,
-    VariableReference<bool>? completeMessage = null,
-    VariableReference<bool>? createTempSubscription = null)
+/// <remarks>
+/// Created by <c>AzureExt.Event.ServiceBus.MessageReceived(identifier)</c>, which matches any message, and narrowed
+/// with <see cref="WithMessageId"/>, <see cref="WithCorrelationId"/> and <see cref="Where"/>. Each narrowing returns a
+/// new event, so one that was handed to a timeline is never changed afterwards. A matching message is completed
+/// unless <see cref="CompleteMessage"/> says otherwise.
+/// </remarks>
+public sealed class ServiceBusProcessEvent
     : AsyncEvent<ServiceBusProcessEvent, ServiceBusReceivedMessageContext>, IHasPreStep, IHasCleanupStep, IHasEnvironmentRequirements
 {
+    private readonly ServiceBusIdentifier identifier;
+    private readonly VariableReference<string>? messageId;
+    private readonly VariableReference<string>? correlationId;
+    private readonly VariableReference<Func<ServiceBusReceivedMessage, bool>>? predicate;
+    private readonly VariableReference<bool>? completeMessage;
+    private readonly VariableReference<bool>? createTempSubscription;
+
+    /// <summary>
+    /// Created by <c>AzureExt.Event.ServiceBus.MessageReceived</c> and narrowed with the <c>With...</c> methods.
+    /// </summary>
+    internal ServiceBusProcessEvent(ServiceBusIdentifier identifier, VariableReference<string>? messageId = null, VariableReference<string>? correlationId = null, VariableReference<Func<ServiceBusReceivedMessage, bool>>? predicate = null, VariableReference<bool>? completeMessage = null, VariableReference<bool>? createTempSubscription = null)
+    {
+        this.identifier = identifier;
+        this.messageId = messageId;
+        this.correlationId = correlationId;
+        this.predicate = predicate;
+        this.completeMessage = completeMessage;
+        this.createTempSubscription = createTempSubscription;
+    }
+
+    /// <summary>
+    /// Waits only for the message with this id.
+    /// </summary>
+    /// <param name="messageId">The message id.</param>
+    /// <returns>A narrowed copy of this event.</returns>
+    public ServiceBusProcessEvent WithMessageId(VariableReference<string> messageId)
+    {
+        ArgumentNullException.ThrowIfNull(messageId);
+        return new ServiceBusProcessEvent(identifier, messageId, correlationId, predicate, completeMessage, createTempSubscription);
+    }
+
+    /// <summary>
+    /// Waits only for a message with this correlation id.
+    /// </summary>
+    /// <remarks>
+    /// With <see cref="WithTempSubscription()"/>, the temporary subscription filters on it server-side.
+    /// </remarks>
+    /// <param name="correlationId">The correlation id.</param>
+    /// <returns>A narrowed copy of this event.</returns>
+    public ServiceBusProcessEvent WithCorrelationId(VariableReference<string> correlationId)
+    {
+        ArgumentNullException.ThrowIfNull(correlationId);
+        return new ServiceBusProcessEvent(identifier, messageId, correlationId, predicate, completeMessage, createTempSubscription);
+    }
+
+    /// <summary>
+    /// Waits only for a message the predicate accepts, on top of any id filters.
+    /// </summary>
+    /// <param name="predicate">The predicate.</param>
+    /// <returns>A narrowed copy of this event.</returns>
+    public ServiceBusProcessEvent Where(VariableReference<Func<ServiceBusReceivedMessage, bool>> predicate)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        return new ServiceBusProcessEvent(identifier, messageId, correlationId, predicate, completeMessage, createTempSubscription);
+    }
+
+    /// <summary>
+    /// Whether the matching message is completed. Without this call it is.
+    /// </summary>
+    /// <remarks>
+    /// <c>CompleteMessage(false)</c> leaves the message on the entity. It becomes visible again and can satisfy a
+    /// later run's wait, which is why completing is what happens unless this says otherwise.
+    /// </remarks>
+    /// <param name="complete">Whether to complete it.</param>
+    /// <returns>A copy of this event that settles the message that way.</returns>
+    public ServiceBusProcessEvent CompleteMessage(VariableReference<bool> complete)
+    {
+        ArgumentNullException.ThrowIfNull(complete);
+        return new ServiceBusProcessEvent(identifier, messageId, correlationId, predicate, complete, createTempSubscription);
+    }
+
+    /// <summary>
+    /// Listens on a temporary subscription created for this wait, for a topic entry without one of its own.
+    /// </summary>
+    /// <remarks>
+    /// A pre-step creates the subscription before the run's main stage, filtered on the id filters, and a cleanup
+    /// step deletes it.
+    /// </remarks>
+    /// <returns>A copy of this event that creates its own subscription.</returns>
+    public ServiceBusProcessEvent WithTempSubscription()
+        => new ServiceBusProcessEvent(identifier, messageId, correlationId, predicate, completeMessage, Var.Const(true));
+
+    /// <summary>
+    /// Listens on a temporary subscription when the variable holds <see langword="true"/>.
+    /// </summary>
+    /// <remarks>
+    /// Immutable, because the decision is made when the run is planned: the pre-step that creates the subscription
+    /// either exists or does not.
+    /// </remarks>
+    /// <typeparam name="TVar">The variable type.</typeparam>
+    /// <param name="create">Whether to create one.</param>
+    /// <returns>A copy of this event that creates its own subscription when asked to.</returns>
+    public ServiceBusProcessEvent WithTempSubscription<TVar>(ImmutableVariable<TVar, bool> create)
+        where TVar : VariableReference<bool>
+    {
+        ArgumentNullException.ThrowIfNull(create);
+        return new ServiceBusProcessEvent(identifier, messageId, correlationId, predicate, completeMessage, create);
+    }
+
     /// <summary>
     /// Gets the display name used for this event.
     /// </summary>

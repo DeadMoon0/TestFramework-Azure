@@ -9,6 +9,7 @@ using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Runtime;
 using Newtonsoft.Json.Linq;
 using TestFramework.Core.Artifacts;
+using TestFramework.Core.Exceptions;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Variables;
 
@@ -73,7 +74,33 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
         ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(cosmos);
 
         ICosmosDbIdentifierResolver resolver = context.Services.GetService<ICosmosDbIdentifierResolver>() ?? new DefaultCosmosDbIdentifierResolver();
-        reference.SetIdentifier(resolver.ResolveId(data.Item), resolver.ResolvePartitionKey(data.Item));
+        string itemId = resolver.ResolveId(data.Item);
+        PartitionKey itemPartitionKey = resolver.ResolvePartitionKey(data.Item);
+
+        if (reference.NamesItsItem)
+        {
+            // Setup writes the item and teardown deletes what the reference names, so the two must be one item.
+            string namedId = reference.GetId(context.Variables);
+            PartitionKey namedPartitionKey = reference.GetPartitionKey(context.Variables);
+            if (!string.Equals(namedId, itemId, StringComparison.Ordinal) || !namedPartitionKey.Equals(itemPartitionKey))
+            {
+                throw new FrameworkConfigurationException(
+                    $"The Cosmos item being set up is '{itemId}' in partition {itemPartitionKey}, and its reference names '{namedId}' in partition {namedPartitionKey}; teardown would delete an item setup never wrote.")
+                {
+                    RecoverySteps =
+                    [
+                        "Give the reference the item's own id and partition key.",
+                        "Or let setup read them from the item: AddCosmosItemArtifact(name, container, item).",
+                    ],
+                };
+            }
+        }
+        else if (!context.Artifacts.Assign(reference, (held, proof) => held.AssignIdentity(proof, itemId, itemPartitionKey)))
+        {
+            // Assigned before the write, so an attempt the run stopped waiting for writes nothing it cannot clean up.
+            context.Logger.LogWarning($"Cosmos item '{itemId}' was not written: the attempt setting it up is one the run had stopped waiting for.");
+            return;
+        }
 
         context.Logger.LogInformation($"Ensuring Cosmos container exists: {config.DatabaseName}/{config.ContainerName}");
         await container.EnsureContainerExistsAsync(data.Item, context.Deadline.Token);

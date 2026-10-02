@@ -1,10 +1,13 @@
-﻿namespace TestFramework.Azure.Identifier;
+﻿using TestFramework.Core.Conventions;
+
+namespace TestFramework.Azure.Identifier;
 
 /// <summary>
 /// Logical identifier used to resolve a configured Azure Service Bus resource.
 /// </summary>
 /// <param name="Identifier">The configuration key that names the Service Bus entry.</param>
-public record ServiceBusIdentifier(string Identifier)
+[ClosedShape("An identifier is its name; anything more about a Service Bus entity belongs in its configuration.")]
+public sealed record ServiceBusIdentifier(string Identifier)
 {
     /// <summary>
     /// Converts a typed identifier to its raw string representation.

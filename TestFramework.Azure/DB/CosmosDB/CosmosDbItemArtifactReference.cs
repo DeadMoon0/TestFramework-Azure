@@ -21,8 +21,13 @@ namespace TestFramework.Azure.DB.CosmosDB;
 /// <summary>
 /// Reference to a Cosmos DB item addressed by id and partition key.
 /// </summary>
+/// <remarks>
+/// Made with <c>AzureExt.Artifact.DB.CosmosRef(...)</c>, which names the item, or by <c>AddCosmosItemArtifact</c>,
+/// which leaves it to setup to read the id and partition key from the item it writes. Either way the reference
+/// addresses exactly one item, so teardown deletes that one.
+/// </remarks>
 /// <typeparam name="TItem">The item type.</typeparam>
-public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbItemArtifactReference<TItem>, CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>>
+public sealed class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbItemArtifactReference<TItem>, CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>>
 {
     private string pinnedId = "";
     private PartitionKey pinnedPartitionKey = PartitionKey.Null;
@@ -30,19 +35,44 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
     private VariableReference<string>? _id;
 
     /// <summary>
-    /// Initializes a Cosmos DB artifact reference.
+    /// A reference that names its item.
     /// </summary>
     /// <param name="dbIdentifier">The Cosmos container identifier.</param>
-    /// <param name="partitionKey">Optional partition key reference.</param>
-    /// <param name="id">Optional document id reference.</param>
-    public CosmosDbItemArtifactReference(CosmosContainerIdentifier dbIdentifier, VariableReference<PartitionKey>? partitionKey = null, VariableReference<string>? id = null)
+    /// <param name="partitionKey">The partition key.</param>
+    /// <param name="id">The document id.</param>
+    internal CosmosDbItemArtifactReference(CosmosContainerIdentifier dbIdentifier, VariableReference<PartitionKey> partitionKey, VariableReference<string> id)
     {
+        ArgumentNullException.ThrowIfNull(dbIdentifier);
+        ArgumentNullException.ThrowIfNull(partitionKey);
+        ArgumentNullException.ThrowIfNull(id);
+
         this._partitionKey = partitionKey;
         this._id = id;
         DbIdentifier = dbIdentifier;
-
-        CanDeconstruct = partitionKey is not null && id is not null;
+        namedByTheTest = true;
+        CanDeconstruct = true;
     }
+
+    /// <summary>
+    /// A reference whose item setup names: the id and partition key are read from the item it writes.
+    /// </summary>
+    /// <param name="dbIdentifier">The Cosmos container identifier.</param>
+    internal CosmosDbItemArtifactReference(CosmosContainerIdentifier dbIdentifier)
+    {
+        ArgumentNullException.ThrowIfNull(dbIdentifier);
+
+        DbIdentifier = dbIdentifier;
+
+        // Nothing to delete until setup has written an item and assigned its identity.
+        CanDeconstruct = false;
+    }
+
+    private readonly bool namedByTheTest;
+
+    /// <summary>
+    /// Whether the reference names its item, or waits for setup to read the identity from the item it writes.
+    /// </summary>
+    internal bool NamesItsItem => _id is not null && _partitionKey is not null;
 
     /// <summary>
     /// The Cosmos container identifier used to resolve the container.
@@ -107,12 +137,25 @@ public class CosmosDbItemArtifactReference<TItem> : ArtifactReference<CosmosDbIt
         return this._id.GetRequiredValue(variableStore);
     }
 
-    internal void SetIdentifier(string _id, PartitionKey _partitionKey)
+    /// <summary>
+    /// Records the identity of the item setup wrote, for a reference that did not name one.
+    /// </summary>
+    /// <param name="proof">The store's proof that the run admitted it.</param>
+    /// <param name="id">The item's id.</param>
+    /// <param name="partitionKey">The item's partition key.</param>
+    internal void AssignIdentity(ArtifactAssignment proof, string id, PartitionKey partitionKey)
     {
-        this._id = Var.Const(_id);
-        pinnedId = _id;
-        this._partitionKey = Var.Const(_partitionKey);
-        pinnedPartitionKey = _partitionKey;
+        ArgumentNullException.ThrowIfNull(proof);
+        proof.EnsureOpen();
+
+        // A reference that named its item keeps that name; setup checks the item agrees instead.
+        if (namedByTheTest)
+            throw new InvalidOperationException($"'{this}' names its item, so it takes no assigned identity.");
+
+        this._id = Var.Const(id);
+        pinnedId = id;
+        this._partitionKey = Var.Const(partitionKey);
+        pinnedPartitionKey = partitionKey;
         CanDeconstruct = true;
     }
 

@@ -13,11 +13,30 @@ namespace TestFramework.Azure.FunctionApp.Results;
 /// <summary>
 /// Serializable HTTP response context returned by Function App HTTP triggers.
 /// </summary>
-public sealed record HttpResponseResultContext(
-    HttpStatusCode StatusCode,
-    string? Body,
-    IReadOnlyDictionary<string, string[]> Headers) : StepResultContext
+public sealed record HttpResponseResultContext : StepResultContext
 {
+    internal HttpResponseResultContext(HttpStatusCode statusCode, string? body, IReadOnlyDictionary<string, string[]> headers)
+    {
+        this.StatusCode = statusCode;
+        this.Body = body;
+        this.Headers = headers;
+    }
+
+    /// <summary>
+    /// StatusCode
+    /// </summary>
+    public HttpStatusCode StatusCode { get; }
+
+    /// <summary>
+    /// Body
+    /// </summary>
+    public string? Body { get; }
+
+    /// <summary>
+    /// Headers
+    /// </summary>
+    public IReadOnlyDictionary<string, string[]> Headers { get; }
+
     internal static async Task<HttpResponseResultContext> FromHttpResponseAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         string? body = response.Content is null

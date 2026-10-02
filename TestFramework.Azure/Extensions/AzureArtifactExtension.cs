@@ -86,6 +86,19 @@ public static class AzureArtifactExtension
     /// <summary>
     /// Registers a blob artifact for timeline setup and cleanup.
     /// </summary>
+    /// <remarks>Uses <c>null</c> for <c>metadata</c>; the other overload states it.</remarks>
+    /// <param name="run">The timeline run builder.</param>
+    /// <param name="artifactId">The artifact identifier.</param>
+    /// <param name="storageId">The Storage Account identifier.</param>
+    /// <param name="path">The blob path inside the configured container.</param>
+    /// <param name="data">The blob payload.</param>
+    /// <returns>The builder for fluent chaining.</returns>
+    public static ITimelineRunBuilder AddBlobArtifact(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, StorageAccountIdentifier storageId, string path, byte[] data)
+        => run.AddBlobArtifact(artifactId, storageId, path, data, null);
+
+    /// <summary>
+    /// Registers a blob artifact for timeline setup and cleanup.
+    /// </summary>
     /// <param name="run">The timeline run builder.</param>
     /// <param name="artifactId">The artifact identifier.</param>
     /// <param name="storageId">The Storage Account identifier.</param>
@@ -93,7 +106,7 @@ public static class AzureArtifactExtension
     /// <param name="data">The blob payload.</param>
     /// <param name="metadata">Optional blob metadata.</param>
     /// <returns>The builder for fluent chaining.</returns>
-    public static ITimelineRunBuilder AddBlobArtifact(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, StorageAccountIdentifier storageId, string path, byte[] data, Dictionary<string, string>? metadata = null)
+    public static ITimelineRunBuilder AddBlobArtifact(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, StorageAccountIdentifier storageId, string path, byte[] data, Dictionary<string, string>? metadata)
     {
         return run.AddArtifact(artifactId, new StorageAccountBlobArtifactReference(storageId, path), new StorageAccountBlobArtifactData(data, metadata ?? []));
     }

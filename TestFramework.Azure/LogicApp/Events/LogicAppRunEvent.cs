@@ -23,15 +23,29 @@ namespace TestFramework.Azure.LogicApp.Events;
 /// <summary>
 /// Async event that polls a Logic App workflow run until it reaches the expected state.
 /// </summary>
-public sealed class LogicAppRunEvent(
-    LogicAppIdentifier identifier,
-    VariableReference<string>? workflowName,
-    VariableReference<string> runId,
-    VariableReference<LogicAppRunStatus>? expectedStatus,
-    VariableReferenceGeneric? projectedSourceReference = null,
-    Type? projectedSourceType = null)
+public sealed class LogicAppRunEvent
     : AsyncEvent<LogicAppRunEvent, LogicAppExecutionResult>, IHasEnvironmentRequirements
 {
+    private readonly LogicAppIdentifier identifier;
+    private readonly VariableReference<string>? workflowName;
+    private readonly VariableReference<string> runId;
+    private readonly VariableReference<LogicAppRunStatus>? expectedStatus;
+    private readonly VariableReferenceGeneric? projectedSourceReference;
+    private readonly Type? projectedSourceType;
+
+    /// <summary>
+    /// Created by the <c>AzureExt.Event.LogicApp</c> factories.
+    /// </summary>
+    internal LogicAppRunEvent(LogicAppIdentifier identifier, VariableReference<string>? workflowName, VariableReference<string> runId, VariableReference<LogicAppRunStatus>? expectedStatus, VariableReferenceGeneric? projectedSourceReference = null, Type? projectedSourceType = null)
+    {
+        this.identifier = identifier;
+        this.workflowName = workflowName;
+        this.runId = runId;
+        this.expectedStatus = expectedStatus;
+        this.projectedSourceReference = projectedSourceReference;
+        this.projectedSourceType = projectedSourceType;
+    }
+
     /// <summary>
     /// Gets the display name used for this event.
     /// </summary>

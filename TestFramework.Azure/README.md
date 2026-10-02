@@ -351,11 +351,12 @@ Use `CallAndCapture()` when the Consumption workflow is effectively stateless an
 |------|-----------------|-------|
 | Queue | `ConnectionString`, `QueueName` | `SubscriptionName` must be omitted. Works with session and non-session queues. Non-matching messages are abandoned so their lock is released. |
 | Topic + subscription | `ConnectionString`, `TopicName`, `SubscriptionName` | Use when the test should receive from a fixed subscription. Non-matching messages are abandoned so their lock is released. |
-| Topic + temp subscription | `ConnectionString`, `TopicName` | Call `AzureExt.Event.ServiceBus.MessageReceived(..., createTempSubscription: true)` to create and clean up a filtered temp subscription automatically. Filtering happens server-side, so nothing is abandoned. |
+| Topic + temp subscription | `ConnectionString`, `TopicName` | Chain `.WithTempSubscription()` onto `AzureExt.Event.ServiceBus.MessageReceived(...)` to create and clean up a filtered temp subscription automatically. Filtering happens server-side, so nothing is abandoned. |
 
 Message settlement:
 
-- A matching message is **completed by default**. Pass `completeMessage: false` to opt out.
+- A matching message is **completed by default**. Chain `.CompleteMessage(false)` to leave it on the entity.
+- Narrow the wait with `.WithMessageId(...)`, `.WithCorrelationId(...)` and `.Where(...)`; each returns a new event.
 - Leaving a matched message uncompleted returns it to the entity, where it can satisfy a *later* run's wait - a cross-run false pass. Only opt out when another consumer owns the message.
 - In the shared modes, a non-matching message is abandoned rather than ignored. Ignoring it would hold its lock for the SDK's renewal window and starve concurrent runs; abandoning increases the message's `DeliveryCount`, which is the accepted tradeoff. The first abandon of a run is logged as a warning.
 
@@ -368,7 +369,7 @@ using TestFramework.Core.Timelines;
 
 Timeline timeline = Timeline.Create()
     .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBQueue", new ServiceBusMessage("Test message") { CorrelationId = "order-42" }))
-    .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBQueue", correlationId: "order-42", completeMessage: true))
+    .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBQueue").WithCorrelationId("order-42").CompleteMessage(true))
         .WithTimeOut(TimeSpan.FromSeconds(10))
     .Build();
 ```
@@ -377,7 +378,7 @@ Timeline timeline = Timeline.Create()
 
 ```csharp
 Timeline timeline = Timeline.Create()
-    .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBTopic", correlationId: "topic-1234", createTempSubscription: true, completeMessage: true))
+    .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBTopic").WithCorrelationId("topic-1234").CompleteMessage(true).WithTempSubscription())
         .WithTimeOut(TimeSpan.FromSeconds(10))
     .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBTopic", new ServiceBusMessage("Test message") { CorrelationId = "topic-1234" }))
     .Build();
@@ -387,7 +388,7 @@ Timeline timeline = Timeline.Create()
 
 Use `ConfigureCosmosClientOptions(...)` when you need to customize the underlying Cosmos SDK client.
 
-For `AzureExt.Trigger.IsLive.Cosmos(...)`, timeout control comes from the normal timeline step timeout, for example via `.WithTimeOut(...)` on the builder. The optional `AlivenessLevel` lets you choose whether the check should stop at endpoint reachability, account authentication, or require the configured container to exist.
+For `AzureExt.Trigger.IsLive.Cosmos(...)`, timeout control comes from the normal timeline step timeout, for example via `.WithTimeOut(...)` on the builder. The overload taking an `AlivenessLevel` lets you choose whether the check should stop at endpoint reachability, account authentication, or require the configured container to exist; without it the container must exist (`AlivenessLevel.Resource`).
 
 ```csharp
 using Microsoft.Azure.Cosmos;

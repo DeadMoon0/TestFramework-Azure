@@ -407,12 +407,6 @@ public static class AzureTimelineResultExtensions
         => builder.BindResultProperty(x => x.AlivenessLevel, identifier);
 
     /// <summary>
-    /// Binds the success flag from an Azure is-live probe into a variable.
-    /// </summary>
-    public static ITimelineBuilderModifier<Trigger.IsLive.AzureIsLiveResult> GetSuccess(this ITimelineBuilderModifier<Trigger.IsLive.AzureIsLiveResult> builder, VariableIdentifier identifier)
-        => builder.BindResultProperty(x => x.Success, identifier);
-
-    /// <summary>
     /// Binds the optional HTTP status code from an Azure is-live probe into a variable.
     /// </summary>
     public static ITimelineBuilderModifier<Trigger.IsLive.AzureIsLiveResult> GetStatusCode(this ITimelineBuilderModifier<Trigger.IsLive.AzureIsLiveResult> builder, VariableIdentifier identifier)

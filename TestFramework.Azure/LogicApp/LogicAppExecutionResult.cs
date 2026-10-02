@@ -9,31 +9,75 @@ namespace TestFramework.Azure.LogicApp;
 /// <summary>
 /// Normalized Logic App execution result that exposes useful bindable outputs.
 /// </summary>
-/// <param name="WorkflowName">The resolved workflow name.</param>
-/// <param name="TriggerName">The resolved trigger name, when available.</param>
-/// <param name="InvokeUri">The invoke or management URI used for the interaction, when available.</param>
-/// <param name="RunId">The resolved workflow run identifier, when available.</param>
-/// <param name="StatusCode">The HTTP status returned by the invoke or trigger request, when available.</param>
-/// <param name="RunStatus">The resolved workflow run status, when available.</param>
-/// <param name="RunCode">The runtime code reported by the workflow, when available.</param>
-/// <param name="ResponseBody">The direct HTTP response body, when captured.</param>
-/// <param name="ResponseHeaders">The direct HTTP response headers, when captured.</param>
-/// <param name="OutputsJson">Serialized workflow outputs, when available.</param>
-/// <param name="RawRunJson">The raw management payload used to build run details, when available.</param>
-public sealed record LogicAppExecutionResult(
-    string WorkflowName,
-    string? TriggerName,
-    string? InvokeUri,
-    string? RunId,
-    HttpStatusCode? StatusCode,
-    LogicAppRunStatus? RunStatus,
-    string? RunCode,
-    string? ResponseBody,
-    IReadOnlyDictionary<string, string[]>? ResponseHeaders,
-    string? OutputsJson,
-    string? RawRunJson) : StepResultContext
+public sealed record LogicAppExecutionResult : StepResultContext
 {
-    private readonly string? invokeUri = LogicAppUriRedaction.Redact(InvokeUri);
+    internal LogicAppExecutionResult(string workflowName, string? triggerName, string? invokeUri, string? runId, HttpStatusCode? statusCode, LogicAppRunStatus? runStatus, string? runCode, string? responseBody, IReadOnlyDictionary<string, string[]>? responseHeaders, string? outputsJson, string? rawRunJson)
+    {
+        this.WorkflowName = workflowName;
+        this.TriggerName = triggerName;
+        this.invokeUri = LogicAppUriRedaction.Redact(invokeUri);
+        this.RunId = runId;
+        this.StatusCode = statusCode;
+        this.RunStatus = runStatus;
+        this.RunCode = runCode;
+        this.ResponseBody = responseBody;
+        this.ResponseHeaders = responseHeaders;
+        this.OutputsJson = outputsJson;
+        this.RawRunJson = rawRunJson;
+    }
+
+    /// <summary>
+    /// The resolved workflow name.
+    /// </summary>
+    public string WorkflowName { get; }
+
+    /// <summary>
+    /// The resolved trigger name, when available.
+    /// </summary>
+    public string? TriggerName { get; }
+
+
+    /// <summary>
+    /// The resolved workflow run identifier, when available.
+    /// </summary>
+    public string? RunId { get; }
+
+    /// <summary>
+    /// The HTTP status returned by the invoke or trigger request, when available.
+    /// </summary>
+    public HttpStatusCode? StatusCode { get; }
+
+    /// <summary>
+    /// The resolved workflow run status, when available.
+    /// </summary>
+    public LogicAppRunStatus? RunStatus { get; }
+
+    /// <summary>
+    /// The runtime code reported by the workflow, when available.
+    /// </summary>
+    public string? RunCode { get; }
+
+    /// <summary>
+    /// The direct HTTP response body, when captured.
+    /// </summary>
+    public string? ResponseBody { get; }
+
+    /// <summary>
+    /// The direct HTTP response headers, when captured.
+    /// </summary>
+    public IReadOnlyDictionary<string, string[]>? ResponseHeaders { get; }
+
+    /// <summary>
+    /// Serialized workflow outputs, when available.
+    /// </summary>
+    public string? OutputsJson { get; }
+
+    /// <summary>
+    /// The raw management payload used to build run details, when available.
+    /// </summary>
+    public string? RawRunJson { get; }
+
+    private readonly string? invokeUri;
 
     /// <summary>
     /// The invoke or management URI used for the interaction, with any shared-access signature
@@ -44,11 +88,7 @@ public sealed record LogicAppExecutionResult(
     /// logs, reports and the DebugUI by <c>ToString()</c>. Redaction is idempotent, so results built
     /// from an already-redacted URL are unaffected.
     /// </remarks>
-    public string? InvokeUri
-    {
-        get => invokeUri;
-        init => invokeUri = LogicAppUriRedaction.Redact(value);
-    }
+    public string? InvokeUri => invokeUri;
 
     /// <summary>
     /// Creates an explicit run-tracking context for stateful Logic App polling.

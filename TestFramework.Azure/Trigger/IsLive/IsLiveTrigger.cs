@@ -31,7 +31,14 @@ public class IsLiveTrigger
     /// <summary>
     /// Creates a Logic App liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> LogicApp(LogicAppIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => LogicApp(identifier, Var.Const(alivenessLevel));
+    /// <remarks>Uses <c>AlivenessLevel.Resource</c> for <c>alivenessLevel</c>; the other overload states it.</remarks>
+    public Step<AzureIsLiveResult> LogicApp(LogicAppIdentifier identifier)
+        => this.LogicApp(identifier, AlivenessLevel.Resource);
+
+    /// <summary>
+    /// Creates a Logic App liveness trigger using a constant aliveness level.
+    /// </summary>
+    public Step<AzureIsLiveResult> LogicApp(LogicAppIdentifier identifier, AlivenessLevel alivenessLevel) => LogicApp(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Logic App liveness trigger using a variable aliveness level.
@@ -41,7 +48,14 @@ public class IsLiveTrigger
     /// <summary>
     /// Creates a Function App liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> FunctionApp(FunctionAppIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => FunctionApp(identifier, Var.Const(alivenessLevel));
+    /// <remarks>Uses <c>AlivenessLevel.Resource</c> for <c>alivenessLevel</c>; the other overload states it.</remarks>
+    public Step<AzureIsLiveResult> FunctionApp(FunctionAppIdentifier identifier)
+        => this.FunctionApp(identifier, AlivenessLevel.Resource);
+
+    /// <summary>
+    /// Creates a Function App liveness trigger using a constant aliveness level.
+    /// </summary>
+    public Step<AzureIsLiveResult> FunctionApp(FunctionAppIdentifier identifier, AlivenessLevel alivenessLevel) => FunctionApp(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Function App liveness trigger using a variable aliveness level.
@@ -51,7 +65,14 @@ public class IsLiveTrigger
     /// <summary>
     /// Creates a Service Bus liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> ServiceBus(ServiceBusIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => ServiceBus(identifier, Var.Const(alivenessLevel));
+    /// <remarks>Uses <c>AlivenessLevel.Resource</c> for <c>alivenessLevel</c>; the other overload states it.</remarks>
+    public Step<AzureIsLiveResult> ServiceBus(ServiceBusIdentifier identifier)
+        => this.ServiceBus(identifier, AlivenessLevel.Resource);
+
+    /// <summary>
+    /// Creates a Service Bus liveness trigger using a constant aliveness level.
+    /// </summary>
+    public Step<AzureIsLiveResult> ServiceBus(ServiceBusIdentifier identifier, AlivenessLevel alivenessLevel) => ServiceBus(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Service Bus liveness trigger using a variable aliveness level.
@@ -61,7 +82,14 @@ public class IsLiveTrigger
     /// <summary>
     /// Creates a Blob Storage liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> Blob(StorageAccountIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Blob(identifier, Var.Const(alivenessLevel));
+    /// <remarks>Uses <c>AlivenessLevel.Resource</c> for <c>alivenessLevel</c>; the other overload states it.</remarks>
+    public Step<AzureIsLiveResult> Blob(StorageAccountIdentifier identifier)
+        => this.Blob(identifier, AlivenessLevel.Resource);
+
+    /// <summary>
+    /// Creates a Blob Storage liveness trigger using a constant aliveness level.
+    /// </summary>
+    public Step<AzureIsLiveResult> Blob(StorageAccountIdentifier identifier, AlivenessLevel alivenessLevel) => Blob(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Blob Storage liveness trigger using a variable aliveness level.
@@ -71,7 +99,14 @@ public class IsLiveTrigger
     /// <summary>
     /// Creates a Table Storage liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> Table(StorageAccountIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Table(identifier, Var.Const(alivenessLevel));
+    /// <remarks>Uses <c>AlivenessLevel.Resource</c> for <c>alivenessLevel</c>; the other overload states it.</remarks>
+    public Step<AzureIsLiveResult> Table(StorageAccountIdentifier identifier)
+        => this.Table(identifier, AlivenessLevel.Resource);
+
+    /// <summary>
+    /// Creates a Table Storage liveness trigger using a constant aliveness level.
+    /// </summary>
+    public Step<AzureIsLiveResult> Table(StorageAccountIdentifier identifier, AlivenessLevel alivenessLevel) => Table(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Table Storage liveness trigger using a variable aliveness level.
@@ -81,7 +116,14 @@ public class IsLiveTrigger
     /// <summary>
     /// Creates a Cosmos DB liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> Cosmos(CosmosContainerIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Cosmos(identifier, Var.Const(alivenessLevel));
+    /// <remarks>Uses <c>AlivenessLevel.Resource</c> for <c>alivenessLevel</c>; the other overload states it.</remarks>
+    public Step<AzureIsLiveResult> Cosmos(CosmosContainerIdentifier identifier)
+        => this.Cosmos(identifier, AlivenessLevel.Resource);
+
+    /// <summary>
+    /// Creates a Cosmos DB liveness trigger using a constant aliveness level.
+    /// </summary>
+    public Step<AzureIsLiveResult> Cosmos(CosmosContainerIdentifier identifier, AlivenessLevel alivenessLevel) => Cosmos(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Cosmos DB liveness trigger using a variable aliveness level.
@@ -91,7 +133,14 @@ public class IsLiveTrigger
     /// <summary>
     /// Creates a SQL database liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> Sql(SqlDatabaseIdentifier identifier, AlivenessLevel alivenessLevel = AlivenessLevel.Resource) => Sql(identifier, Var.Const(alivenessLevel));
+    /// <remarks>Uses <c>AlivenessLevel.Resource</c> for <c>alivenessLevel</c>; the other overload states it.</remarks>
+    public Step<AzureIsLiveResult> Sql(SqlDatabaseIdentifier identifier)
+        => this.Sql(identifier, AlivenessLevel.Resource);
+
+    /// <summary>
+    /// Creates a SQL database liveness trigger using a constant aliveness level.
+    /// </summary>
+    public Step<AzureIsLiveResult> Sql(SqlDatabaseIdentifier identifier, AlivenessLevel alivenessLevel) => Sql(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a SQL database liveness trigger using a variable aliveness level.
@@ -114,7 +163,7 @@ internal abstract class AzureIsLiveTriggerBase(string resourceKind, string resou
     protected AlivenessLevel GetAlivenessLevel(VariableStore variableStore) => AlivenessLevelReference.GetValue(variableStore);
 
     protected AzureIsLiveResult CreateResult(VariableStore variableStore, HttpStatusCode? statusCode = null)
-        => new(ResourceKind, ResourceIdentifier, GetAlivenessLevel(variableStore), true, statusCode);
+        => new(ResourceKind, ResourceIdentifier, GetAlivenessLevel(variableStore), statusCode);
 
     public override void DeclareIO(StepIOContract contract)
     {

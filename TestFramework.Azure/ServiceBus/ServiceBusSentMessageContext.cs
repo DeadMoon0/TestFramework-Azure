@@ -6,5 +6,15 @@ namespace TestFramework.Azure.ServiceBus;
 /// <summary>
 /// Step result context for sent Service Bus messages.
 /// </summary>
-/// <param name="Message">The message that was sent.</param>
-public sealed record ServiceBusSentMessageContext(ServiceBusMessage Message) : StepResultContext;
+public sealed record ServiceBusSentMessageContext : StepResultContext
+{
+    internal ServiceBusSentMessageContext(ServiceBusMessage message)
+    {
+        this.Message = message;
+    }
+
+    /// <summary>
+    /// The message that was sent.
+    /// </summary>
+    public ServiceBusMessage Message { get; }
+}

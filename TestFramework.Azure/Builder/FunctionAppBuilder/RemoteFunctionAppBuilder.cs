@@ -107,7 +107,7 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
             if (string.IsNullOrWhiteSpace(resolvedPath))
                 throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("Function App endpoint path cannot be blank.");
 
-            return new TriggerHttpRouting(resolvedPath.Trim(), method.GetRequiredValue(store), null!);
+            return new TriggerHttpRouting(resolvedPath.Trim(), method.GetRequiredValue(store));
         }
 
         public override VariableReference<TNew> Transform<TNew>(Func<TriggerHttpRouting?, TNew?> transform) where TNew : default =>
@@ -133,7 +133,7 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
             // Relative to the host route prefix, which HttpRemoteFunctionAppTrigger applies from
             // FunctionAppConfig.RoutePrefix.
             string normalized = resolvedFunctionName.Trim().TrimStart('/');
-            return new TriggerHttpRouting(normalized, method.GetRequiredValue(store), null!);
+            return new TriggerHttpRouting(normalized, method.GetRequiredValue(store));
         }
 
         public override VariableReference<TNew> Transform<TNew>(Func<TriggerHttpRouting?, TNew?> transform) where TNew : default =>

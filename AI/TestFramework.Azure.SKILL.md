@@ -47,7 +47,7 @@
     - AzureExt.Trigger.LogicApp.Http("logic").Workflow("StatelessWorkflow").Manual().CallAndCapture()
     - AzureExt.Event.LogicApp.RunCompleted("logic", runId, workflowName) is for stateful workflows only
     - AzureExt.Trigger.ServiceBus.Send("configName", message)
-    - AzureExt.Event.ServiceBus.MessageReceived("configName", ...)
+    - AzureExt.Event.ServiceBus.MessageReceived("configName").WithMessageId(v).WithCorrelationId(v).Where(v).CompleteMessage(false).WithTempSubscription(); each narrowing returns a new event
     - AzureExt.Trigger.IsLive.Cosmos("configName")
     - AzureExt.ArtifactFinder.DB.CosmosQuery<T>("configName", queryDefinition)
     - Config extensions such as LoadAzureConfig() prepare Azure-specific configuration.

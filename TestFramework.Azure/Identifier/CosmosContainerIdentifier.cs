@@ -1,10 +1,13 @@
-﻿namespace TestFramework.Azure.Identifier;
+﻿using TestFramework.Core.Conventions;
+
+namespace TestFramework.Azure.Identifier;
 
 /// <summary>
 /// Logical identifier used to resolve a configured Cosmos DB container.
 /// </summary>
 /// <param name="Identifier">The configuration key that names the Cosmos DB entry.</param>
-public record CosmosContainerIdentifier(string Identifier)
+[ClosedShape("An identifier is its name; anything more about a Cosmos container belongs in its configuration.")]
+public sealed record CosmosContainerIdentifier(string Identifier)
 {
     /// <summary>
     /// Converts a typed identifier to its raw string representation.

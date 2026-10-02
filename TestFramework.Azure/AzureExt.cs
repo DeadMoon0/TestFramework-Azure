@@ -212,9 +212,18 @@ public static class AzureExt
         /// <param name="partitionKey">The document partition key.</param>
         /// <returns>A Cosmos artifact reference.</returns>
         public CosmosDbItemArtifactReference<TItem> CosmosRef<TItem>(CosmosContainerIdentifier identifier, string id, PartitionKey partitionKey)
-        {
-            return new CosmosDbItemArtifactReference<TItem>(identifier, partitionKey, id);
-        }
+            => CosmosRef<TItem>(identifier, Var.Const(id), Var.Const(partitionKey));
+
+        /// <summary>
+        /// Creates a reference to a Cosmos DB item named by variables, resolved when the reference is pinned.
+        /// </summary>
+        /// <typeparam name="TItem">The item type stored in Cosmos.</typeparam>
+        /// <param name="identifier">The Cosmos container identifier.</param>
+        /// <param name="id">The document id.</param>
+        /// <param name="partitionKey">The document partition key.</param>
+        /// <returns>A Cosmos artifact reference.</returns>
+        public CosmosDbItemArtifactReference<TItem> CosmosRef<TItem>(CosmosContainerIdentifier identifier, VariableReference<string> id, VariableReference<PartitionKey> partitionKey)
+            => new(identifier, partitionKey, id);
 
         /// <summary>
         /// Creates a reference to a SQL row addressed by its primary key values.
@@ -415,13 +424,27 @@ public static class AzureExt
         /// <summary>
         /// Waits until a Logic App run reaches a specific status.
         /// </summary>
-        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<string> runId, LogicAppRunStatus status, VariableReference<string>? workflowName = null)
+        /// <remarks>Uses <c>null</c> for <c>workflowName</c>; the other overload states it.</remarks>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<string> runId, LogicAppRunStatus status)
+            => this.RunReachedStatus(identifier, runId, status, null);
+
+        /// <summary>
+        /// Waits until a Logic App run reaches a specific status.
+        /// </summary>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<string> runId, LogicAppRunStatus status, VariableReference<string>? workflowName)
             => new(identifier, workflowName, runId, Var.Const(status));
 
         /// <summary>
         /// Waits until a Logic App run reaches a specific status.
         /// </summary>
-        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<string> runId, VariableReference<LogicAppRunStatus> status, VariableReference<string>? workflowName = null)
+        /// <remarks>Uses <c>null</c> for <c>workflowName</c>; the other overload states it.</remarks>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<string> runId, VariableReference<LogicAppRunStatus> status)
+            => this.RunReachedStatus(identifier, runId, status, null);
+
+        /// <summary>
+        /// Waits until a Logic App run reaches a specific status.
+        /// </summary>
+        public LogicAppRunEvent RunReachedStatus(LogicAppIdentifier identifier, VariableReference<string> runId, VariableReference<LogicAppRunStatus> status, VariableReference<string>? workflowName)
             => new(identifier, workflowName, runId, status);
 
         /// <summary>
@@ -460,7 +483,14 @@ public static class AzureExt
         /// <summary>
         /// Waits until a Logic App run reaches any terminal state.
         /// </summary>
-        public LogicAppRunEvent RunCompleted(LogicAppIdentifier identifier, VariableReference<string> runId, VariableReference<string>? workflowName = null)
+        /// <remarks>Uses <c>null</c> for <c>workflowName</c>; the other overload states it.</remarks>
+        public LogicAppRunEvent RunCompleted(LogicAppIdentifier identifier, VariableReference<string> runId)
+            => this.RunCompleted(identifier, runId, null);
+
+        /// <summary>
+        /// Waits until a Logic App run reaches any terminal state.
+        /// </summary>
+        public LogicAppRunEvent RunCompleted(LogicAppIdentifier identifier, VariableReference<string> runId, VariableReference<string>? workflowName)
             => new(identifier, workflowName, runId, null);
     }
 
@@ -470,31 +500,19 @@ public static class AzureExt
     public class ServiceBusEvents
     {
         /// <summary>
-        /// Creates a Service Bus message-received event using a plain boolean flag for temporary subscription creation.
+        /// Creates a Service Bus message-received event that matches any message on the entity.
         /// </summary>
+        /// <remarks>
+        /// Narrow it with <c>.WithMessageId(...)</c>, <c>.WithCorrelationId(...)</c> and <c>.Where(...)</c>; a topic entry
+        /// without a subscription of its own takes <c>.WithTempSubscription()</c>. The matching message is completed
+        /// unless <c>.CompleteMessage(false)</c> says otherwise.
+        /// </remarks>
         /// <param name="identifier">The Service Bus identifier.</param>
-        /// <param name="messageId">Optional message id filter.</param>
-        /// <param name="correlationId">Optional correlation id filter.</param>
-        /// <param name="predicate">Optional custom predicate applied to received messages.</param>
-        /// <param name="completeMessage">Whether a matching message is completed. Defaults to true when unspecified; pass false to leave the message on the entity, where it can satisfy a later run.</param>
-        /// <param name="createTempSubscription">Whether a temporary topic subscription should be created for the receive flow.</param>
         /// <returns>A Service Bus event that completes when a matching message is observed.</returns>
-        public ServiceBusProcessEvent MessageReceived(ServiceBusIdentifier identifier, VariableReference<string>? messageId = null, VariableReference<string>? correlationId = null, VariableReference<Func<ServiceBusReceivedMessage, bool>>? predicate = null, VariableReference<bool>? completeMessage = null, bool createTempSubscription = false)
-            => new ServiceBusProcessEvent(identifier, messageId, correlationId, predicate, completeMessage,
-                createTempSubscription ? Var.Const(createTempSubscription) : null);
-
-        /// <summary>
-        /// Creates a Service Bus message-received event using a variable-backed temporary subscription flag.
-        /// </summary>
-        /// <typeparam name="TVar">The variable type used for the temporary-subscription flag.</typeparam>
-        /// <param name="identifier">The Service Bus identifier.</param>
-        /// <param name="messageId">Optional message id filter.</param>
-        /// <param name="correlationId">Optional correlation id filter.</param>
-        /// <param name="predicate">Optional custom predicate applied to received messages.</param>
-        /// <param name="completeMessage">Whether a matching message is completed. Defaults to true when unspecified; pass false to leave the message on the entity, where it can satisfy a later run.</param>
-        /// <param name="createTempSubscription">Variable-backed flag controlling temporary topic subscription creation.</param>
-        /// <returns>A Service Bus event that completes when a matching message is observed.</returns>
-        public ServiceBusProcessEvent MessageReceived<TVar>(ServiceBusIdentifier identifier, VariableReference<string>? messageId = null, VariableReference<string>? correlationId = null, VariableReference<Func<ServiceBusReceivedMessage, bool>>? predicate = null, VariableReference<bool>? completeMessage = null, ImmutableVariable<TVar, bool>? createTempSubscription = null) where TVar : VariableReference<bool>
-            => new ServiceBusProcessEvent(identifier, messageId, correlationId, predicate, completeMessage, createTempSubscription);
+        public ServiceBusProcessEvent MessageReceived(ServiceBusIdentifier identifier)
+        {
+            ArgumentNullException.ThrowIfNull(identifier);
+            return new ServiceBusProcessEvent(identifier, null, null, null, null, null);
+        }
     }
 }

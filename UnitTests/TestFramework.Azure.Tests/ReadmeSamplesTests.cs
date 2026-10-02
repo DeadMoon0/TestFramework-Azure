@@ -265,7 +265,7 @@ public class ReadmeSamplesTests
     {
         Timeline timeline = Timeline.Create()
             .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBQueue", new ServiceBusMessage("Test message") { CorrelationId = "order-42" }))
-            .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBQueue", correlationId: "order-42", completeMessage: true))
+            .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBQueue").WithCorrelationId("order-42").CompleteMessage(true))
                 .WithTimeOut(TimeSpan.FromSeconds(10))
             .Build();
 
@@ -275,7 +275,7 @@ public class ReadmeSamplesTests
     [Fact]
     public void ServiceBusTopicTempSubscriptionWait_CreatesPreAndCleanupSteps()
     {
-        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("MainSBTopic", correlationId: "topic-1234", createTempSubscription: true, completeMessage: true);
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("MainSBTopic").WithCorrelationId("topic-1234").CompleteMessage(true).WithTempSubscription();
         Timeline timeline = Timeline.Create()
             .WaitForEvent(receiveEvent)
                 .WithTimeOut(TimeSpan.FromSeconds(10))

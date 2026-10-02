@@ -1,8 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Net.Http;
-using TestFramework.Core.Variables;
+﻿using System.Net.Http;
 
 namespace TestFramework.Azure.FunctionApp.TriggerConfigs;
 
 internal record TriggerRouting(string Name);
-internal record TriggerHttpRouting(string Path, HttpMethod Method, VariableReference<Dictionary<string, string>> queryParameter);
+internal record TriggerHttpRouting(string Path, HttpMethod Method);

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using TestFramework.Core.Steps.Options;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -54,7 +55,7 @@ public class AzureSurfaceTests
     [Fact]
     public void AzureEnv_MessageReceived_WithTempSubscriptionFlag_ProvidesPreAndCleanupSteps()
     {
-        ServiceBusProcessEvent step = AzureExt.Event.ServiceBus.MessageReceived("bus", createTempSubscription: true);
+        ServiceBusProcessEvent step = AzureExt.Event.ServiceBus.MessageReceived("bus").WithTempSubscription();
 
         StepGeneric? preStep = ((IHasPreStep)step).CreatePreStep(null!);
         StepGeneric? cleanupStep = ((IHasCleanupStep)step).CreateCleanupStep(null!);
@@ -111,13 +112,29 @@ public class AzureSurfaceTests
     }
 
     [Fact]
+    public void NarrowingAServiceBusWait_ReturnsANewEventAndLeavesTheOriginalAsItWas()
+    {
+        // An event handed to one timeline and narrowed again for another must not change under the first.
+        ServiceBusProcessEvent any = AzureExt.Event.ServiceBus.MessageReceived("bus");
+        ServiceBusProcessEvent narrowed = any.WithMessageId(Var.Ref<string>("messageId")).WithCorrelationId(Var.Ref<string>("correlationId"));
+
+        StepIOContract anyContract = new();
+        any.DeclareIO(anyContract);
+        StepIOContract narrowedContract = new();
+        narrowed.DeclareIO(narrowedContract);
+
+        Assert.NotSame(any, narrowed);
+        Assert.Empty(anyContract.Inputs);
+        Assert.Equal(["correlationId", "messageId"], narrowedContract.Inputs.Select(input => input.Key).Order());
+    }
+
+    [Fact]
     public void AzureIsLiveResult_ExposesKnownResourceKind()
     {
         Azure.Trigger.IsLive.AzureIsLiveResult result = new(
             AzureEnvironmentResourceKinds.FunctionApp,
             "func",
             AlivenessLevel.Authenticated,
-            true,
             null);
 
         Assert.Equal(Azure.Trigger.IsLive.AzureKnownResourceKind.FunctionApp, result.KnownResourceKind);

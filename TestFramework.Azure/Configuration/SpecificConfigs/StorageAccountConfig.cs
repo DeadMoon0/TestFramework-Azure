@@ -19,17 +19,17 @@ public record StorageAccountConfig
     /// <summary>
     /// Optional queue name when queue-backed storage operations need a default queue.
     /// </summary>
-    public required string? QueueContainerName { get; init; }
+    public string? QueueContainerName { get; init; }
 
     /// <summary>
     /// Optional blob container name used by blob artifact helpers and blob liveness checks.
     /// </summary>
-    public required string? BlobContainerName { get; init; }
+    public string? BlobContainerName { get; init; }
 
     /// <summary>
     /// Optional table name used by table artifact helpers and table liveness checks.
     /// </summary>
-    public required string? TableContainerName { get; init; }
+    public string? TableContainerName { get; init; }
 
     /// <summary>
     /// Gets the configured queue name or throws when no queue name has been supplied.

@@ -35,7 +35,7 @@ internal static class FunctionAppMethodAnalyzer
             ? new HttpMethod(trigger.Methods[0])
             : HttpMethod.Get;
 
-        return new TriggerHttpRouting(trigger.Path, httpMethod, null!);
+        return new TriggerHttpRouting(trigger.Path, httpMethod);
     }
 
     internal static TriggerHttpRouting GetHttpTriggerRouting<TFunctionType>(string methodName, HttpMethod httpMethod)
@@ -55,7 +55,7 @@ internal static class FunctionAppMethodAnalyzer
             };
         }
 
-        return new TriggerHttpRouting(trigger.Path, httpMethod, null!);
+        return new TriggerHttpRouting(trigger.Path, httpMethod);
     }
 
     private readonly record struct HttpTriggerMetadata(string Path, string[]? Methods);

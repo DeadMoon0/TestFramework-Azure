@@ -29,9 +29,29 @@ public static class AzureServiceCollectionExtension
     /// </para>
     /// </remarks>
     /// <param name="serviceCollection">The service collection to register Azure configs in.</param>
+    /// <returns>The service collection for fluent chaining.</returns>
+    public static IServiceCollection LoadAzureConfigs(this IServiceCollection serviceCollection)
+        => serviceCollection.LoadAzureConfigs(null);
+
+    /// <summary>
+    /// Turns this package's configuration on: which sections it reads, and how each one maps to a resource.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Takes no configuration, deliberately.</strong> It used to, and the parameter stopped meaning
+    /// anything when the typed stores were deleted: a shape reads the configuration the run holds, when the
+    /// run composes its resources. Keeping an ignored parameter would have let a caller pass one
+    /// configuration here, register another on the run, and be served the second without a word.
+    /// </para>
+    /// <para>
+    /// So the run decides which configuration these sections are read from, which is the same rule every
+    /// other package follows and the reason a step never has to ask which of two files won.
+    /// </para>
+    /// </remarks>
+    /// <param name="serviceCollection">The service collection to register Azure configs in.</param>
     /// <param name="provider">Optional custom configuration provider. Uses DefaultConfigProvider if not specified.</param>
     /// <returns>The service collection for fluent chaining.</returns>
-    public static IServiceCollection LoadAzureConfigs(this IServiceCollection serviceCollection, IConfigProvider? provider = null)
+    public static IServiceCollection LoadAzureConfigs(this IServiceCollection serviceCollection, IConfigProvider? provider)
     {
         provider ??= new DefaultConfigProvider();
         ConfigLoader loader = new ConfigLoader(provider);

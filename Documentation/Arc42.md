@@ -241,7 +241,7 @@ classDiagram
         +TableRef~T~(id, table, pk, rk) TableStorageEntityArtifactReference~T~
     }
     class ServiceBusEventProxy {
-        +MessageReceived(id, ...) ServiceBusProcessEvent
+        +MessageReceived(id) ServiceBusProcessEvent
     }
     AzureExt --> FunctionAppTriggerProxy
     AzureExt --> ServiceBusTriggerProxy
@@ -663,7 +663,7 @@ public record StorageAccountIdentifier(string Identifier)
 |------|------------------------|-------------------|
 | Queue | `ConnectionString`, `QueueName` | `MessageReceived(...)` listens directly on the queue. No subscription is required. |
 | Topic + subscription | `ConnectionString`, `TopicName`, `SubscriptionName` | `MessageReceived(...)` uses the configured subscription. |
-| Topic + temp subscription | `ConnectionString`, `TopicName` | `MessageReceived(..., createTempSubscription: true)` creates a filtered temp subscription during pre-step and deletes it during cleanup. |
+| Topic + temp subscription | `ConnectionString`, `TopicName` | `MessageReceived(...).WithTempSubscription()` creates a filtered temp subscription during pre-step and deletes it during cleanup. |
 
 `RequiredSession` applies to queue and topic receive modes.
 
@@ -763,7 +763,7 @@ stateDiagram-v2
 
 **Decision:** `FunctionAppHttpInProcessCallProxy` provides `HttpRequest`, `GetService()`, and `GetVariable()`. The function class is instantiated directly.
 
-**Consequence:** Full debugging support; only HTTP triggers are currently supported in-process. Timer InProcess is also available.
+**Consequence:** Full debugging support; only HTTP triggers are supported in-process.
 
 ---
 
@@ -967,10 +967,7 @@ public async Task ServiceBus_Queue_Send_Receive()
     var correlationId = Guid.NewGuid().ToString();
 
     var timeline = Timeline.Create()
-        .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived(
-            "MainSBQueue",
-            correlationId: correlationId,
-            completeMessage: true))
+        .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBQueue").WithCorrelationId(correlationId).CompleteMessage(true))
             .WithTimeOut(TimeSpan.FromMinutes(2))
         .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBQueue",
             new ServiceBusMessage("payload") { CorrelationId = correlationId }))
@@ -990,11 +987,7 @@ public async Task ServiceBus_Topic_Send_Receive_With_Temp_Subscription()
     var correlationId = Guid.NewGuid().ToString();
 
     var timeline = Timeline.Create()
-        .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived(
-            "MainSBTopic",
-            correlationId: correlationId,
-            createTempSubscription: true,
-            completeMessage: true))
+        .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBTopic").WithCorrelationId(correlationId).CompleteMessage(true).WithTempSubscription())
             .WithTimeOut(TimeSpan.FromMinutes(2))
         .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBTopic",
             new ServiceBusMessage("payload") { CorrelationId = correlationId }))

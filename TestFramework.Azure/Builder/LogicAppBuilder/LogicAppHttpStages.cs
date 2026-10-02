@@ -34,9 +34,16 @@ public interface ILogicAppTriggerStage
     /// <summary>
     /// Selects a manual HTTP trigger by constant name.
     /// </summary>
+    /// <remarks>Uses <c>"manual"</c> for <c>triggerName</c>; the other overload states it.</remarks>
+    /// <returns>The payload stage used to shape the request body and headers.</returns>
+    ILogicAppHttpPayloadStage Manual();
+
+    /// <summary>
+    /// Selects a manual HTTP trigger by constant name.
+    /// </summary>
     /// <param name="triggerName">The manual trigger name. Defaults to <c>manual</c>.</param>
     /// <returns>The payload stage used to shape the request body and headers.</returns>
-    ILogicAppHttpPayloadStage Manual(string triggerName = "manual");
+    ILogicAppHttpPayloadStage Manual(string triggerName);
 
     /// <summary>
     /// Selects a manual HTTP trigger by variable-backed name.
@@ -48,9 +55,16 @@ public interface ILogicAppTriggerStage
     /// <summary>
     /// Selects a timer or recurrence trigger by constant name.
     /// </summary>
+    /// <remarks>Uses <c>"Recurrence"</c> for <c>triggerName</c>; the other overload states it.</remarks>
+    /// <returns>The stage that can execute the trigger.</returns>
+    ILogicAppExecutionStage Timer();
+
+    /// <summary>
+    /// Selects a timer or recurrence trigger by constant name.
+    /// </summary>
     /// <param name="triggerName">The timer trigger name. Defaults to <c>Recurrence</c>.</param>
     /// <returns>The stage that can execute the trigger.</returns>
-    ILogicAppExecutionStage Timer(string triggerName = "Recurrence");
+    ILogicAppExecutionStage Timer(string triggerName);
 
     /// <summary>
     /// Selects a timer or recurrence trigger by variable-backed name.

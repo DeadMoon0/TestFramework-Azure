@@ -16,9 +16,7 @@
 		<PackageTags>Test;UnitTest;IntegrationTest;Framework;Fluent;Timeline;Azure</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<Copyright>Copyright (c) DeadMoon0 2026</Copyright>
-		<PackageReleaseNotes>BREAKING - teardown now deletes what a run discovered. An artifact this package produces is deletable, and the timeline decides whether it may be deleted: chain MarkReadonly() onto the FindArtifact / FindArtifacts / RegisterArtifact call for a resource the run only reads. Requires TestFramework.Core 0.3.0.
-Before this release the Cosmos item finder and the Table Storage entity finder handed back references teardown deleted, while a SQL row located by the EF Core finder was never deleted. That split was invisible at the call site and inconsistent between resource families. Now all three behave the same way and the decision is written where the artifact is declared.
-What to change: a timeline that discovers Azure SQL rows and relies on them surviving the run must add MarkReadonly(), or teardown will delete rows the application under test owns. A timeline that already treated discovery as deleting needs no change. Cosmos and Table discovery is unchanged in effect - it deleted before and it deletes now.</PackageReleaseNotes>
+		<PackageReleaseNotes>BREAKING - needs TestFramework.Core 0.7.0 and TestFramework.Config 0.4.0. MessageReceived(identifier) is narrowed with WithMessageId, WithCorrelationId, Where, CompleteMessage and WithTempSubscription instead of optional arguments; a Cosmos reference comes from CosmosRef(...), and setup refuses an item that is not the one its reference names. Optional parameters elsewhere became overloads, results are built by Azure only, AzureIsLiveResult.Success and GetSuccess are gone (a probe that does not answer fails), and the identifiers are sealed.</PackageReleaseNotes>
 	</PropertyGroup>
 
 	<ItemGroup>

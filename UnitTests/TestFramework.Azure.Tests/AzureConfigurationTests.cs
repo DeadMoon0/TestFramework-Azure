@@ -400,7 +400,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        TriggerHttpRouting routing = new("orders", HttpMethod.Post, Var.Const(new Dictionary<string, string>()));
+        TriggerHttpRouting routing = new("orders", HttpMethod.Post);
         CommonHttpRequest request = new();
         request.Headers.Add("x-test", "1");
         request.Content = new StringContent("body", Encoding.UTF8, "text/plain");
@@ -435,7 +435,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
-        TriggerHttpRouting routing = new("orders", HttpMethod.Post, Var.Const(new Dictionary<string, string>()));
+        TriggerHttpRouting routing = new("orders", HttpMethod.Post);
         CommonHttpRequest request = new();
         request.Content = new StringContent("body", Encoding.UTF8, "text/plain");
 
@@ -614,7 +614,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         }, debugger);
 
-        TriggerHttpRouting routing = new("orders", HttpMethod.Post, Var.Const(new Dictionary<string, string>()));
+        TriggerHttpRouting routing = new("orders", HttpMethod.Post);
         CommonHttpRequest request = new();
 
         HttpRemoteFunctionAppTrigger trigger = new("func", Var.Const(routing), Var.Const(request));
@@ -1706,7 +1706,6 @@ public class AzureConfigurationTests
             .GetResourceKind("probeKind")
             .GetResourceIdentifier("probeIdentifier")
             .GetAlivenessLevel("probeLevel")
-            .GetSuccess("probeSuccess")
             .GetStatusCode("probeStatusCode")
             .Build()
             .SetupRun(runtime.ServiceProvider)
@@ -1719,7 +1718,6 @@ public class AzureConfigurationTests
         Assert.Equal(AzureEnvironmentResourceKinds.FunctionApp, result!.ResourceKind);
         Assert.Equal("func", result.ResourceIdentifier);
         Assert.Equal(AlivenessLevel.Authenticated, result.AlivenessLevel);
-        Assert.True(result.Success);
         Assert.Equal(HttpStatusCode.OK, result.StatusCode);
     }
 
@@ -2202,6 +2200,35 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public async Task ACosmosItemThatIsNotTheOneItsReferenceNames_IsRefusedBeforeItIsWritten()
+    {
+        // Setup writes the item and teardown deletes what the reference names. Before, setup silently re-aimed the
+        // reference at the item's own id, so the named item was never the one cleaned up.
+        FakeCosmosContainerAdapter container = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.Declare("cosmos", new CosmosContainerDbConfig
+            {
+                ConnectionString = "AccountEndpoint=https://cosmos.test/",
+                DatabaseName = "db",
+                ContainerName = "items",
+            });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
+        });
+
+        CosmosDbItemArtifactReference<TestItem> reference = AzureExt.Artifact.DB.CosmosRef<TestItem>("cosmos", "41", new PartitionKey("tenant-1"));
+        CosmosDbItemArtifactData<TestItem> data = new(new TestItem("42", "tenant-1", "Ada"));
+        runtime.Context.Artifacts.Add<CosmosDbItemArtifactDescriber<TestItem>, CosmosDbItemArtifactData<TestItem>, CosmosDbItemArtifactReference<TestItem>>("item", reference, data);
+
+        FrameworkConfigurationException refusal = await Assert.ThrowsAsync<FrameworkConfigurationException>(
+            () => new CosmosDbItemArtifactDescriber<TestItem>().Setup(runtime.Context, data, reference));
+
+        Assert.Contains("its reference names '41'", refusal.Message, StringComparison.Ordinal);
+        Assert.Null(container.UpsertedItem);
+        Assert.Equal("41", reference.GetId(runtime.VariableStore));
+    }
+
+    [Fact]
     public async Task CosmosDbItemArtifactDescriber_UsesUnifiedFactoryContainer()
     {
         FakeCosmosContainerAdapter container = new();
@@ -2219,6 +2246,9 @@ public class AzureConfigurationTests
         CosmosDbItemArtifactDescriber<TestItem> describer = new();
         CosmosDbItemArtifactReference<TestItem> reference = new("cosmos");
         CosmosDbItemArtifactData<TestItem> data = new(new TestItem("42", "tenant-1", "Ada"));
+
+        // Held by the run's store, as every set-up artifact is: setup records the item's identity through it.
+        runtime.Context.Artifacts.Add<CosmosDbItemArtifactDescriber<TestItem>, CosmosDbItemArtifactData<TestItem>, CosmosDbItemArtifactReference<TestItem>>("item", reference, data);
 
         await describer.Setup(runtime.Context, data, reference);
         await describer.Deconstruct(runtime.Context, reference);
@@ -2516,12 +2546,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
-        ServiceBusProcessEvent step = AzureExt.Event.ServiceBus.MessageReceived(
-            "topic",
-            messageId: Var.Const("m1"),
-            correlationId: Var.Const("c1"),
-            predicate: Var.Const<Func<ServiceBusReceivedMessage, bool>>(message => message.MessageId == "m1"),
-            completeMessage: Var.Const(true));
+        ServiceBusProcessEvent step = AzureExt.Event.ServiceBus.MessageReceived("topic").WithMessageId(Var.Const("m1")).WithCorrelationId(Var.Const("c1")).Where(Var.Const<Func<ServiceBusReceivedMessage, bool>>(message => message.MessageId == "m1")).CompleteMessage(Var.Const(true));
 
         var result = await step.DoEventPolling(runtime.Context);
 
@@ -2556,7 +2581,7 @@ public class AzureConfigurationTests
 
         ServiceBusMessage sendMessage = new("payload") { MessageId = "q1" };
         ServiceBusSendTrigger sendTrigger = AzureExt.Trigger.ServiceBus.Send("queue", Var.Const(sendMessage));
-        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q1"));
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue").WithMessageId(Var.Const("q1"));
 
         await sendTrigger.Execute(runtime.Context);
         var result = await receiveEvent.DoEventPolling(runtime.Context);
@@ -2589,7 +2614,7 @@ public class AzureConfigurationTests
 
         ServiceBusMessage sendMessage = new("payload") { MessageId = "q2" };
         ServiceBusSendTrigger sendTrigger = AzureExt.Trigger.ServiceBus.Send("queue", Var.Const(sendMessage));
-        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q2"));
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue").WithMessageId(Var.Const("q2"));
 
         await sendTrigger.Execute(runtime.Context);
         var result = await receiveEvent.DoEventPolling(runtime.Context);
@@ -2653,10 +2678,7 @@ public class AzureConfigurationTests
         RuntimeContext runtime = RuntimeContext.Create(_ => { });
         runtime.VariableStore.SetVariable("waitTimeout", TimeSpan.FromSeconds(42));
 
-        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived(
-            "topic",
-            correlationId: Var.Const("c1"),
-            createTempSubscription: true);
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic").WithCorrelationId(Var.Const("c1")).WithTempSubscription();
         receiveEvent.TimeOutOptions.TimeOut = Var.Ref<TimeSpan>("waitTimeout");
 
         StepGeneric? preStep = ((IHasPreStep)receiveEvent).CreatePreStep(runtime.VariableStore);
@@ -2681,7 +2703,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
-        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q1"));
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue").WithMessageId(Var.Const("q1"));
 
         await receiveEvent.DoEventPolling(runtime.Context);
 
@@ -2706,7 +2728,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
-        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue", messageId: Var.Const("q1"), completeMessage: Var.Const(false));
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("queue").WithMessageId(Var.Const("q1")).CompleteMessage(Var.Const(false));
 
         await receiveEvent.DoEventPolling(runtime.Context);
 
@@ -2731,7 +2753,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
-        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic", correlationId: Var.Const("c1"), createTempSubscription: true);
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic").WithCorrelationId(Var.Const("c1")).WithTempSubscription();
 
         // Planning first, like the runner: the pre-step decision arms the temporary subscription, and
         // polling refuses a flag that differs from what planning saw.
@@ -2759,7 +2781,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
 
-        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic", messageId: Var.Const("t1"), createTempSubscription: true);
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic").WithMessageId(Var.Const("t1")).WithTempSubscription();
 
         StepGeneric? preStep = ((IHasPreStep)receiveEvent).CreatePreStep(runtime.VariableStore);
         StepGeneric? cleanupStep = ((IHasCleanupStep)receiveEvent).CreateCleanupStep(runtime.VariableStore);
@@ -2789,7 +2811,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory());
         });
 
-        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic", messageId: Var.Const("missing-sub"));
+        ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic").WithMessageId(Var.Const("missing-sub"));
 
         FrameworkConfigurationException exception = await Assert.ThrowsAsync<FrameworkConfigurationException>(() =>
             receiveEvent.DoEventPolling(runtime.Context));

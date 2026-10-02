@@ -7,18 +7,38 @@ namespace TestFramework.Azure.LogicApp;
 /// <summary>
 /// Result returned when a Logic App trigger is invoked.
 /// </summary>
-/// <param name="WorkflowName">The resolved workflow name.</param>
-/// <param name="TriggerName">The resolved trigger name.</param>
-/// <param name="CallbackUrl">The callback or management URL that was invoked.</param>
-/// <param name="RunId">The resolved workflow run identifier, when available.</param>
-/// <param name="StatusCode">The HTTP status returned by the trigger invocation.</param>
-public sealed record LogicAppTriggerResult(
-    string WorkflowName,
-    string TriggerName,
-    string CallbackUrl,
-    string? RunId,
-    HttpStatusCode StatusCode) : StepResultContext
+public sealed record LogicAppTriggerResult : StepResultContext
 {
+    internal LogicAppTriggerResult(string workflowName, string triggerName, string callbackUrl, string? runId, HttpStatusCode statusCode)
+    {
+        this.WorkflowName = workflowName;
+        this.TriggerName = triggerName;
+        this.CallbackUrl = LogicAppUriRedaction.Redact(callbackUrl)!;
+        this.RunId = runId;
+        this.StatusCode = statusCode;
+    }
+
+    /// <summary>
+    /// The resolved workflow name.
+    /// </summary>
+    public string WorkflowName { get; }
+
+    /// <summary>
+    /// The resolved trigger name.
+    /// </summary>
+    public string TriggerName { get; }
+
+
+    /// <summary>
+    /// The resolved workflow run identifier, when available.
+    /// </summary>
+    public string? RunId { get; }
+
+    /// <summary>
+    /// The HTTP status returned by the trigger invocation.
+    /// </summary>
+    public HttpStatusCode StatusCode { get; }
+
     /// <summary>
     /// The callback or management URL that was invoked, with its signature redacted.
     /// </summary>
@@ -27,7 +47,7 @@ public sealed record LogicAppTriggerResult(
     /// <c>sig</c> is a bearer credential, and a result travels into variables, logs and the frozen
     /// run. This was the one result type that kept the raw URL.
     /// </remarks>
-    public string CallbackUrl { get; init; } = LogicAppUriRedaction.Redact(CallbackUrl)!;
+    public string CallbackUrl { get; }
 
     /// <summary>
     /// Gets the invoked callback URL using the consumer-facing invoke URI terminology.

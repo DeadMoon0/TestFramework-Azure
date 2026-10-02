@@ -41,24 +41,24 @@ public record ServiceBusConfig
     /// Queue-backed mode. Required for queue send and receive flows.
     /// Leave <see cref="TopicName"/> and <see cref="SubscriptionName"/> unset in this mode.
     /// </summary>
-    public required string? QueueName { get; init; }
+    public string? QueueName { get; init; }
 
     /// <summary>
     /// Topic-backed mode. Required for topic send and receive flows.
     /// Pair with <see cref="SubscriptionName"/> for a fixed subscription, or use
-    /// AzureExt.Event.ServiceBus.MessageReceived(..., createTempSubscription: true) for a temp subscription.
+    /// AzureExt.Event.ServiceBus.MessageReceived(...).WithTempSubscription() for a temp subscription.
     /// </summary>
-    public required string? TopicName { get; init; }
+    public string? TopicName { get; init; }
 
     /// <summary>
     /// Fixed topic subscription for receive flows. Not used for queues and optional when a temp subscription is created.
     /// </summary>
-    public required string? SubscriptionName { get; init; }
+    public string? SubscriptionName { get; init; }
 
     /// <summary>
     /// When true, send and receive flows use session-capable Service Bus clients.
     /// </summary>
-    public required bool RequiredSession { get; init; }
+    public bool RequiredSession { get; init; }
 
     /// <summary>
     /// Gets the active queue or topic entity name.
@@ -89,7 +89,7 @@ public record ServiceBusConfig
     /// </summary>
     /// <param name="createTempSubscription">Whether the framework should create a temporary subscription for topic-backed receive flows.</param>
     /// <returns>The receive mode implied by the configured entity fields.</returns>
-    public ServiceBusConfigReceiveMode GetReceiveMode(bool createTempSubscription = false)
+    internal ServiceBusConfigReceiveMode GetReceiveMode(bool createTempSubscription)
     {
         if (IsQueue) return ServiceBusConfigReceiveMode.Queue;
         if (!IsTopic)

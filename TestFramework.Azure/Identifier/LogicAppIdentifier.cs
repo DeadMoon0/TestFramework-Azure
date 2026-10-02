@@ -1,10 +1,13 @@
+using TestFramework.Core.Conventions;
+
 namespace TestFramework.Azure.Identifier;
 
 /// <summary>
 /// Logical identifier used to resolve a configured Azure Logic App.
 /// </summary>
 /// <param name="Identifier">The configuration key that names the Logic App entry.</param>
-public record LogicAppIdentifier(string Identifier)
+[ClosedShape("An identifier is its name; anything more about a Logic App belongs in its configuration.")]
+public sealed record LogicAppIdentifier(string Identifier)
 {
     /// <summary>
     /// Converts a typed identifier to its raw string representation.
