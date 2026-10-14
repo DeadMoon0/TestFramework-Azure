@@ -6,11 +6,11 @@ namespace TestFramework.Azure.DB.SqlServer;
 /// Static artifact kind for SQL row artifacts.
 /// </summary>
 /// <typeparam name="TRow">The row entity type.</typeparam>
-public class SqlRowArtifactKind<TRow> : ArtifactKind<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>>, IStaticArtifactKind<SqlRowArtifactKind<TRow>>
+public class AzureSqlRowArtifactKind<TRow> : ArtifactKind<AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactReference<TRow>>, IStaticArtifactKind<AzureSqlRowArtifactKind<TRow>>
     where TRow : class
 {
     /// <summary>
     /// Singleton artifact kind instance.
     /// </summary>
-    public static SqlRowArtifactKind<TRow> Kind { get; } = new SqlRowArtifactKind<TRow>();
+    public static AzureSqlRowArtifactKind<TRow> Kind { get; } = new AzureSqlRowArtifactKind<TRow>();
 }

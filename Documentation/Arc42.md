@@ -234,7 +234,7 @@ classDiagram
     }
     class DbArtifactProxy {
         +CosmosRef~T~(id, docId, pk) CosmosDbItemArtifactReference~T~
-        +SqlRef~T~(id, keys) SqlRowArtifactReference~T~
+        +SqlRef~T~(id, keys) AzureSqlRowArtifactReference~T~
     }
     class StorageAccountArtifactProxy {
         +BlobRef(id, path) StorageAccountBlobArtifactReference
@@ -294,13 +294,13 @@ classDiagram
         +Deconstruct() DeleteItemAsync
     }
 
-    class SqlRowArtifactReference~T~ {
+    class AzureSqlRowArtifactReference~T~ {
         +SqlDatabaseIdentifier Identifier
         +string[] PrimaryKeyValues
         +ResolveToDataAsync() FindAsync via EF Core
     }
-    class SqlRowArtifactData~T~ { +T Row }
-    class SqlRowArtifactDescriber~T~ {
+    class AzureSqlRowArtifactData~T~ { +T Row }
+    class AzureSqlRowArtifactDescriber~T~ {
         +Setup() Add/Update + SaveChangesAsync
         +Deconstruct() Remove + SaveChangesAsync
     }
@@ -308,15 +308,15 @@ classDiagram
     ArtifactReferenceGeneric <|-- StorageAccountBlobArtifactReference
     ArtifactReferenceGeneric <|-- TableStorageEntityArtifactReference~T~
     ArtifactReferenceGeneric <|-- CosmosDbItemArtifactReference~T~
-    ArtifactReferenceGeneric <|-- SqlRowArtifactReference~T~
+    ArtifactReferenceGeneric <|-- AzureSqlRowArtifactReference~T~
     ArtifactDataGeneric <|-- StorageAccountBlobArtifactData
     ArtifactDataGeneric <|-- TableStorageEntityArtifactData~T~
     ArtifactDataGeneric <|-- CosmosDbItemArtifactData~T~
-    ArtifactDataGeneric <|-- SqlRowArtifactData~T~
+    ArtifactDataGeneric <|-- AzureSqlRowArtifactData~T~
     ArtifactDescriberGeneric <|-- StorageAccountBlobArtifactDescriber
     ArtifactDescriberGeneric <|-- TableStorageEntityArtifactDescriber~T~
     ArtifactDescriberGeneric <|-- CosmosDbItemArtifactDescriber~T~
-    ArtifactDescriberGeneric <|-- SqlRowArtifactDescriber~T~
+    ArtifactDescriberGeneric <|-- AzureSqlRowArtifactDescriber~T~
 ```
 
 ### 5.4 Function App Trigger — Three Modes
@@ -395,7 +395,7 @@ classDiagram
 
 ```mermaid
 graph TD
-    REQ["SqlRowArtifactDescriber needs DbContext"] --> RES[SqlDbContextResolver]
+    REQ["AzureSqlRowArtifactDescriber needs DbContext"] --> RES[SqlDbContextResolver]
     RES --> COORD["SqlDatabaseResources.Resolve(run, identifier)"]
     COORD --> OPTS["DbContextOptions pointed at the run's database"]
     OPTS --> T1{"1. Registration for this identifier?"}
@@ -698,7 +698,7 @@ Register `ICosmosClientOptionsProvider` or call `ConfigureCosmosClientOptions(..
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CheckTracker : SqlRowArtifactDescriber.Setup()
+    [*] --> CheckTracker : AzureSqlRowArtifactDescriber.Setup()
     CheckTracker --> AlreadyMigrated : DB already checked this process
     AlreadyMigrated --> Ready
 
@@ -1037,7 +1037,7 @@ services.AddSqlArtifactContexts(registry =>
 
 // 2. Use in a test
 var sqlRef  = AzureExt.Artifact.DB.SqlRef<OrderEntity>("MainSql", orderId.ToString());
-var sqlData = new SqlRowArtifactData<OrderEntity>(new OrderEntity { Id = orderId, Name = "TestOrder" });
+var sqlData = new AzureSqlRowArtifactData<OrderEntity>(new OrderEntity { Id = orderId, Name = "TestOrder" });
 
 var timeline = Timeline.Create()
     .SetupArtifact("order")

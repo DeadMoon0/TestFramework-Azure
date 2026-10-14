@@ -199,8 +199,8 @@ public static class AzureArtifactExtension
     /// <param name="store">The artifact store to read from.</param>
     /// <param name="identifier">The artifact identifier.</param>
     /// <returns>The typed SQL artifact instance.</returns>
-    public static ArtifactInstance<SqlRowArtifactDescriber<T>, SqlRowArtifactData<T>, SqlRowArtifactReference<T>> GetSqlArtifact<T>(this ArtifactStore store, ArtifactIdentifier identifier) where T : class
-        => store.GetArtifact(SqlRowArtifactKind<T>.Kind, identifier);
+    public static ArtifactInstance<AzureSqlRowArtifactDescriber<T>, AzureSqlRowArtifactData<T>, AzureSqlRowArtifactReference<T>> GetSqlArtifact<T>(this ArtifactStore store, ArtifactIdentifier identifier) where T : class
+        => store.GetArtifact(AzureSqlRowArtifactKind<T>.Kind, identifier);
 
     /// <summary>
     /// Registers a SQL artifact for timeline setup and cleanup.
@@ -213,7 +213,7 @@ public static class AzureArtifactExtension
     /// <param name="primaryKeyValues">Primary key values used to resolve the row later.</param>
     /// <returns>The builder for fluent chaining.</returns>
     public static ITimelineRunBuilder AddSqlArtifact<T>(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, SqlDatabaseIdentifier dbIdentifier, T row, params VariableReference<string>[] primaryKeyValues) where T : class
-        => run.AddArtifact(artifactId, new SqlRowArtifactReference<T>(dbIdentifier, primaryKeyValues), new SqlRowArtifactData<T>(row));
+        => run.AddArtifact(artifactId, new AzureSqlRowArtifactReference<T>(dbIdentifier, primaryKeyValues), new AzureSqlRowArtifactData<T>(row));
 
     /// <summary>
     /// Returns an assertion handle for a SQL artifact in a completed run.
@@ -222,18 +222,18 @@ public static class AzureArtifactExtension
     /// <param name="run">The completed timeline run.</param>
     /// <param name="identifier">The artifact identifier.</param>
     /// <returns>An assertion handle for the SQL artifact.</returns>
-    public static ArtifactHandle<SqlRowArtifactData<T>> SqlArtifact<T>(this TimelineRun run, ArtifactIdentifier identifier) where T : class
-        => run.Artifact<SqlRowArtifactData<T>>(identifier);
+    public static ArtifactHandle<AzureSqlRowArtifactData<T>> SqlArtifact<T>(this TimelineRun run, ArtifactIdentifier identifier) where T : class
+        => run.Artifact<AzureSqlRowArtifactData<T>>(identifier);
 
     /// <summary>
     /// Returns the latest SQL row as a value handle.
     /// </summary>
-    public static ValueHandle<T> Row<T>(this ArtifactHandle<SqlRowArtifactData<T>> handle) where T : class
+    public static ValueHandle<T> Row<T>(this ArtifactHandle<AzureSqlRowArtifactData<T>> handle) where T : class
         => handle.Select(data => data.Row);
 
     /// <summary>
     /// Projects the latest SQL row to a specific value.
     /// </summary>
-    public static ValueHandle<TValue> Row<T, TValue>(this ArtifactHandle<SqlRowArtifactData<T>> handle, System.Func<T, TValue> selector) where T : class
+    public static ValueHandle<TValue> Row<T, TValue>(this ArtifactHandle<AzureSqlRowArtifactData<T>> handle, System.Func<T, TValue> selector) where T : class
         => handle.Row().Select(selector);
 }

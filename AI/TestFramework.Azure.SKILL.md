@@ -172,7 +172,7 @@
 <grounding_files>
     Most important files for expert grounding:
     - TestFramework-Azure/TestFramework.Azure/AzureExt.cs
-    - TestFramework-Azure/TestFramework.Azure/Extensions/ConfigExtension.cs
+    - TestFramework-Azure/TestFramework.Azure/Extensions/AzureConfigExtension.cs
     - TestFramework-Azure/TestFramework.Azure/Configuration/ConfigLoader.cs
     - TestFramework-Azure/TestFramework.Azure/Configuration/DefaultConfigProvider.cs
     - TestFramework-Azure/TestFramework.Azure/ServiceBus/ServiceBusProcessEvent.cs

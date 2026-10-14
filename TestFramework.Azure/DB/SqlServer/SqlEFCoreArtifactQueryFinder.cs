@@ -22,7 +22,7 @@ namespace TestFramework.Azure.DB.SqlServer;
 public class SqlEFCoreArtifactQueryFinder<TRow>(
     SqlDatabaseIdentifier dbIdentifier,
     Func<IQueryable<TRow>, IQueryable<TRow>> queryModifier)
-    : ArtifactFinder<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>>
+    : ArtifactFinder<AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactReference<TRow>>
     where TRow : class
 {
     /// <summary>
@@ -40,7 +40,7 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
         TRow? entity = await queryModifier(dbContext.Set<TRow>()).FirstOrDefaultAsync(context.Deadline.Token);
         if (entity is null) return null;
 
-        SqlRowArtifactReference<TRow> reference = BuildReference(dbContext, entity);
+        AzureSqlRowArtifactReference<TRow> reference = BuildReference(dbContext, entity);
         return new ArtifactFinderResult(reference);
     }
 
@@ -62,7 +62,7 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
         return new ArtifactFinderResultMulti(results.ToArray());
     }
 
-    private SqlRowArtifactReference<TRow> BuildReference(DbContext dbContext, TRow entity)
+    private AzureSqlRowArtifactReference<TRow> BuildReference(DbContext dbContext, TRow entity)
     {
         var entityType = dbContext.Model.FindEntityType(typeof(TRow))
             ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Entity type '{typeof(TRow).Name}' is not registered in the DbContext.");
@@ -82,7 +82,7 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
 
         VariableReference<string>[] pkRefs = pkStringValues.Select(v => Var.Const(v)).ToArray();
 
-        SqlRowArtifactReference<TRow> reference = new SqlRowArtifactReference<TRow>(dbIdentifier, pkRefs);
+        AzureSqlRowArtifactReference<TRow> reference = new AzureSqlRowArtifactReference<TRow>(dbIdentifier, pkRefs);
         // Pre-pin with already-resolved values so reference is immediately usable for cleanup
         reference.PinWithValues(pkStringValues);
         return reference;

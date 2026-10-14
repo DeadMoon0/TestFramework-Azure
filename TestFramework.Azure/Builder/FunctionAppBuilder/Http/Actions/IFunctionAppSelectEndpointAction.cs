@@ -7,7 +7,7 @@ namespace TestFramework.Azure.Builder.FunctionAppBuilder.Http.Actions;
 /// <summary>
 /// Selects a remote Function App endpoint by explicit path and HTTP method.
 /// </summary>
-public interface ISelectEndpointAction
+public interface IFunctionAppSelectEndpointAction
 {
     /// <summary>
     /// Selects a remote endpoint using an explicit path and HTTP method.

@@ -7,7 +7,7 @@ namespace TestFramework.Azure.DB.SqlServer;
 /// Artifact payload that stores a SQL row snapshot.
 /// </summary>
 /// <typeparam name="TRow">The row entity type.</typeparam>
-public class SqlRowArtifactData<TRow>(TRow row) : ArtifactData<SqlRowArtifactData<TRow>, SqlRowArtifactDescriber<TRow>, SqlRowArtifactReference<TRow>>
+public class AzureSqlRowArtifactData<TRow>(TRow row) : ArtifactData<AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactReference<TRow>>
     where TRow : class
 {
     /// <summary>

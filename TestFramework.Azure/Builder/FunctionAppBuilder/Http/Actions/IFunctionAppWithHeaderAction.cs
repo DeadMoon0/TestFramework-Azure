@@ -7,7 +7,7 @@ namespace TestFramework.Azure.Builder.FunctionAppBuilder.Http.Actions;
 /// <summary>
 /// Adds headers to a remote Function App HTTP request.
 /// </summary>
-public interface IWithHeaderAction
+public interface IFunctionAppWithHeaderAction
 {
     /// <summary>
     /// Adds a single-value header.

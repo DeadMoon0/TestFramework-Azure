@@ -232,9 +232,9 @@ public static class AzureExt
         /// <param name="identifier">The SQL database identifier.</param>
         /// <param name="primaryKeyValues">Primary key values in key-order.</param>
         /// <returns>A SQL row artifact reference.</returns>
-        public SqlRowArtifactReference<TRow> SqlRef<TRow>(SqlDatabaseIdentifier identifier, params VariableReference<string>[] primaryKeyValues) where TRow : class
+        public AzureSqlRowArtifactReference<TRow> SqlRef<TRow>(SqlDatabaseIdentifier identifier, params VariableReference<string>[] primaryKeyValues) where TRow : class
         {
-            return new SqlRowArtifactReference<TRow>(identifier, primaryKeyValues);
+            return new AzureSqlRowArtifactReference<TRow>(identifier, primaryKeyValues);
         }
     }
 

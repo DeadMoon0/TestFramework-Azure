@@ -6,7 +6,7 @@ namespace TestFramework.Azure.Extensions;
 /// <summary>
 /// Extension methods for loading Azure configurations in timeline builders.
 /// </summary>
-public static class ConfigExtension
+public static class AzureConfigExtension
 {
     /// <summary>
     /// Loads Azure configuration into the timeline config builder.

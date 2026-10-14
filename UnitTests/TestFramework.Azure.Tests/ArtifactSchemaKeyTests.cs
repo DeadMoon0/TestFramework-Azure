@@ -39,14 +39,14 @@ public class ArtifactSchemaKeyTests
 
     [Fact]
     public void SqlRowArtifactReportsTheCanonicalSchemaKey()
-        => Assert.Equal("tf.artifact.sql.row", new SqlRowArtifactDescriber<SampleRow>().DebugValueSchemaKey);
+        => Assert.Equal("tf.artifact.sql.row", new AzureSqlRowArtifactDescriber<SampleRow>().DebugValueSchemaKey);
 
     [Fact]
     public void SqlRowSharesItsSchemaKeyWithTheWebImplementation()
     {
         // The EF-backed row here and the ADO-backed row in TestFramework.Web are different types
         // presenting the same thing, so a consumer should draw them with one icon and one inspector.
-        Assert.Equal("tf.artifact.sql.row", new SqlRowArtifactDescriber<SampleRow>().DebugValueSchemaKey);
+        Assert.Equal("tf.artifact.sql.row", new AzureSqlRowArtifactDescriber<SampleRow>().DebugValueSchemaKey);
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public class ArtifactSchemaKeyTests
         // an implementation detail, so renaming its class breaks every consumer that drew it.
         object[] describers =
         [
-            new SqlRowArtifactDescriber<SampleRow>(),
+            new AzureSqlRowArtifactDescriber<SampleRow>(),
             new CosmosDbItemArtifactDescriber<SampleItem>(),
             new StorageAccountBlobArtifactDescriber(),
             new TableStorageEntityArtifactDescriber<SampleEntity>()

@@ -6,6 +6,6 @@ namespace TestFramework.Azure.Builder.FunctionAppBuilder.Http.Stages;
 /// Builder stage used to add request payload details before invoking a remote Function App endpoint.
 /// </summary>
 public interface IFunctionAppHttpPayloadStage :
-    IWithBodyAction,
-    IWithHeaderAction,
+    IFunctionAppWithBodyAction,
+    IFunctionAppWithHeaderAction,
     ICallRemoteHttpAction;

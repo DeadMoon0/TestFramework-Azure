@@ -6,7 +6,7 @@ namespace TestFramework.Azure.Builder.FunctionAppBuilder.Http.Actions;
 /// <summary>
 /// Adds body content to a remote Function App HTTP request.
 /// </summary>
-public interface IWithBodyAction
+public interface IFunctionAppWithBodyAction
 {
     /// <summary>
     /// Adds a text body to the request.

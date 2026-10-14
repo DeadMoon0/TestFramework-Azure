@@ -16,7 +16,7 @@ namespace TestFramework.Azure.DB.SqlServer;
 /// Reference to a SQL row addressed by its primary key values.
 /// </summary>
 /// <typeparam name="TRow">The row entity type.</typeparam>
-public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactReference<TRow>, SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>>
+public class AzureSqlRowArtifactReference<TRow> : ArtifactReference<AzureSqlRowArtifactReference<TRow>, AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>>
     where TRow : class
 {
     private readonly VariableReference<string>[] _primaryKeyValues;
@@ -32,7 +32,7 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
     /// </summary>
     /// <param name="dbIdentifier">The SQL database identifier.</param>
     /// <param name="primaryKeyValues">Primary key values in entity key order.</param>
-    public SqlRowArtifactReference(SqlDatabaseIdentifier dbIdentifier, params VariableReference<string>[] primaryKeyValues)
+    public AzureSqlRowArtifactReference(SqlDatabaseIdentifier dbIdentifier, params VariableReference<string>[] primaryKeyValues)
     {
         if (primaryKeyValues.Length == 0)
             throw new ArgumentException("At least one primary key value must be provided.", nameof(primaryKeyValues));
@@ -83,7 +83,7 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
     /// <summary>
     /// Resolves the reference into concrete artifact data.
     /// </summary>
-    public override async Task<ArtifactResolveResult<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
+    public override async Task<ArtifactResolveResult<AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactReference<TRow>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
         await using DbContext dbContext = resolver.Resolve(context, DbIdentifier);
@@ -93,12 +93,12 @@ public class SqlRowArtifactReference<TRow> : ArtifactReference<SqlRowArtifactRef
         TRow? row = await dbContext.Set<TRow>().FindAsync(keyValues, context.Deadline.Token);
 
         if (row is null)
-            return new ArtifactResolveResult<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>> { Found = false };
+            return new ArtifactResolveResult<AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactReference<TRow>> { Found = false };
 
-        return new ArtifactResolveResult<SqlRowArtifactDescriber<TRow>, SqlRowArtifactData<TRow>, SqlRowArtifactReference<TRow>>
+        return new ArtifactResolveResult<AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactReference<TRow>>
         {
             Found = true,
-            Data = new SqlRowArtifactData<TRow>(row) { Identifier = versionIdentifier }
+            Data = new AzureSqlRowArtifactData<TRow>(row) { Identifier = versionIdentifier }
         };
     }
 
