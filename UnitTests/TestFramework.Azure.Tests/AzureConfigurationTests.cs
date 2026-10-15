@@ -1383,7 +1383,7 @@ public class AzureConfigurationTests
         });
 
         TimelineRun run = await Timeline.Create()
-            .SetVariable("logicRun", Var.Const(new LogicAppRunContext("OrderProcessor", "run-ctx")))
+            .SetVariable("logicRun", new LogicAppRunContext("OrderProcessor", "run-ctx"))
             .WaitForEvent(AzureExt.Event.LogicApp.RunCompleted("logic", Var.Ref<LogicAppRunContext>("logicRun")))
             .Build()
             .SetupRun(runtime.ServiceProvider)
