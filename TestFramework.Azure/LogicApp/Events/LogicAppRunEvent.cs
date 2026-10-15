@@ -10,6 +10,7 @@ using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.LogicApp;
 using TestFramework.Azure.Runtime;
+using TestFramework.Config;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Events;
 using TestFramework.Core.Environment;

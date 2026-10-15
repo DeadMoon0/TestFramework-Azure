@@ -14,6 +14,7 @@ using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
+using TestFramework.Config;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Variables;
 

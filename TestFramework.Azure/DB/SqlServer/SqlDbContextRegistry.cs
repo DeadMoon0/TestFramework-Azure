@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Identifier;
+using TestFramework.Config;
 using TestFramework.Core.Steps;
 
 namespace TestFramework.Azure.DB.SqlServer;
