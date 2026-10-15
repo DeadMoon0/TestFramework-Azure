@@ -21,7 +21,7 @@ public sealed class AzureClientCacheTests
     public void AProviderDisposedSynchronously_DisposesTheClientsItCreated()
     {
         ServiceCollection services = new();
-        services.LoadAzureConfigs();
+        services.AddAzure();
         ServiceProvider provider = services.BuildServiceProvider();
 
         AzureClientCache cache = provider.GetRequiredService<AzureClientCache>();
@@ -38,7 +38,7 @@ public sealed class AzureClientCacheTests
     public async Task AProviderDisposedAsynchronously_StillDisposesThemOnce()
     {
         ServiceCollection services = new();
-        services.LoadAzureConfigs();
+        services.AddAzure();
         ServiceProvider provider = services.BuildServiceProvider();
 
         AzureClientCache cache = provider.GetRequiredService<AzureClientCache>();

@@ -433,7 +433,7 @@ public class ReadmeSamplesTests
     [InlineData("CallForRunContext")]
     [InlineData("LogicAppCapturedResult")]
     [InlineData(".GetCallbackUrl(")]
-    [InlineData("LoadAzureConfigs(configuration")]
+    [InlineData("AddAzure(configuration")]
     [InlineData("createTempSubscription:")]
     [InlineData("completeMessage:")]
     [InlineData(".GetSuccess(")]
@@ -525,7 +525,7 @@ public class ReadmeSamplesTests
     public void CosmosClientOptionsNote_RegistersConfiguredClientOptionsProvider()
     {
         // The entry goes on the config instance rather than into a second configuration handed to the loader.
-        // The old shape of this test is why LoadAzureConfigs no longer takes one: it passed a configuration
+        // The old shape of this test is why AddAzure takes none: it passed a configuration
         // the run never saw, and only worked because the loader eagerly filled a store from it.
         ConfigInstance config = ConfigInstance.Create()
             .OverrideConfig(new Dictionary<string, string?>
@@ -536,7 +536,7 @@ public class ReadmeSamplesTests
             })
             .AddService(services =>
             {
-                services.LoadAzureConfigs()
+                services.AddAzure()
                     .ConfigureCosmosClientOptions(_ => new CosmosClientOptions
                     {
                         ConnectionMode = ConnectionMode.Gateway,

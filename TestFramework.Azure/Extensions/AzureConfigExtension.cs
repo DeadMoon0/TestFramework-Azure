@@ -25,7 +25,7 @@ public static class AzureConfigExtension
     /// <returns>The builder for fluent chaining.</returns>
     public static IConfigInstanceBuilder LoadAzureConfig(this IConfigInstanceBuilder builder, IConfigProvider? provider)
     {
-        builder.AddService(s => s.LoadAzureConfigs(provider));
+        builder.AddService(s => s.AddAzure(provider));
         return builder;
     }
 }

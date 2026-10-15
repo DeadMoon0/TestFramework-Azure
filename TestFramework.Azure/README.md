@@ -84,7 +84,7 @@ var config = provider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>()
 var config = context.Configured<CosmosContainerDbConfig>("MainDb");
 ```
 
-`LoadAzureConfigs(...)` no longer takes an `IConfiguration` either, for the same reason: the run holds the
+`AddAzure(...)` takes no `IConfiguration` either, for the same reason: the run holds the
 configuration its shapes read.
 
 ## Output Binding Mental Model
@@ -99,7 +99,7 @@ If a scenario starts to feel too Azure-magic-heavy, pull the extracted value int
 
 ## Configuration Records
 
-The Azure package reads named records from configuration sections through `LoadAzureConfig()` or `LoadAzureConfigs(...)`.
+The Azure package reads named records from configuration sections through `LoadAzureConfig()` or `AddAzure(...)`.
 Each DSL identifier such as `"MainDb"` or `"Default"` maps to one child object inside the matching section.
 
 Supported record types:
@@ -405,7 +405,7 @@ using TestFramework.Core.Timelines;
 ConfigInstance config = ConfigInstance.FromJsonFile("local.testSettings.json")
     .AddService(services =>
     {
-        services.LoadAzureConfigs()
+        services.AddAzure()
             .ConfigureCosmosClientOptions(_ => new CosmosClientOptions
             {
                 ConnectionMode = ConnectionMode.Gateway,

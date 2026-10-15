@@ -138,7 +138,7 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
 
         ServiceCollection services = new ServiceCollection();
         services.AddSingleton(configuration);
-        services.LoadAzureConfigs();
+        services.AddAzure();
         services.AddSqlArtifactContexts(registry => registry.AddForIdentifier<ProbeContext>("orders", options => new ProbeContext(options)));
         services.AddSqlArtifactContexts(registry => registry.AddForIdentifier<ProbeContext>("invoices", options => new ProbeContext(options)));
 
@@ -215,7 +215,7 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
 
         ServiceCollection services = new ServiceCollection();
         services.AddSingleton(configuration);
-        services.LoadAzureConfigs();
+        services.AddAzure();
         services.AddSqlArtifactContexts(registry => registry.AddForIdentifier<ProbeContext>(
             "orders",
             options => new ProbeContext(options),
