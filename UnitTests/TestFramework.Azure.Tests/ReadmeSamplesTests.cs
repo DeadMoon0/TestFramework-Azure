@@ -266,7 +266,7 @@ public class ReadmeSamplesTests
         Timeline timeline = Timeline.Create()
             .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBQueue", new ServiceBusMessage("Test message") { CorrelationId = "order-42" }))
             .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBQueue").WithCorrelationId("order-42").CompleteMessage(true))
-                .WithTimeOut(TimeSpan.FromSeconds(10))
+                .WithTimeout(TimeSpan.FromSeconds(10))
             .Build();
 
         Assert.NotNull(timeline);
@@ -278,7 +278,7 @@ public class ReadmeSamplesTests
         ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("MainSBTopic").WithCorrelationId("topic-1234").CompleteMessage(true).WithTempSubscription();
         Timeline timeline = Timeline.Create()
             .WaitForEvent(receiveEvent)
-                .WithTimeOut(TimeSpan.FromSeconds(10))
+                .WithTimeout(TimeSpan.FromSeconds(10))
             .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBTopic", new ServiceBusMessage("Test message") { CorrelationId = "topic-1234" }))
             .Build();
 
@@ -286,7 +286,7 @@ public class ReadmeSamplesTests
         // would hide a variable-backed timeout regression.
         VariableStore variableStore = TestVariableStore.Create();
         variableStore.SetVariable("sampleTimeout", TimeSpan.FromSeconds(10));
-        receiveEvent.TimeOutOptions.TimeOut = Var.Ref<TimeSpan>("sampleTimeout");
+        receiveEvent.TimeoutOptions.Timeout = Var.Ref<TimeSpan>("sampleTimeout");
 
         Assert.NotNull(timeline);
         Assert.NotNull(((IHasPreStep)receiveEvent).CreatePreStep(variableStore));
@@ -328,7 +328,7 @@ public class ReadmeSamplesTests
                     .Manual()
                     .WithBody(Var.Const("{\"id\":42}"))
                     .CallAndCapture())
-            .Name("logic-call")
+            .Label("logic-call")
             .Build();
 
         TimelineRun run = await timeline.SetupRun(runtime.ServiceProvider).RunAsync();
@@ -392,7 +392,7 @@ public class ReadmeSamplesTests
                     .Manual()
                     .WithBody(Var.Const("{\"id\":42}"))
                     .Call())
-            .Name("logic-call")
+            .Label("logic-call")
             .GetRunContext("logicRun")
             .WaitForEvent(
                 AzureExt.Event.LogicApp.RunCompleted(

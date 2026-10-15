@@ -203,7 +203,7 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
     private async Task<string> Listing(params (string Key, string Value)[] configured)
     {
         Timeline timeline = Timeline.Create()
-            .Trigger(new ReadsValueStep(AzureEnvironmentResourceKinds.FunctionApp, "orders-fn", ValueNames.BaseUrl, ResourceVantage.Host)).Name("reads")
+            .Trigger(new ReadsValueStep(AzureEnvironmentResourceKinds.FunctionApp, "orders-fn", ValueNames.BaseUrl, ResourceVantage.Host)).Label("reads")
             .Build();
 
         TimelineRun run = await timeline.SetupRun(Configured(configured), output.WriteLine).RunAsync();
@@ -221,7 +221,7 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
         params (string Key, string Value)[] configured)
     {
         Timeline timeline = Timeline.Create()
-            .Trigger(new ReadsValueStep(kind, identifier, valueName, vantage)).Name("reads")
+            .Trigger(new ReadsValueStep(kind, identifier, valueName, vantage)).Label("reads")
             .Build();
 
         TimelineRun run = await timeline.SetupRun(Configured(configured), output.WriteLine).RunAsync();

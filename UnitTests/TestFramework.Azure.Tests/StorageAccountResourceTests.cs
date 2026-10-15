@@ -93,7 +93,7 @@ public class StorageAccountResourceTests(ITestOutputHelper output)
     private async Task<TimelineRun> Run(PublishingEnvironment? environment, params (string Key, string Value)[] configured)
     {
         Timeline timeline = Timeline.Create()
-            .Trigger(new ResolvesStorageStep("files")).Name("resolves")
+            .Trigger(new ResolvesStorageStep("files")).Label("resolves")
             .Build();
 
         ITimelineRunBuilder builder = timeline.SetupRun(Configured(configured), output.WriteLine);

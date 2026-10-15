@@ -143,8 +143,8 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
         services.AddSqlArtifactContexts(registry => registry.AddForIdentifier<ProbeContext>("invoices", options => new ProbeContext(options)));
 
         TimelineRun run = await Timeline.Create()
-            .Trigger(new BuildsContextStep("orders")).Name("orders")
-            .Trigger(new BuildsContextStep("invoices")).Name("invoices")
+            .Trigger(new BuildsContextStep("orders")).Label("orders")
+            .Trigger(new BuildsContextStep("invoices")).Label("invoices")
             .Build()
             .SetupRun(services.BuildServiceProvider(), output.WriteLine)
             .RunAsync();
@@ -222,7 +222,7 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
             configure));
 
         Timeline timeline = Timeline.Create()
-            .Trigger(new BuildsContextStep(resolves)).Name("builds")
+            .Trigger(new BuildsContextStep(resolves)).Label("builds")
             .Build();
 
         ITimelineRunBuilder builder = timeline.SetupRun(services.BuildServiceProvider(), output.WriteLine);

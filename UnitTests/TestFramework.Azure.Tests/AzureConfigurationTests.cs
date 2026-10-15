@@ -341,9 +341,9 @@ public class AzureConfigurationTests
 
         TimelineRun run = await Timeline.Create()
             .Trigger(AzureExt.Trigger.ServiceBus.Send("bus", Var.Const(first)))
-            .Name("send-first")
+            .Label("send-first")
             .Trigger(AzureExt.Trigger.ServiceBus.Send("bus", Var.Const(second)))
-            .Name("send-second")
+            .Label("send-second")
             .Build()
             .SetupRun(runtime.ServiceProvider)
             .RunAsync();
@@ -385,7 +385,7 @@ public class AzureConfigurationTests
 
         TimelineRun run = await Timeline.Create()
             .Trigger(AzureExt.Trigger.ServiceBus.Send("bus", Var.Const(message)))
-            .Name("send")
+            .Label("send")
             .GetMessage("sentMessage")
             .GetMessageId("sentMessageId")
             .GetCorrelationId("sentCorrelationId")
@@ -568,7 +568,7 @@ public class AzureConfigurationTests
 
         TimelineRun run = await Timeline.Create()
             .Trigger(AzureExt.Trigger.FunctionApp.Http("func").SelectFunction("orders", HttpMethod.Post).WithBody(Var.Const("payload")).Call())
-            .Name("http")
+            .Label("http")
             .GetResponse("httpResponse")
             .GetStatusCode("httpStatusCode")
             .GetBody("httpBody")
@@ -1732,7 +1732,7 @@ public class AzureConfigurationTests
 
         TimelineRun run = await Timeline.Create()
             .Trigger(new ManagedRemoteFunctionAppTrigger("func", Var.Const(new TriggerRouting("cleanup"))))
-            .Name("managed")
+            .Label("managed")
             .GetManagedResult("managedResult")
             .GetStatusCode("managedStatusCode")
             .GetBody("managedBody")
@@ -1794,7 +1794,7 @@ public class AzureConfigurationTests
 
         TimelineRun run = await Timeline.Create()
             .Trigger(AzureExt.Trigger.IsLive.FunctionApp("func", AlivenessLevel.Authenticated))
-            .Name("is-live")
+            .Label("is-live")
             .GetProbeResult("probeResult")
             .GetResourceKind("probeKind")
             .GetResourceIdentifier("probeIdentifier")
@@ -2208,7 +2208,7 @@ public class AzureConfigurationTests
         });
 
         var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Authenticated);
-        trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
+        trigger.TimeoutOptions.Timeout = Var.Const(TimeSpan.FromMilliseconds(150));
 
         await trigger.Execute(runtime.Context);
 
@@ -2233,7 +2233,7 @@ public class AzureConfigurationTests
         });
 
         var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Reachable);
-        trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
+        trigger.TimeoutOptions.Timeout = Var.Const(TimeSpan.FromMilliseconds(150));
 
         await trigger.Execute(runtime.Context);
 
@@ -2258,7 +2258,7 @@ public class AzureConfigurationTests
         });
 
         var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos");
-        trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(150));
+        trigger.TimeoutOptions.Timeout = Var.Const(TimeSpan.FromMilliseconds(150));
 
         await trigger.Execute(runtime.Context);
 
@@ -2284,12 +2284,12 @@ public class AzureConfigurationTests
         });
 
         var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos");
-        trigger.TimeOutOptions.TimeOut = Var.Const(TimeSpan.FromMilliseconds(50));
+        trigger.TimeoutOptions.Timeout = Var.Const(TimeSpan.FromMilliseconds(50));
 
         FrameworkTimeoutException exception = await Assert.ThrowsAsync<FrameworkTimeoutException>(() =>
             trigger.Execute(runtime.Context));
 
-        Assert.Contains("WithTimeOut", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("WithTimeout", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -2772,7 +2772,7 @@ public class AzureConfigurationTests
         runtime.VariableStore.SetVariable("waitTimeout", TimeSpan.FromSeconds(42));
 
         ServiceBusProcessEvent receiveEvent = AzureExt.Event.ServiceBus.MessageReceived("topic").WithCorrelationId(Var.Const("c1")).WithTempSubscription();
-        receiveEvent.TimeOutOptions.TimeOut = Var.Ref<TimeSpan>("waitTimeout");
+        receiveEvent.TimeoutOptions.Timeout = Var.Ref<TimeSpan>("waitTimeout");
 
         StepGeneric? preStep = ((IHasPreStep)receiveEvent).CreatePreStep(runtime.VariableStore);
 

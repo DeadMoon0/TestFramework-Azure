@@ -300,7 +300,7 @@ Timeline timeline = Timeline.Create()
             .Manual()
             .WithBody(Var.Const("{\"id\":42}"))
             .CallAndCapture())
-    .Name("logic-call")
+    .Label("logic-call")
     .Build();
 
 // The provider owns the cached Azure SDK clients - a Service Bus connection, a Cosmos pool - so dispose it.
@@ -329,7 +329,7 @@ Timeline timeline = Timeline.Create()
             .Manual()
             .WithBody(Var.Const("{\"id\":42}"))
             .Call())
-    .Name("logic-call")
+    .Label("logic-call")
     .GetRunContext("logicRun")
     .WaitForEvent(
         AzureExt.Event.LogicApp.RunCompleted(
@@ -374,7 +374,7 @@ using TestFramework.Core.Timelines;
 Timeline timeline = Timeline.Create()
     .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBQueue", new ServiceBusMessage("Test message") { CorrelationId = "order-42" }))
     .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBQueue").WithCorrelationId("order-42").CompleteMessage(true))
-        .WithTimeOut(TimeSpan.FromSeconds(10))
+        .WithTimeout(TimeSpan.FromSeconds(10))
     .Build();
 ```
 
@@ -383,7 +383,7 @@ Timeline timeline = Timeline.Create()
 ```csharp
 Timeline timeline = Timeline.Create()
     .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBTopic").WithCorrelationId("topic-1234").CompleteMessage(true).WithTempSubscription())
-        .WithTimeOut(TimeSpan.FromSeconds(10))
+        .WithTimeout(TimeSpan.FromSeconds(10))
     .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBTopic", new ServiceBusMessage("Test message") { CorrelationId = "topic-1234" }))
     .Build();
 ```
@@ -392,7 +392,7 @@ Timeline timeline = Timeline.Create()
 
 Use `ConfigureCosmosClientOptions(...)` when you need to customize the underlying Cosmos SDK client.
 
-For `AzureExt.Trigger.IsLive.Cosmos(...)`, timeout control comes from the normal timeline step timeout, for example via `.WithTimeOut(...)` on the builder. The overload taking an `AlivenessLevel` lets you choose whether the check should stop at endpoint reachability, account authentication, or require the configured container to exist; without it the container must exist (`AlivenessLevel.Resource`).
+For `AzureExt.Trigger.IsLive.Cosmos(...)`, timeout control comes from the normal timeline step timeout, for example via `.WithTimeout(...)` on the builder. The overload taking an `AlivenessLevel` lets you choose whether the check should stop at endpoint reachability, account authentication, or require the configured container to exist; without it the container must exist (`AlivenessLevel.Resource`).
 
 ```csharp
 using Microsoft.Azure.Cosmos;
@@ -415,7 +415,7 @@ ConfigInstance config = ConfigInstance.FromJsonFile("local.testSettings.json")
 
 Timeline timeline = Timeline.Create()
     .Trigger(AzureExt.Trigger.IsLive.Cosmos("MainDb", AlivenessLevel.Authenticated))
-        .WithTimeOut(TimeSpan.FromSeconds(5))
+        .WithTimeout(TimeSpan.FromSeconds(5))
     .Build();
 ```
 

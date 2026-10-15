@@ -387,7 +387,7 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
         Resolved<CosmosContainerDbConfig> cosmos = AzureResources.For<CosmosContainerDbConfig>(context, identifier);
-        TimeSpan timeout = TimeOutOptions.TimeOut.GetValue(context.Variables);
+        TimeSpan timeout = TimeoutOptions.Timeout.GetValue(context.Variables);
         if (timeout <= TimeSpan.Zero)
         {
             throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Cosmos IsLive timeout for '{identifier}' must be greater than zero.");
@@ -402,19 +402,19 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
                 timeout,
                 context.Deadline.Token,
                 token => container.ValidateAccountReachabilityAsync(token),
-                $"Cosmos account endpoint for '{identifier}' did not respond within {timeout}. Configure the timeline step timeout, for example with .WithTimeOut(...), for slower local or emulator environments."),
+                $"Cosmos account endpoint for '{identifier}' did not respond within {timeout}. Configure the timeline step timeout, for example with .WithTimeout(...), for slower local or emulator environments."),
             AlivenessLevel.Authenticated => await ExecuteWithTimeoutAsync(
                 context.Variables,
                 timeout,
                 context.Deadline.Token,
                 token => container.ValidateAccountConnectionAsync(token),
-                $"Cosmos account for '{identifier}' did not authenticate within {timeout}. Configure the timeline step timeout, for example with .WithTimeOut(...), for slower local or emulator environments."),
+                $"Cosmos account for '{identifier}' did not authenticate within {timeout}. Configure the timeline step timeout, for example with .WithTimeout(...), for slower local or emulator environments."),
             _ => await ExecuteWithTimeoutAsync(
                 context.Variables,
                 timeout,
                 context.Deadline.Token,
                 token => container.ValidateConnectionAsync(token),
-                $"Cosmos container '{identifier}' did not respond within {timeout}. Configure the timeline step timeout, for example with .WithTimeOut(...), for slower local or emulator environments."),
+                $"Cosmos container '{identifier}' did not respond within {timeout}. Configure the timeline step timeout, for example with .WithTimeout(...), for slower local or emulator environments."),
         };
     }
 

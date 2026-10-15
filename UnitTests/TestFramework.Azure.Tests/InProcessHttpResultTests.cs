@@ -26,7 +26,7 @@ public class InProcessHttpResultTests
     private static async Task<TimelineRun> CallAsync(Func<OrderFunction, IActionResult> handler)
     {
         Timeline timeline = Timeline.Create()
-            .Trigger(AzureExt.Trigger.FunctionApp.InProcessHttp<OrderFunction>((function, _) => handler(function)).Call()).Name("call")
+            .Trigger(AzureExt.Trigger.FunctionApp.InProcessHttp<OrderFunction>((function, _) => handler(function)).Call()).Label("call")
             .Build();
 
         ServiceCollection services = new();

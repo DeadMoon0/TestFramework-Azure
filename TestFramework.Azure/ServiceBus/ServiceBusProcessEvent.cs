@@ -187,7 +187,7 @@ public sealed class ServiceBusProcessEvent
 
         // The store must be the real one: the default timeout happens to be a ConstVariable that
         // ignores it, but a variable-backed timeout would dereference null here.
-        var timeout = TimeOutOptions.TimeOut.GetValue(variableStore);
+        var timeout = TimeoutOptions.Timeout.GetValue(variableStore);
         return new ServiceBusCreateTempSubscriptionStep(
             identifier, TempSubscriptionName, messageId, correlationId, timeout);
     }

@@ -692,7 +692,7 @@ stateDiagram-v2
 
 Register `ICosmosClientOptionsProvider` or call `ConfigureCosmosClientOptions(...)` to customize `CosmosClientOptions` for Cosmos SDK behavior.
 
-`AzureExt.Trigger.IsLive.Cosmos(...)` does not use a separate Cosmos config timeout. It uses the normal step timeout configured by the timeline, for example `.WithTimeOut(...)` on the builder.
+`AzureExt.Trigger.IsLive.Cosmos(...)` does not use a separate Cosmos config timeout. It uses the normal step timeout configured by the timeline, for example `.WithTimeout(...)` on the builder.
 
 ### 8.8 SQL Migration Tracking
 
