@@ -54,7 +54,7 @@ internal sealed class CosmosDbShape(IConfigProvider provider) : ConfigShape<Cosm
     }
 
     /// <inheritdoc />
-    public override IReadOnlyDictionary<ValueKey, string> Values(CosmosContainerDbConfig config)
+    public override IReadOnlyDictionary<ValueKey, string> Values(CosmosContainerDbConfig config, string identifier)
     {
         ArgumentNullException.ThrowIfNull(config);
 

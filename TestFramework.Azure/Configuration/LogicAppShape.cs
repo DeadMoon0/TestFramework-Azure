@@ -54,7 +54,7 @@ internal sealed class LogicAppShape(IConfigProvider provider) : ConfigShape<Logi
     }
 
     /// <inheritdoc />
-    public override IReadOnlyDictionary<ValueKey, string> Values(LogicAppConfig config)
+    public override IReadOnlyDictionary<ValueKey, string> Values(LogicAppConfig config, string identifier)
     {
         ArgumentNullException.ThrowIfNull(config);
 

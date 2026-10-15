@@ -53,7 +53,7 @@ internal sealed class SqlDatabaseShape(IConfigProvider provider) : ConfigShape<S
     }
 
     /// <inheritdoc />
-    public override IReadOnlyDictionary<ValueKey, string> Values(SqlDatabaseConfig config)
+    public override IReadOnlyDictionary<ValueKey, string> Values(SqlDatabaseConfig config, string identifier)
     {
         ArgumentNullException.ThrowIfNull(config);
 

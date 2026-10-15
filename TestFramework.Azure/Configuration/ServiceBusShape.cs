@@ -54,7 +54,7 @@ internal sealed class ServiceBusShape(IConfigProvider provider) : ConfigShape<Se
     }
 
     /// <inheritdoc />
-    public override IReadOnlyDictionary<ValueKey, string> Values(ServiceBusConfig config)
+    public override IReadOnlyDictionary<ValueKey, string> Values(ServiceBusConfig config, string identifier)
     {
         ArgumentNullException.ThrowIfNull(config);
 

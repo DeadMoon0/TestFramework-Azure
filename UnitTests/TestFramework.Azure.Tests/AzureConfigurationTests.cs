@@ -121,7 +121,7 @@ public class AzureConfigurationTests
 
         // A record built in code reaches a run through the shape, which refuses it the same way.
         ServiceBusShape shape = new(new DefaultConfigProvider());
-        IReadOnlyDictionary<string, string> values = shape.Values(new ServiceBusConfig { ConnectionString = "Endpoint=sb://orders/", QueueName = "orders", TopicName = "order-events" })
+        IReadOnlyDictionary<string, string> values = shape.Values(new ServiceBusConfig { ConnectionString = "Endpoint=sb://orders/", QueueName = "orders", TopicName = "order-events" }, "orders")
             .GroupBy(pair => pair.Key.ValueName).ToDictionary(group => group.Key, group => group.First().Value);
         Assert.Throws<FrameworkConfigurationException>(() => shape.Read(values, "orders"));
     }

@@ -53,7 +53,7 @@ internal sealed class StorageAccountShape(IConfigProvider provider) : ConfigShap
     }
 
     /// <inheritdoc />
-    public override IReadOnlyDictionary<ValueKey, string> Values(StorageAccountConfig config)
+    public override IReadOnlyDictionary<ValueKey, string> Values(StorageAccountConfig config, string identifier)
     {
         ArgumentNullException.ThrowIfNull(config);
 

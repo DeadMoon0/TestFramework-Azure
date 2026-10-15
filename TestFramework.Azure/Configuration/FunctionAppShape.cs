@@ -57,7 +57,7 @@ internal sealed class FunctionAppShape(IConfigProvider provider) : ConfigShape<F
     }
 
     /// <inheritdoc />
-    public override IReadOnlyDictionary<ValueKey, string> Values(FunctionAppConfig config)
+    public override IReadOnlyDictionary<ValueKey, string> Values(FunctionAppConfig config, string identifier)
     {
         ArgumentNullException.ThrowIfNull(config);
 
