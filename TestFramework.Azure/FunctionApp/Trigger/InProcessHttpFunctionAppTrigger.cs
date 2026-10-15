@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
@@ -82,6 +81,12 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
         return await HttpResponseResultContext.FromHttpResponseAsync(response, context.Deadline.Token).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// The host's own serializer settings: an in-process call must answer with the body a deployed app would send,
+    /// or a test's assertions change when it moves from one to the other.
+    /// </summary>
+    private static readonly System.Text.Json.JsonSerializerOptions HostJson = new(System.Text.Json.JsonSerializerDefaults.Web);
+
     private static HttpResponseMessage ConvertToHttpResponseMessage(IActionResult? result)
     {
         if (result is null)
@@ -90,8 +95,12 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
         if (result is ObjectResult obj)
         {
             HttpResponseMessage response = new((HttpStatusCode)(obj.StatusCode ?? 200));
-            if (obj.Value is not null)
-                response.Content = new StringContent(obj.Value.ToString()!);
+            response.Content = obj.Value switch
+            {
+                null => null,
+                string text => new StringContent(text, Encoding.UTF8, "text/plain"),
+                object value => new StringContent(System.Text.Json.JsonSerializer.Serialize(value, value.GetType(), HostJson), Encoding.UTF8, "application/json"),
+            };
             return response;
         }
 
@@ -106,7 +115,7 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
         if (result is JsonResult json)
         {
             HttpResponseMessage response = new((HttpStatusCode)(json.StatusCode ?? 200));
-            string body = JsonConvert.SerializeObject(json.Value);
+            string body = System.Text.Json.JsonSerializer.Serialize(json.Value, json.Value?.GetType() ?? typeof(object), HostJson);
             response.Content = new StringContent(body, Encoding.UTF8, "application/json");
             return response;
         }
@@ -114,7 +123,7 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
         if (result is StatusCodeResult sc)
             return new HttpResponseMessage((HttpStatusCode)sc.StatusCode);
 
-        throw new NotSupportedException(
+        throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
             $"IActionResult type '{result.GetType().Name}' is not supported by {nameof(InProcessHttpFunctionAppTrigger<TFunction>)}. " +
             $"Supported types: {nameof(ObjectResult)}, {nameof(ContentResult)}, {nameof(JsonResult)}, {nameof(StatusCodeResult)}.");
     }

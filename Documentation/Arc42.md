@@ -649,11 +649,11 @@ The in-process trigger turns the returned `IActionResult` into the step's `HttpR
 | IActionResult type | Behaviour |
 |-------------------|-----------|
 | `null` | 200 OK, empty body |
-| `ObjectResult` (incl. `OkObjectResult`, `BadRequestObjectResult`, …) | Status from `StatusCode`, body from `obj.Value.ToString()` |
+| `ObjectResult` (incl. `OkObjectResult`, `BadRequestObjectResult`, …) | Status from `StatusCode`; a string as text, anything else as JSON with the host's web defaults (camelCase) |
 | `ContentResult` | Status, body, and `ContentType` preserved |
-| `JsonResult` | Status + JSON-serialised `Value` (`application/json`) |
+| `JsonResult` | Status + `Value` as JSON with the host's web defaults (`application/json`) |
 | `StatusCodeResult` (incl. `OkResult`, `NoContentResult`, …) | Status, no body |
-| Any other type | `NotSupportedException` with clear message |
+| Any other type | `FrameworkConfigurationException` naming the supported types |
 
 ### 8.5 Service Bus Temp Subscription Lifecycle
 

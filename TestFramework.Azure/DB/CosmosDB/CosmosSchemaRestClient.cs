@@ -277,7 +277,7 @@ internal static class CosmosSchemaRestClient
         throw new HttpRequestException($"Cosmos REST request failed with status {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
     }
 
-    private static string GenerateMasterKeyAuthorizationSignature(string verb, string resourceType, string resourceLink, string date, string key)
+    internal static string GenerateMasterKeyAuthorizationSignature(string verb, string resourceType, string resourceLink, string date, string key)
     {
         string payload = $"{verb.ToLowerInvariant()}\n{resourceType.ToLowerInvariant()}\n{resourceLink}\n{date.ToLowerInvariant()}\n\n";
         using HMACSHA256 hmacSha256 = new HMACSHA256(Convert.FromBase64String(key));
