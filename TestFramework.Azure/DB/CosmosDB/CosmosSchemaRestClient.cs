@@ -28,7 +28,7 @@ internal static class CosmosSchemaRestClient
     /// </summary>
     private static readonly HttpClient ValidatingHttpClient = new()
     {
-        Timeout = TimeSpan.FromSeconds(20),
+        Timeout = AzureTimings.CosmosSchemaRequestTimeout,
     };
 
     /// <summary>
@@ -39,7 +39,7 @@ internal static class CosmosSchemaRestClient
         ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
     })
     {
-        Timeout = TimeSpan.FromSeconds(20),
+        Timeout = AzureTimings.CosmosSchemaRequestTimeout,
     };
 
     /// <summary>
@@ -204,7 +204,7 @@ internal static class CosmosSchemaRestClient
 
     private static async Task WaitForResourceAsync(HttpClient httpClient, Uri endpoint, string key, string resourceType, string resourceLink, string relativeUri, CancellationToken cancellationToken)
     {
-        DateTime deadline = DateTime.UtcNow.AddSeconds(30);
+        DateTime deadline = DateTime.UtcNow.Add(AzureTimings.CosmosSchemaReadyBudget);
         Exception? lastError = null;
 
         while (DateTime.UtcNow < deadline)
@@ -220,13 +220,13 @@ internal static class CosmosSchemaRestClient
 
                 if (response.StatusCode == HttpStatusCode.NotFound && response.Headers.TryGetValues("x-ms-substatus", out IEnumerable<string>? substatusValues) && substatusValues.Contains("1013"))
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(AzureTimings.CosmosSchemaPollInterval, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(AzureTimings.CosmosSchemaPollInterval, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
 
@@ -237,13 +237,13 @@ internal static class CosmosSchemaRestClient
             catch (HttpRequestException exception)
             {
                 lastError = exception;
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
+                await Task.Delay(AzureTimings.CosmosSchemaPollInterval, cancellationToken).ConfigureAwait(false);
             }
             catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
             {
                 // The HttpClient timeout elapsed rather than the caller cancelling - that is retryable.
                 lastError = exception;
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
+                await Task.Delay(AzureTimings.CosmosSchemaPollInterval, cancellationToken).ConfigureAwait(false);
             }
         }
 

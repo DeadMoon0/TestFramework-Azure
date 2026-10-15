@@ -119,7 +119,7 @@ public sealed class LogicAppRunEvent
                     return resolved;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(1), context.Deadline.Token);
+            await Task.Delay(AzureTimings.LogicAppPollInterval, context.Deadline.Token);
         }
     }
 

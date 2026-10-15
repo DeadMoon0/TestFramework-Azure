@@ -92,7 +92,7 @@ internal static class LogicAppManagementTrigger
                     return runId!;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            await Task.Delay(AzureTimings.LogicAppPollInterval, cancellationToken);
         }
     }
 

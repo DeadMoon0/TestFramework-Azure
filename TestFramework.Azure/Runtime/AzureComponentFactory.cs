@@ -623,8 +623,8 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         /// </remarks>
         internal static readonly HttpClient SharedClient = new(new SocketsHttpHandler
         {
-            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
-            ConnectTimeout = TimeSpan.FromSeconds(15),
+            PooledConnectionLifetime = AzureTimings.HttpPooledConnectionLifetime,
+            ConnectTimeout = AzureTimings.HttpConnectTimeout,
         })
         {
             Timeout = Timeout.InfiniteTimeSpan,

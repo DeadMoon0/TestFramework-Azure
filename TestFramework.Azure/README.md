@@ -434,6 +434,19 @@ Timeline timeline = Timeline.Create()
     .Build();
 ```
 
+## Defaults
+
+A step's timeout is the budget for anything it waits on. Inside it, these fixed values apply:
+
+| What | Value |
+|---|---|
+| Pause between two reads of a Logic App's run history | 1 s |
+| Pause between two looks at a Cosmos database or container that schema setup created | 1 s |
+| Total wait for that database or container to become readable | 30 s |
+| One Cosmos schema request | 20 s |
+| Opening a connection to any Azure HTTP endpoint | 15 s |
+| Reuse of a pooled HTTP connection, so a DNS change is noticed | 2 min |
+
 ## Target Frameworks
 
 - .NET 8 (`net8.0`), with EF Core 8
