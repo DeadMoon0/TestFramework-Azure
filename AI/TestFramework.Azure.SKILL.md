@@ -63,14 +63,14 @@
     - Use `Call()` when you need a run id and plan to wait with `RunCompleted(...)` or `RunReachedStatus(...)`.
     - Use `CallAndCapture()` for stateless Logic Apps; do not model stateless completion through run polling or hidden fallback storage.
     - Service Bus receive flows may create temporary subscriptions for scoped topic tests.
-    - Most Azure operations rely on configuration stores resolved from dependency injection and IConfiguration.
+    - A step reads its resource's configuration from the run with context.Configured<T>(identifier); there is no configuration store in the service provider.
     - Live checks and remote interactions should be explicit in the timeline so waiting, retries, and timeouts remain visible.
 </runtime_behavior>
 
 <config_model>
     Important configuration ideas:
     - identifiers such as FunctionAppIdentifier, ServiceBusIdentifier, CosmosContainerIdentifier, SqlDatabaseIdentifier, and StorageAccountIdentifier are thin named wrappers
-    - config loading is done through providers and stores, not direct connection strings inside tests
+    - LoadAzureConfig declares which sections the package reads; the run reads them once before the first step, and a container can publish an entry at run time
     - LoadAzureConfig() is the standard preparation path when using TestFramework.Config
     - named config entries are the boundary between the test timeline and the real Azure environment
 </config_model>
@@ -152,7 +152,7 @@
     - AzureExt: main facade for Azure triggers, events, artifact registration, and artifact finding
     - IConfigProvider: project-to-TestFramework.Azure config adapter seam
     - DefaultConfigProvider: default reader for the package's standard section names
-    - ConfigLoader: component that loads all Azure configs into DI stores
+    - ConfigLoader: registers one config shape per Azure resource kind, which tells the run how to read and publish that kind
     - FunctionAppIdentifier / ServiceBusIdentifier / CosmosContainerIdentifier / SqlDatabaseIdentifier / StorageAccountIdentifier: named identifiers that bind test code to configured resources
     - FunctionAppConfig / ServiceBusConfig / CosmosContainerDbConfig / SqlDatabaseConfig / StorageAccountConfig: concrete config records resolved from IConfiguration
 

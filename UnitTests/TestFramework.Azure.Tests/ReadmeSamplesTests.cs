@@ -437,14 +437,20 @@ public class ReadmeSamplesTests
     [InlineData("createTempSubscription:")]
     [InlineData("completeMessage:")]
     [InlineData(".GetSuccess(")]
+    [InlineData("RegisterDefault<")]
+    [InlineData("Step~HttpResponseMessage~")]
+    [InlineData("ConvertToHttpResponseMessage")]
+    [InlineData("configuration stores")]
     public void PackedReadme_DoesNotAdvertiseApisThatDoNotExist(string inventedApi)
     {
-        // The README ships in the package and the skill file is what an assistant writes code from, so neither may
-        // name an API a stranger's compiler then refuses.
+        // The README ships in the package, the skill file is what an assistant writes code from, and Arc42 is what a
+        // contributor reads first, so none of them may name an API a stranger's compiler then refuses.
         string readme = FindPackedReadme();
-        string skill = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(readme)!)!, "AI", "TestFramework.Azure.SKILL.md");
+        string repository = Path.GetDirectoryName(Path.GetDirectoryName(readme)!)!;
+        string skill = Path.Combine(repository, "AI", "TestFramework.Azure.SKILL.md");
+        string arc42 = Path.Combine(repository, "Documentation", "Arc42.md");
 
-        foreach (string document in new[] { readme, skill })
+        foreach (string document in new[] { readme, skill, arc42 })
             Assert.DoesNotContain(inventedApi, File.ReadAllText(document), StringComparison.Ordinal);
     }
 

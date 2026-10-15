@@ -63,11 +63,11 @@
 
 | Constraint | Detail |
 |------------|--------|
-| Runtime | .NET 8.0 |
+| Runtime | .NET 8.0 and .NET 10.0 |
 | Azure Functions | Isolated Worker Model (dotnet-isolated) |
-| ORM | Entity Framework Core 8.0 (SQL Server provider) |
+| ORM | Entity Framework Core 8 on net8.0, 10 on net10.0 (SQL Server provider) |
 | Configuration | Microsoft.Extensions.Configuration + DependencyInjection v10.0 |
-| Azure SDKs | Azure.Storage.Blobs 12.26, Azure.Data.Tables 12.9, Azure.Messaging.ServiceBus 7.20, Microsoft.Azure.Cosmos 3.57 |
+| Azure SDKs | Azure.Storage.Blobs 12.26, Azure.Data.Tables 12.9, Azure.Messaging.ServiceBus 7.20, Microsoft.Azure.Cosmos 3.59 |
 
 ### 2.2 Organisational
 
@@ -325,7 +325,7 @@ classDiagram
 classDiagram
     class Step~TResult~ {<<abstract / Core>>}
     class HttpRemoteFunctionAppTrigger {
-        +Step~HttpResponseMessage~
+        +Step~HttpResponseResultContext~
         +Calls deployed function via HTTP (Function Key auth)
     }
     class ManagedRemoteFunctionAppTrigger {
@@ -333,7 +333,7 @@ classDiagram
         +Calls deployed function via admin endpoint (AdminCode auth)
     }
     class InProcessHttpFunctionAppTrigger~TFunction~ {
-        +Step~HttpResponseMessage~
+        +Step~HttpResponseResultContext~
         +Invokes function class directly in test process
     }
     Step~TResult~ <|-- HttpRemoteFunctionAppTrigger
@@ -492,13 +492,13 @@ sequenceDiagram
     participant PROXY as FunctionAppHttpInProcessCallProxy
     participant FUNC as MyFunction.Run()
 
-    TL->>IPT: Execute(sp, vs, as, log, ct)
+    TL->>IPT: Execute(context)
     IPT->>PROXY: new(serviceProvider, variableStore, httpRequest)
     IPT->>FUNC: action(proxy) → MyFunction.Run(proxy.Request)
     FUNC->>FUNC: business logic
     FUNC-->>IPT: IActionResult (OkObjectResult, ContentResult, JsonResult, …)
-    IPT->>IPT: ConvertToHttpResponseMessage(result)
-    IPT-->>TL: HttpResponseMessage
+    IPT->>IPT: convert the IActionResult to an HTTP response
+    IPT-->>TL: HttpResponseResultContext
 
     Note over Test: Full breakpoint debugging available
 ```
@@ -636,7 +636,7 @@ public record StorageAccountIdentifier(string Identifier)
 |--------|-------------|---------|-----------|
 | **Target** | Deployed function via HTTP | Deployed function via admin API | Function class in test process |
 | **Auth** | Function Key (`Code`) | Admin Master Key (`AdminCode`) | None (direct call) |
-| **Return** | `HttpResponseMessage` | `ManagedResult` | `HttpResponseMessage` |
+| **Return** | `HttpResponseResultContext` | `ManagedResult` | `HttpResponseResultContext` |
 | **Ping check** | Optional | Optional | Not needed |
 | **Debugging** | Not possible | Not possible | Full breakpoint debugging |
 | **Prerequisite** | Deployed + online | Deployed + online + AdminCode | Project reference to FunctionApp |
@@ -644,7 +644,7 @@ public record StorageAccountIdentifier(string Identifier)
 
 ### 8.4 Supported IActionResult Types (InProcess)
 
-`ConvertToHttpResponseMessage` handles:
+The in-process trigger turns the returned `IActionResult` into the step's `HttpResponseResultContext`:
 
 | IActionResult type | Behaviour |
 |-------------------|-----------|
@@ -842,261 +842,8 @@ mindmap
 
 ## 13. Quickstart
 
-### 13.1 Prerequisites
+The runnable starting points live where they are compiled and run, so they cannot drift from the API:
 
-**Package references** in your test project:
-
-```xml
-<PackageReference Include="TestFramework.Core" Version="0.1.0" />
-<PackageReference Include="TestFramework.Azure" Version="0.1.0" />
-<PackageReference Include="TestFramework.Config" Version="0.1.0" />
-```
-
-**`local.testSettings.json`** (set as Content / Copy to Output):
-
-```json
-{
-  "StorageAccount": {
-    "MainStorage": {
-      "ConnectionString": "UseDevelopmentStorage=true",
-      "BlobContainerName": "test-blobs",
-      "TableContainerName": "test-tables"
-    }
-  },
-  "FunctionApp": {
-    "MainFunc": {
-      "BaseUrl": "http://localhost:7071",
-      "Code": ""
-    }
-  },
-  "CosmosDb": {
-    "MainDb": {
-      "ConnectionString": "AccountEndpoint=https://localhost:8081;AccountKey=...",
-      "DatabaseName": "TestDb",
-            "ContainerName": "Items"
-    }
-  },
-  "ServiceBus": {
-        "MainSBQueue": {
-            "ConnectionString": "Endpoint=sb://...;SharedAccessKeyName=...;SharedAccessKey=...",
-            "QueueName": "test-queue"
-        },
-    "MainSBTopic": {
-      "ConnectionString": "Endpoint=sb://...;SharedAccessKeyName=...;SharedAccessKey=...",
-      "TopicName": "test-topic",
-      "SubscriptionName": "test-sub"
-    }
-  },
-  "SqlDatabase": {
-    "MainSql": {
-      "ConnectionString": "Server=localhost;Database=TestDb;Trusted_Connection=true;",
-      "DatabaseName": "TestDb"
-    }
-  }
-}
-```
-
-Azure resources must exist before running tests (Storage Account, Service Bus Namespace, Cosmos DB, SQL DB, Function App).
-
-### 13.2 Load Configuration
-
-```csharp
-using TestFramework.Config;
-using TestFramework.Azure.Extensions;
-
-var serviceProvider = ConfigInstance
-    .FromJsonFile("local.testSettings.json")
-    .LoadAzureConfig()
-    .BuildServiceProvider();
-```
-
-### 13.3 Blob Upload Test
-
-```csharp
-[Fact]
-public async Task Blob_Upload_And_Verify()
-{
-    var blobRef  = AzureExt.Artifact.StorageAccount.BlobRef("MainStorage", Var.Const("test/sample.json"));
-    var blobData = new StorageAccountBlobArtifactData(
-        Encoding.UTF8.GetBytes("{\"key\": \"value\"}"),
-        new Dictionary<string, string> { ["version"] = "1.0" });
-
-    var timeline = Timeline.Create()
-        .SetupArtifact("testBlob")
-        .CaptureArtifactVersion("testBlob")
-        .Build();
-
-    var run = await timeline
-        .SetupRun(serviceProvider, _output)
-        .AddArtifact("testBlob", blobRef, blobData)
-        .RunAsync();
-
-    run.EnsureRanToCompletion();
-    run.Artifact<StorageAccountBlobArtifactData>("testBlob").Should().HaveBeenSetUp();
-}
-```
-
-### 13.4 Function App HTTP Trigger
-
-```csharp
-[Fact]
-public async Task Function_HTTP_Trigger()
-{
-    var trigger = AzureExt.Trigger.FunctionApp.Http("MainFunc")
-        .SelectEndpoint("/api/process", HttpMethod.Post)
-        .WithBody("{\"input\": \"test\"}")
-        .Call();
-
-    var timeline = Timeline.Create()
-        .Trigger(trigger)
-            .WithTimeOut(TimeSpan.FromSeconds(60))
-            .WithRetry(2, CalcDelays.Linear(TimeSpan.FromSeconds(3)))
-        .Build();
-
-    var run = await timeline.SetupRun(serviceProvider, _output).RunAsync();
-    run.EnsureRanToCompletion();
-}
-```
-
-### 13.5 Service Bus Queue Send + Receive
-
-```csharp
-[Fact]
-public async Task ServiceBus_Queue_Send_Receive()
-{
-    var correlationId = Guid.NewGuid().ToString();
-
-    var timeline = Timeline.Create()
-        .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBQueue").WithCorrelationId(correlationId).CompleteMessage(true))
-            .WithTimeOut(TimeSpan.FromMinutes(2))
-        .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBQueue",
-            new ServiceBusMessage("payload") { CorrelationId = correlationId }))
-        .Build();
-
-    var run = await timeline.SetupRun(serviceProvider, _output).RunAsync();
-    run.EnsureRanToCompletion();
-}
-```
-
-### 13.6 Service Bus Topic Send + Temp Subscription Receive
-
-```csharp
-[Fact]
-public async Task ServiceBus_Topic_Send_Receive_With_Temp_Subscription()
-{
-    var correlationId = Guid.NewGuid().ToString();
-
-    var timeline = Timeline.Create()
-        .WaitForEvent(AzureExt.Event.ServiceBus.MessageReceived("MainSBTopic").WithCorrelationId(correlationId).CompleteMessage(true).WithTempSubscription())
-            .WithTimeOut(TimeSpan.FromMinutes(2))
-        .Trigger(AzureExt.Trigger.ServiceBus.Send("MainSBTopic",
-            new ServiceBusMessage("payload") { CorrelationId = correlationId }))
-        .Build();
-
-    var run = await timeline.SetupRun(serviceProvider, _output).RunAsync();
-    run.EnsureRanToCompletion();
-}
-```
-
-### 13.7 Cosmos DB Artifact
-
-```csharp
-public record MyItem(string id, string partitionKey, string Name);
-
-[Fact]
-public async Task Cosmos_Item_Lifecycle()
-{
-    var itemId    = Guid.NewGuid().ToString();
-    var cosmosRef = AzureExt.Artifact.DB.CosmosRef<MyItem>("MainDb", itemId, itemId);
-    var cosmosData = new CosmosDbItemArtifactData<MyItem>(new MyItem(itemId, itemId, "TestItem"));
-
-    var timeline = Timeline.Create()
-        .SetupArtifact("myDoc")
-        .CaptureArtifactVersion("myDoc")
-        .Build();
-
-    var run = await timeline
-        .SetupRun(serviceProvider, _output)
-        .AddArtifact("myDoc", cosmosRef, cosmosData)
-        .RunAsync();
-
-    run.EnsureRanToCompletion();
-    // Item is automatically upserted on setup and deleted in cleanup
-}
-```
-
-### 13.7 SQL Server with EF Core
-
-```csharp
-// 1. Register DbContext once (e.g. in test fixture)
-services.AddSqlArtifactContexts(registry =>
-{
-    registry.RegisterDefault<TestDbContext>();
-    // or: registry.Register("MainSql", typeof(TestDbContext));
-});
-
-// 2. Use in a test
-var sqlRef  = AzureExt.Artifact.DB.SqlRef<OrderEntity>("MainSql", orderId.ToString());
-var sqlData = new AzureSqlRowArtifactData<OrderEntity>(new OrderEntity { Id = orderId, Name = "TestOrder" });
-
-var timeline = Timeline.Create()
-    .SetupArtifact("order")
-    .Trigger(myBusinessStep)
-    .CaptureArtifactVersion("order")
-    .Build();
-```
-
-### 13.8 InProcess Function App (Local Debugging)
-
-```csharp
-// Requires a project reference to the FunctionApp project
-
-[Fact]
-public async Task Function_InProcess_Debug()
-{
-    var trigger = AzureExt.Trigger.FunctionApp
-        .InProcessHttp<MyFunction>(async proxy =>
-        {
-            var func = new MyFunction(proxy.GetService<IMyService>()!);
-            return await func.Run(proxy.Request);
-        });
-
-    var timeline = Timeline.Create("InProcessTest")
-        .Trigger(trigger).WithTimeOut(TimeSpan.FromSeconds(30))
-        .Build();
-
-    var run = await timeline.SetupRun(serviceProvider, _output).RunAsync();
-    run.EnsureRanToCompletion();
-}
-```
-
-### 13.9 End-to-End Test (Blob → Function → Cosmos)
-
-```csharp
-[Fact]
-public async Task E2E_Blob_Function_Cosmos()
-{
-    var blobPath = $"input/{Guid.NewGuid()}.json";
-
-    var timeline = Timeline.Create("E2E")
-        .SetupArtifact("inputBlob")
-        .Trigger(AzureExt.Trigger.FunctionApp.Http("MainFunc")
-            .SelectEndpoint($"/api/process?blob={blobPath}", HttpMethod.Post)
-            .Call())
-            .WithTimeOut(TimeSpan.FromMinutes(2))
-            .WithRetry(3, CalcDelays.Exponential)
-        .RegisterArtifact("resultDoc", cosmosRef)
-        .CaptureArtifactVersion("resultDoc")
-        .Build();
-
-    var run = await timeline
-        .SetupRun(serviceProvider, _output)
-        .AddArtifact("inputBlob", blobRef, blobData)
-        .RunAsync();
-
-    run.EnsureRanToCompletion();
-    run.Artifact<CosmosDbItemArtifactData<ResultItem>>("resultDoc")
-        .Select(d => d.Item.Status)
-        .Should().Be("Processed");
-}
-```
+- the package [README](../TestFramework.Azure/README.md), whose samples `ReadmeSamplesTests` runs in the suite, and
+- the [Showroom's Azure lane](https://github.com/DeadMoon0/TestFramework-Showroom/tree/main/TestFramework.Showroom.Azure),
+  one chapter per service, from configuration (`A0`) to a persistent hosted fixture (`A9`).
