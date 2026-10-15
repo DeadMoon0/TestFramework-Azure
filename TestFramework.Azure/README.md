@@ -434,6 +434,10 @@ Timeline timeline = Timeline.Create()
     .Build();
 ```
 
-## Target Framework
+## Target Frameworks
 
-- .NET 8 (`net8.0`)
+- .NET 8 (`net8.0`), with EF Core 8
+- .NET 10 (`net10.0`), with EF Core 10
+
+EF Core follows the framework, so a `DbContext` you register is built against the EF Core major your test
+project's runtime ships.

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,6 +44,19 @@ namespace TestFramework.Azure.Tests;
 /// </remarks>
 public class SqlDbContextRegistryTests(ITestOutputHelper output)
 {
+    /// <summary>
+    /// Where a context's connection points. Compared by meaning, not text: each EF Core major writes the same
+    /// connection back with its own keywords, and drops the password.
+    /// </summary>
+    private static void AssertPointsAt(TimelineRun run, string server, string database, string user)
+    {
+        SqlConnectionStringBuilder connection = new(run.VariableStore.GetVariable<string>("connection"));
+
+        Assert.Equal(server, connection.DataSource);
+        Assert.Equal(database, connection.InitialCatalog);
+        Assert.Equal(user, connection.UserID);
+    }
+
     [Fact]
     public async Task AContextIsBuiltAgainstWhatTheRunPublished()
     {
@@ -52,9 +66,7 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
 
         run.EnsureRanToCompletion();
 
-        Assert.Equal(
-            "Server=127.0.0.1,49999;Database=orders;User Id=sa;Password=x",
-            run.VariableStore.GetVariable<string>("connection"));
+        AssertPointsAt(run, server: "127.0.0.1,49999", database: "orders", user: "sa");
     }
 
     [Fact]
@@ -95,7 +107,7 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
 
         // And it did not cost the coordinate: the callback runs after the connection is set, which is the
         // ordering the design rests on - a caller who saw an unset connection would reasonably set one.
-        Assert.Equal("Server=127.0.0.1,49999;Database=orders", run.VariableStore.GetVariable<string>("connection"));
+        AssertPointsAt(run, server: "127.0.0.1,49999", database: "orders", user: "");
     }
 
     [Fact]
@@ -138,7 +150,7 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
             .RunAsync();
 
         run.EnsureRanToCompletion();
-        Assert.Contains("Database=invoices", run.VariableStore.GetVariable<string>("connection")!, StringComparison.Ordinal);
+        Assert.Equal("invoices", new SqlConnectionStringBuilder(run.VariableStore.GetVariable<string>("connection")).InitialCatalog);
     }
 
     [Fact]
