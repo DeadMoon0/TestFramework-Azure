@@ -649,9 +649,9 @@ The in-process trigger turns the returned `IActionResult` into the step's `HttpR
 | IActionResult type | Behaviour |
 |-------------------|-----------|
 | `null` | 200 OK, empty body |
-| `ObjectResult` (incl. `OkObjectResult`, `BadRequestObjectResult`, …) | Status from `StatusCode`; a string as text, anything else as JSON with the host's web defaults (camelCase) |
+| `ObjectResult` (incl. `OkObjectResult`, `BadRequestObjectResult`, …) | Status from `StatusCode`; a string as text, anything else as camelCase JSON, as the host writes it |
 | `ContentResult` | Status, body, and `ContentType` preserved |
-| `JsonResult` | Status + `Value` as JSON with the host's web defaults (`application/json`) |
+| `JsonResult` | Status + `Value` as camelCase JSON (`application/json`) |
 | `StatusCodeResult` (incl. `OkResult`, `NoContentResult`, …) | Status, no body |
 | Any other type | `FrameworkConfigurationException` naming the supported types |
 

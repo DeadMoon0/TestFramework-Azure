@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
+using Newtonsoft.Json;
 using System;
 using System.IO;
 using System.Linq;
@@ -82,10 +83,16 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
     }
 
     /// <summary>
-    /// The host's own serializer settings: an in-process call must answer with the body a deployed app would send,
-    /// or a test's assertions change when it moves from one to the other.
+    /// The shape the Functions host gives a body: camelCase property names.
     /// </summary>
-    private static readonly System.Text.Json.JsonSerializerOptions HostJson = new(System.Text.Json.JsonSerializerDefaults.Web);
+    /// <remarks>
+    /// An in-process call must answer with the body a deployed app would send, or a test's assertions change when it
+    /// moves from one to the other. Written with Newtonsoft, the family's one JSON library, set to the host's naming.
+    /// </remarks>
+    private static readonly JsonSerializerSettings HostJson = new()
+    {
+        ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver(),
+    };
 
     private static HttpResponseMessage ConvertToHttpResponseMessage(IActionResult? result)
     {
@@ -99,7 +106,7 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
             {
                 null => null,
                 string text => new StringContent(text, Encoding.UTF8, "text/plain"),
-                object value => new StringContent(System.Text.Json.JsonSerializer.Serialize(value, value.GetType(), HostJson), Encoding.UTF8, "application/json"),
+                object value => new StringContent(JsonConvert.SerializeObject(value, HostJson), Encoding.UTF8, "application/json"),
             };
             return response;
         }
@@ -115,7 +122,7 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
         if (result is JsonResult json)
         {
             HttpResponseMessage response = new((HttpStatusCode)(json.StatusCode ?? 200));
-            string body = System.Text.Json.JsonSerializer.Serialize(json.Value, json.Value?.GetType() ?? typeof(object), HostJson);
+            string body = JsonConvert.SerializeObject(json.Value, HostJson);
             response.Content = new StringContent(body, Encoding.UTF8, "application/json");
             return response;
         }

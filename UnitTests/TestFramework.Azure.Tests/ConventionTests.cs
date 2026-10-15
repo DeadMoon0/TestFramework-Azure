@@ -1,4 +1,6 @@
-﻿using System.Linq;
+﻿using System;
+using System.IO;
+using System.Linq;
 using Microsoft.Azure.Cosmos;
 using TestFramework.Azure.DB.CosmosDB;
 using TestFramework.Core.Conventions;
@@ -39,11 +41,37 @@ public class ConventionTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void OnlyTheCosmosAttributeReaderNamesSystemTextJson()
+    {
+        // The rule itself, not only its one exception: the family serialises with Newtonsoft (ARCHITECTURE.md
+        // section 6). This package references System.Text.Json through ASP.NET Core, so the reference cannot be what
+        // the check looks at; the source can. Reading a test author's Cosmos attributes is the one use, and anything
+        // else - a serialiser call slipped in beside it - is what review cannot see and this test does.
+        string package = Path.Combine(RepositoryRoot(), "TestFramework.Azure");
+        string[] users = [.. Directory.GetFiles(package, "*.cs", SearchOption.AllDirectories)
+            .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(file => File.ReadAllText(file).Contains("System.Text.Json", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .OfType<string>()];
+
+        Assert.Equal(["CosmosModelSchemaResolver.cs"], users);
+    }
+
+    private static string RepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "TestFramework.Azure.slnx")))
+            directory = directory.Parent;
+
+        return directory?.FullName ?? throw new InvalidOperationException($"No TestFramework.Azure.slnx above '{AppContext.BaseDirectory}'.");
+    }
+
+    [Fact]
     public void ACosmosModelMayBeAnnotatedWithEitherJsonLibrary()
     {
         // Why this package still names System.Text.Json, and the only reason it may.
         //
-        // The family serialises with Newtonsoft only (ARCHITECTURE.md section 4), and nothing here
+        // The family serialises with Newtonsoft only (ARCHITECTURE.md section 6), and nothing here
         // serialises with anything else. But a Cosmos model belongs to the test author, not to us, and
         // theirs may be annotated with either library's attribute. Reading both is interop; dropping the
         // System.Text.Json one would silently retarget somebody's container to the wrong property path.
