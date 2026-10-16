@@ -74,7 +74,7 @@
 | Constraint | Detail |
 |------------|--------|
 | Dependency | Builds on `TestFramework.Core` (engine) and `TestFramework.Config` (configuration) |
-| Config source | JSON file (e.g. `local.testSettings.json`) with sections per Azure service |
+| Config source | JSON file (e.g. `local.testsettings.json`) with sections per Azure service |
 | Azure resources | Must be pre-provisioned — the framework does not create infrastructure |
 | Local Docker bootstrap | Explicitly out of scope here — handled by `TestFramework.Container.Azure` so Timeline and Azure triggers stay clean |
 
@@ -511,9 +511,9 @@ sequenceDiagram
     participant CI as ConfigInstance
     participant CL as ConfigLoader
     participant DCP as DefaultConfigProvider
-    participant JSON as local.testSettings.json
+    participant JSON as local.testsettings.json
 
-    Test->>CI: ConfigInstance.FromJsonFile("local.testSettings.json")
+    Test->>CI: ConfigInstance.FromJsonFile("local.testsettings.json")
     Test->>CI: .LoadAzureConfig()
     CI->>CL: Load(configuration, DefaultConfigProvider)
     CL->>DCP: Load~FunctionAppConfig~(config, "MainFunc")
@@ -535,7 +535,7 @@ graph TB
             AZ[TestFramework.Azure.dll]
             CORE[TestFramework.Core.dll]
             CFG[TestFramework.Config.dll]
-            SETTINGS["local.testSettings.json"]
+            SETTINGS["local.testsettings.json"]
         end
     end
     subgraph "Azure Cloud"
@@ -576,7 +576,7 @@ public record StorageAccountIdentifier(string Identifier)
 }
 ```
 
-**JSON configuration (`local.testSettings.json`):**
+**JSON configuration (`local.testsettings.json`):**
 
 ```json
 {
