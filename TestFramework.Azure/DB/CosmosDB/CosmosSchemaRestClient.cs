@@ -23,26 +23,6 @@ internal static class CosmosSchemaRestClient
     private const string ApiVersion = "2018-12-31";
 
     /// <summary>
-    /// The client used for every real Cosmos account. Certificate validation stays on: these requests
-    /// carry a master-key HMAC signature, and a captured request is replayable full account control.
-    /// </summary>
-    private static readonly HttpClient ValidatingHttpClient = new()
-    {
-        Timeout = AzureTimings.CosmosSchemaRequestTimeout,
-    };
-
-    /// <summary>
-    /// The client used only for local emulators, which present a self-signed certificate.
-    /// </summary>
-    private static readonly HttpClient EmulatorHttpClient = new(new HttpClientHandler
-    {
-        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
-    })
-    {
-        Timeout = AzureTimings.CosmosSchemaRequestTimeout,
-    };
-
-    /// <summary>
     /// Ensures that the target Cosmos database and container exist.
     /// </summary>
     /// <param name="config">The resolved Cosmos container configuration.</param>
@@ -90,7 +70,7 @@ internal static class CosmosSchemaRestClient
             $"dbs/{databaseName}/colls/{containerName}",
             $"/dbs/{Uri.EscapeDataString(databaseName)}/colls/{Uri.EscapeDataString(containerName)}");
 
-        using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        using HttpResponseMessage response = await SendAsync(httpClient, request, cancellationToken).ConfigureAwait(false);
 
         if (response.StatusCode == HttpStatusCode.OK)
             return true;
@@ -130,17 +110,35 @@ internal static class CosmosSchemaRestClient
 
     /// <summary>
     /// Picks the emulator client only for local development endpoints; everything else - including
-    /// every <c>*.documents.azure.com</c> account - gets full certificate validation.
+    /// every <c>*.documents.azure.com</c> account - gets full certificate validation. That matters here:
+    /// these requests carry a master-key HMAC signature, and a captured request is replayable full
+    /// account control.
     /// </summary>
     private static HttpClient SelectHttpClient(Uri endpoint)
-        => LocalEndpoints.IsLocalDevelopmentHost(endpoint) ? EmulatorHttpClient : ValidatingHttpClient;
+        => LocalEndpoints.IsLocalDevelopmentHost(endpoint) ? AzureHttpClients.LocalEmulator : AzureHttpClients.Shared;
+
+    /// <summary>
+    /// Sends one schema request, bounded by <see cref="AzureTimings.CosmosSchemaRequestTimeout"/>.
+    /// </summary>
+    /// <remarks>
+    /// The package's clients have no overall timeout, because elsewhere the step's token is the budget.
+    /// Schema setup bounds each request on its own, so the bound is applied here; an elapsed bound surfaces
+    /// as a <see cref="TaskCanceledException"/> while <paramref name="cancellationToken"/> is still live,
+    /// which is what the readiness loop retries on.
+    /// </remarks>
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient httpClient, HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        using CancellationTokenSource requestTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        requestTimeout.CancelAfter(AzureTimings.CosmosSchemaRequestTimeout);
+        return await httpClient.SendAsync(request, requestTimeout.Token).ConfigureAwait(false);
+    }
 
     private static async Task CreateDatabaseIfNotExistsAsync(HttpClient httpClient, Uri endpoint, string key, string databaseName, CancellationToken cancellationToken)
     {
         using HttpRequestMessage request = CreateRequest(HttpMethod.Post, endpoint, key, "dbs", string.Empty, "/dbs");
         request.Content = CreateJsonContent(new { id = databaseName });
 
-        using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        using HttpResponseMessage response = await SendAsync(httpClient, request, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode is HttpStatusCode.Created or HttpStatusCode.Conflict)
             return;
 
@@ -170,7 +168,7 @@ internal static class CosmosSchemaRestClient
             }
         });
 
-        using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        using HttpResponseMessage response = await SendAsync(httpClient, request, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode is HttpStatusCode.Created or HttpStatusCode.Conflict)
             return;
 
@@ -213,7 +211,7 @@ internal static class CosmosSchemaRestClient
             try
             {
                 using HttpRequestMessage request = CreateRequest(HttpMethod.Get, endpoint, key, resourceType, resourceLink, relativeUri);
-                using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                using HttpResponseMessage response = await SendAsync(httpClient, request, cancellationToken).ConfigureAwait(false);
 
                 if (response.StatusCode == HttpStatusCode.OK)
                     return;
@@ -241,7 +239,7 @@ internal static class CosmosSchemaRestClient
             }
             catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
             {
-                // The HttpClient timeout elapsed rather than the caller cancelling - that is retryable.
+                // The request bound elapsed rather than the caller cancelling - that is retryable.
                 lastError = exception;
                 await Task.Delay(AzureTimings.CosmosSchemaPollInterval, cancellationToken).ConfigureAwait(false);
             }

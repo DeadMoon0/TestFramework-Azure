@@ -167,13 +167,13 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
     internal DefaultAzureComponentFactory(IServiceProvider serviceProvider, AzureClientCache clientCache)
     {
         _serviceProvider = serviceProvider;
-        Cosmos = new DefaultCosmosComponentFactory(_serviceProvider, clientCache);
+        Cosmos = new DefaultCosmosComponentFactory(_serviceProvider, clientCache, Http);
         Blob = new DefaultBlobComponentFactory(clientCache);
         Table = new DefaultTableComponentFactory(clientCache);
         ServiceBus = new DefaultServiceBusComponentFactory(clientCache);
     }
 
-    private sealed class DefaultCosmosComponentFactory(IServiceProvider serviceProvider, AzureClientCache clientCache) : ICosmosComponentFactory
+    private sealed class DefaultCosmosComponentFactory(IServiceProvider serviceProvider, AzureClientCache clientCache, IHttpComponentFactory http) : ICosmosComponentFactory
     {
         public ICosmosContainerAdapter CreateContainer(Resolved<CosmosContainerDbConfig> container)
         {
@@ -187,7 +187,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
                 return new CosmosClient(config.ConnectionString, options);
             });
 
-            return new DefaultCosmosContainerAdapter(client, config);
+            return new DefaultCosmosContainerAdapter(client, config, http.CreateSender());
         }
     }
 
@@ -221,11 +221,12 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
         public Task DeleteBlobAsync(string path, CancellationToken cancellationToken) => container.DeleteBlobAsync(path, DeleteSnapshotsOption.IncludeSnapshots, cancellationToken: cancellationToken);
 
-        public async Task UploadBlobAsync(string path, byte[] data, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
+        public Task UploadBlobAsync(string path, byte[] data, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
         {
+            // One request: content and metadata land together, so no reader ever sees the blob without its
+            // metadata. Options without conditions overwrite, as the old overwrite flag did.
             BlobClient blob = container.GetBlobClient(path);
-            await blob.UploadAsync(new BinaryData(data), true, cancellationToken);
-            await blob.SetMetadataAsync(new Dictionary<string, string>(metadata), cancellationToken: cancellationToken);
+            return blob.UploadAsync(new BinaryData(data), new BlobUploadOptions { Metadata = new Dictionary<string, string>(metadata) }, cancellationToken);
         }
 
         public async Task<BlobReadResponse> ReadBlobAsync(string path, CancellationToken cancellationToken)
@@ -302,7 +303,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         }
     }
 
-    private sealed class DefaultCosmosContainerAdapter(CosmosClient client, CosmosContainerDbConfig config) : ICosmosContainerAdapter
+    private sealed class DefaultCosmosContainerAdapter(CosmosClient client, CosmosContainerDbConfig config, IHttpRequestSender http) : ICosmosContainerAdapter
     {
         private Container GetContainer()
         {
@@ -312,7 +313,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         public async Task ValidateAccountReachabilityAsync(CancellationToken cancellationToken)
         {
             using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, client.Endpoint);
-            using HttpResponseMessage _ = await DefaultHttpComponentFactory.SharedClient.SendAsync(request, cancellationToken);
+            using HttpResponseMessage _ = await http.SendAsync(request, cancellationToken);
         }
 
         public async Task ValidateAccountConnectionAsync(CancellationToken cancellationToken)
@@ -610,29 +611,9 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
     private sealed class DefaultHttpComponentFactory : IHttpComponentFactory
     {
-        /// <summary>
-        /// The one HttpClient every Azure HTTP call goes through.
-        /// </summary>
-        /// <remarks>
-        /// The overall timeout stays infinite because the step's CancellationToken is the real budget
-        /// - a long-polling wait must not be cut short by the client. The handler bounds the parts
-        /// that the step token cannot express well: <c>ConnectTimeout</c> so a black-holed host fails
-        /// fast instead of hanging on the TCP handshake, and <c>PooledConnectionLifetime</c> so a
-        /// long-lived test host picks up DNS changes (failovers, swapped slots) instead of pinning a
-        /// stale address for the life of the process.
-        /// </remarks>
-        internal static readonly HttpClient SharedClient = new(new SocketsHttpHandler
-        {
-            PooledConnectionLifetime = AzureTimings.HttpPooledConnectionLifetime,
-            ConnectTimeout = AzureTimings.HttpConnectTimeout,
-        })
-        {
-            Timeout = Timeout.InfiniteTimeSpan,
-        };
-
         public IHttpRequestSender CreateSender()
         {
-            return new DefaultHttpRequestSender(SharedClient);
+            return new DefaultHttpRequestSender(AzureHttpClients.Shared);
         }
     }
 
