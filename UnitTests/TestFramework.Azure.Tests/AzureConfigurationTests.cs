@@ -270,10 +270,74 @@ public class AzureConfigurationTests
         ServiceBusMessage message = new("payload");
         ServiceBusSendTrigger trigger = new("bus", Var.Const(message));
 
-        await trigger.Execute(runtime.Context);
+        ServiceBusSentMessageContext? result = await trigger.Execute(runtime.Context);
 
-        Assert.Same(message, sender.MessageSent);
-        Assert.False(string.IsNullOrWhiteSpace(message.SessionId));
+        Assert.False(string.IsNullOrWhiteSpace(sender.MessageSent!.SessionId));
+        Assert.Equal(sender.MessageSent.SessionId, result!.Message.SessionId);
+    }
+
+    [Fact]
+    public async Task SendingAMessage_LeavesTheCallersMessageAsItWas()
+    {
+        FakeServiceBusSender sender = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.Declare("bus", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = "orders",
+                TopicName = null,
+                SubscriptionName = null,
+                RequiredSession = true,
+            });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender) });
+        });
+
+        ServiceBusMessage message = new("payload") { MessageId = "order-42", Subject = "orders" };
+        message.ApplicationProperties["tenant"] = "north";
+
+        await new ServiceBusSendTrigger("bus", Var.Const(message)).Execute(runtime.Context);
+
+        Assert.Null(message.SessionId);
+        Assert.NotSame(message, sender.MessageSent);
+        Assert.Equal("order-42", sender.MessageSent!.MessageId);
+        Assert.Equal("orders", sender.MessageSent.Subject);
+        Assert.Equal("north", sender.MessageSent.ApplicationProperties["tenant"]);
+        Assert.Equal("payload", sender.MessageSent.Body.ToString());
+    }
+
+    [Fact]
+    public async Task AFinishedRunsRecordOfTheSentMessage_DoesNotFollowLaterChanges()
+    {
+        FakeServiceBusSender sender = new();
+        RuntimeContext runtime = RuntimeContext.Create(services =>
+        {
+            services.Declare("bus", new ServiceBusConfig
+            {
+                ConnectionString = "Endpoint=sb://orders/",
+                QueueName = "orders",
+                TopicName = null,
+                SubscriptionName = null,
+                RequiredSession = false,
+            });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender) });
+        });
+
+        byte[] payload = Encoding.UTF8.GetBytes("payload");
+        ServiceBusMessage message = new(new BinaryData(payload)) { MessageId = "order-42" };
+        message.ApplicationProperties["tenant"] = "north";
+
+        ServiceBusSentMessageContext? result = await new ServiceBusSendTrigger("bus", Var.Const(message)).Execute(runtime.Context);
+
+        payload[0] = (byte)'X';
+        message.MessageId = "changed";
+        message.ApplicationProperties["tenant"] = "south";
+        sender.MessageSent!.MessageId = "changed too";
+        sender.MessageSent.ApplicationProperties["tenant"] = "west";
+
+        Assert.Equal("order-42", result!.Message.MessageId);
+        Assert.Equal("north", result.Message.ApplicationProperties["tenant"]);
+        Assert.Equal("payload", result.Message.Body!.ToString());
     }
 
     [Fact]
@@ -404,8 +468,8 @@ public class AzureConfigurationTests
 
         run.EnsureRanToCompletion();
 
-        Assert.True(run.VariableStore.TryGetVariable<ServiceBusMessage>("sentMessage", out ServiceBusMessage? sentMessage));
-        Assert.Same(message, sentMessage);
+        Assert.True(run.VariableStore.TryGetVariable<ServiceBusSentMessage>("sentMessage", out ServiceBusSentMessage? sentMessage));
+        Assert.Equal("message-123", sentMessage!.MessageId);
         Assert.True(run.VariableStore.TryGetVariable<string>("sentMessageId", out string? messageId));
         Assert.Equal("message-123", messageId);
         Assert.True(run.VariableStore.TryGetVariable<string>("sentCorrelationId", out string? correlationId));
@@ -424,7 +488,7 @@ public class AzureConfigurationTests
         Assert.Equal("reply-session-123", replyToSessionId);
         Assert.True(run.VariableStore.TryGetVariable<string>("sentTo", out string? to));
         Assert.Equal("orders", to);
-        Assert.True(run.VariableStore.TryGetVariable<IDictionary<string, object>>("sentApplicationProperties", out IDictionary<string, object>? applicationProperties));
+        Assert.True(run.VariableStore.TryGetVariable<IReadOnlyDictionary<string, object>>("sentApplicationProperties", out IReadOnlyDictionary<string, object>? applicationProperties));
         Assert.NotNull(applicationProperties);
         Assert.Equal("tenant-123", applicationProperties!["tenant"]);
         Assert.Equal(2, applicationProperties["attempt"]);
@@ -2679,7 +2743,7 @@ public class AzureConfigurationTests
         await sendTrigger.Execute(runtime.Context);
         var result = await receiveEvent.DoEventPolling(runtime.Context);
 
-        Assert.Same(sendMessage, sender.MessageSent);
+        Assert.Equal(sendMessage.MessageId, sender.MessageSent!.MessageId);
         Assert.NotNull(result);
         Assert.Same(receivedMessage, result!.Message);
         Assert.Null(pump.SubscriptionName);
@@ -2712,8 +2776,8 @@ public class AzureConfigurationTests
         await sendTrigger.Execute(runtime.Context);
         var result = await receiveEvent.DoEventPolling(runtime.Context);
 
-        Assert.Same(sendMessage, sender.MessageSent);
-        Assert.False(string.IsNullOrWhiteSpace(sendMessage.SessionId));
+        Assert.Equal(sendMessage.MessageId, sender.MessageSent!.MessageId);
+        Assert.False(string.IsNullOrWhiteSpace(sender.MessageSent.SessionId));
         Assert.NotNull(result);
         Assert.Same(receivedMessage, result!.Message);
         Assert.Null(pump.SubscriptionName);

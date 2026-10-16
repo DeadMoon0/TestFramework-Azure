@@ -1,4 +1,3 @@
-using Azure.Messaging.ServiceBus;
 using TestFramework.Core.Steps;
 
 namespace TestFramework.Azure.ServiceBus;
@@ -8,13 +7,13 @@ namespace TestFramework.Azure.ServiceBus;
 /// </summary>
 public sealed record ServiceBusSentMessageContext : StepResultContext
 {
-    internal ServiceBusSentMessageContext(ServiceBusMessage message)
+    internal ServiceBusSentMessageContext(ServiceBusSentMessage message)
     {
         this.Message = message;
     }
 
     /// <summary>
-    /// The message that was sent.
+    /// The message that was sent, frozen when it was sent.
     /// </summary>
-    public ServiceBusMessage Message { get; }
+    public ServiceBusSentMessage Message { get; }
 }

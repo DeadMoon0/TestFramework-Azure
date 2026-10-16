@@ -1,4 +1,5 @@
-﻿using Azure.Messaging.ServiceBus;
+﻿using Azure.Core.Amqp;
+using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -65,18 +66,29 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
         ServiceBusConfig config = serviceBus.Value;
         await using IServiceBusSenderAdapter sender = context.Services.GetAzureComponentFactory().ServiceBus.CreateSender(serviceBus);
 
-        ServiceBusMessage _message = message.GetRequiredValue(context.Variables);
-        if (config.RequiredSession && _message.SessionId is null)
+        ServiceBusMessage toSend = CopyForSending(message.GetRequiredValue(context.Variables));
+        if (config.RequiredSession && toSend.SessionId is null)
         {
-            _message.SessionId = Guid.NewGuid().ToString();
+            toSend.SessionId = Guid.NewGuid().ToString();
         }
 
-        await sender.SendMessageAsync(_message, context.Deadline.Token);
+        await sender.SendMessageAsync(toSend, context.Deadline.Token);
 
-        context.Logger.LogInformation("Sent message to Service Bus: {0}", _message);
+        context.Logger.LogInformation("Sent message to Service Bus: {0}", toSend);
 
-        return new ServiceBusSentMessageContext(_message);
+        return new ServiceBusSentMessageContext(ServiceBusSentMessage.Of(toSend));
     }
+
+    /// <summary>
+    /// Copies the caller's message, so the session id this trigger may assign never lands on their instance.
+    /// </summary>
+    /// <remarks>
+    /// The SDK has no copy constructor for an outgoing message, and copying property by property would drop
+    /// whatever a caller set on the raw AMQP message. A round trip through the AMQP encoding copies all of it,
+    /// body bytes included.
+    /// </remarks>
+    private static ServiceBusMessage CopyForSending(ServiceBusMessage original)
+        => new(AmqpAnnotatedMessage.FromBytes(original.GetRawAmqpMessage().ToBytes()));
 
     /// <summary>
     /// Creates a runtime step instance.
