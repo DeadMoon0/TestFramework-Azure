@@ -18,8 +18,11 @@ It does not own local Docker/bootstrap concerns. When you want the same Azure tr
 
 ## What This Solution Covers
 
-TestFramework-Azure contains the Azure extension package for the ecosystem.
+TestFramework-Azure contains the Azure extension packages for the ecosystem.
 It is the solution you add when your timelines need to interact with Microsoft Azure services such as Function Apps, Service Bus, Blob Storage, Table Storage, Cosmos DB, or SQL-backed artifacts.
+
+- `TestFramework.Azure` is the package every Azure timeline uses. It brings neither ASP.NET Core nor the Azure Functions Worker.
+- `TestFramework.Azure.Functions` adds what needs a Function App's own code: in-process HTTP execution (`InProcessHttp<T>`) and endpoint selection from a function's attributes (`SelectEndpointWithMethod<T>`, `Managed<T>`). See [its README](./TestFramework.Azure.Functions/README.md).
 
 ## What You Can Do With It
 
@@ -74,5 +77,5 @@ The same pattern is available for Function App HTTP results, managed Function Ap
 Local pre-PR test command:
 
 ```bash
-dotnet test UnitTests/TestFramework.Azure.Tests/TestFramework.Azure.Tests.csproj --configuration Release
+dotnet test TestFramework.Azure.slnx --configuration Release
 ```

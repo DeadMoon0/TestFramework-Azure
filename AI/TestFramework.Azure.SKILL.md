@@ -27,7 +27,7 @@
     Prefer one visible end-to-end flow over several tiny wrappers that hide the Azure interaction sequence.
     Use correlation ids or equivalent scoping when message-driven tests would otherwise be ambiguous.
     Prefer AzureExt entry points and identifier-driven config over ad-hoc nested helper layers.
-    Prefer compact AzureExt call chains when they remain readable, for example `Trigger(AzureExt.Trigger.FunctionApp.Http(...).SelectEndpointWithMethod<...>(...).Call())`.
+    Prefer compact AzureExt call chains when they remain readable, for example `Trigger(AzureExt.Trigger.FunctionApp.Http(...).SelectFunction(...).Call())`.
 </best_practices>
 
 <surface_guidance>
@@ -42,7 +42,9 @@
 
 <api_hints>
     Important APIs and shapes from the package docs:
-    - AzureExt.Trigger.FunctionApp.Http("name").SelectEndpointWithMethod<T>(...).Call()
+    - AzureExt.Trigger.FunctionApp.Http("name").SelectFunction("FunctionName", HttpMethod.Post).Call(), or SelectEndpoint(path, method)
+    - AzureExt.Trigger.FunctionApp.ManagedFunction("name", "FunctionName") runs a non-HTTP function through the host's admin endpoint
+    - With the TestFramework.Azure.Functions package and `using TestFramework.Azure.Functions;`: AzureExt.Trigger.FunctionApp.InProcessHttp<T>(...), Http("name").SelectEndpointWithMethod<T>(...) and Managed<T>("name", method). They are extensions, so the call reads the same; they need ASP.NET Core and the Functions Worker, which the base package does not bring. Recommend that package only when the test needs in-process execution or reads the function's attributes.
     - AzureExt.Trigger.LogicApp.Http("logic").Workflow("StatefulWorkflow").Manual().Call()
     - AzureExt.Trigger.LogicApp.Http("logic").Workflow("StatelessWorkflow").Manual().CallAndCapture()
     - AzureExt.Event.LogicApp.RunCompleted("logic", runId, workflowName) is for stateful workflows only
@@ -95,7 +97,7 @@
     Guidance the agent should preserve:
     - public Azure docs and config guidance are the preferred happy path instead of custom wrapper invention
     - the remaining weaknesses are ergonomic backlog items such as proxy depth and overload cleanup, not reasons to redesign working flows during normal user requests
-    - duplicated Function App HTTP request-shaping logic was centralized; when modifying that area, keep remote and in-process request behavior aligned
+    - Function App HTTP request shaping is centralized: remote calls and the in-process calls in TestFramework.Azure.Functions compose their request through the same public FunctionAppHttpPayloadBuilder; when modifying that area, keep remote and in-process request behavior aligned
 </documentation_notes>
 
 <style_guide>

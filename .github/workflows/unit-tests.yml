@@ -30,8 +30,13 @@ jobs:
             8.0.x
             10.0.x
 
-      - name: Restore test project
-        run: dotnet restore UnitTests/TestFramework.Azure.Tests/TestFramework.Azure.Tests.csproj
+      - name: Restore test projects
+        run: |
+          dotnet restore UnitTests/TestFramework.Azure.Tests/TestFramework.Azure.Tests.csproj
+          dotnet restore UnitTests/TestFramework.Azure.Functions.Tests/TestFramework.Azure.Functions.Tests.csproj
 
-      - name: Run unit tests
+      - name: Run TestFramework.Azure unit tests
         run: dotnet test UnitTests/TestFramework.Azure.Tests/TestFramework.Azure.Tests.csproj --configuration Release --no-restore --logger "trx"
+
+      - name: Run TestFramework.Azure.Functions unit tests
+        run: dotnet test UnitTests/TestFramework.Azure.Functions.Tests/TestFramework.Azure.Functions.Tests.csproj --configuration Release --no-restore --logger "trx"

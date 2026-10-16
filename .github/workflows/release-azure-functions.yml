@@ -1,0 +1,121 @@
+name: Release TestFramework.Azure.Functions
+
+# Publishes ONE package: TestFramework.Azure.Functions.
+#
+# Trigger: push a package-prefixed tag, e.g.
+#     git tag AzureFunctions-v<version> && git push origin AzureFunctions-v<version>
+#
+# This repo produces two packages, TestFramework.Azure and this one; each has its own tag prefix and
+# workflow, so a tag releases exactly one of them. 'Azure-v*' does not match 'AzureFunctions-v*'.
+#
+# The tag is the source of truth: the job refuses to publish unless the packed project's
+# <Version> matches the version in the tag.
+#
+# Publish order matters: this package depends on TestFramework.Azure at the version its
+# project carries, and on TestFramework.Core, so those must already be on nuget.org first.
+#
+# AUTHENTICATION - Trusted Publishing (OIDC). There is no long-lived API key.
+# The job requests a short-lived GitHub OIDC token and exchanges it with nuget.org for a
+# temporary key valid for this run only. Two things must be set up once:
+#   1. On nuget.org: Account -> Trusted Publishing -> add a policy for this package naming
+#      the GitHub owner (DeadMoon0), the repository, and this workflow file name.
+#   2. `id-token: write` below - without it the OIDC token is never issued.
+# The nuget.org account name can be overridden with a `NUGET_USER` repository variable.
+
+on:
+  push:
+    tags:
+      - 'AzureFunctions-v*'
+
+permissions:
+  contents: read
+  # Required for Trusted Publishing: lets the runner request an OIDC token.
+  id-token: write
+
+concurrency:
+  group: release-azure-functions-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PACKAGE_PREFIX: AzureFunctions
+  PROJECT: TestFramework.Azure.Functions/TestFramework.Azure.Functions.csproj
+  TEST_PROJECT: UnitTests/TestFramework.Azure.Functions.Tests/TestFramework.Azure.Functions.Tests.csproj
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Required: the packed icon comes from Modules/TestFramework-Common.
+          # Without this the pack fails with NuGet's opaque "icon file does not exist".
+          submodules: recursive
+          # Every tag, so the release-notes check below can read the previous release.
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Verify tag matches the project version
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#${PACKAGE_PREFIX}-v}"
+          version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$PROJECT" | head -n1)"
+          echo "Tag version:     $tag"
+          echo "Project version: $version"
+          if [ "$tag" = "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not start with '${PACKAGE_PREFIX}-v'"
+            exit 1
+          fi
+          if [ "$version" != "$tag" ]; then
+            echo "::error file=$PROJECT::Version '$version' does not match tag '$tag'"
+            exit 1
+          fi
+
+      - name: Refuse release notes carried over from the previous release
+        run: |
+          set -euo pipefail
+          # The notes describe this release. A copy of the previous one's tells a consumer nothing new - or tells
+          # them again about a break they already took - and twelve releases of this family shipped exactly that.
+          previous="$(git tag -l "${PACKAGE_PREFIX}-v*" --sort=-v:refname | grep -vx "$GITHUB_REF_NAME" | head -n1 || true)"
+          if [ -z "$previous" ]; then
+            echo "No earlier ${PACKAGE_PREFIX} release to compare with."
+            exit 0
+          fi
+          notes() { tr -d '\r' | awk '/<PackageReleaseNotes>/,/<\/PackageReleaseNotes>/'; }
+          before="$(git show "$previous:$PROJECT" 2>/dev/null | notes || true)"
+          now="$(notes < "$PROJECT")"
+          if [ -n "$before" ] && [ "$before" = "$now" ]; then
+            echo "::error file=$PROJECT::PackageReleaseNotes are unchanged since $previous. Say what this release changes, in a few sentences."
+            exit 1
+          fi
+
+      - name: Test
+        run: dotnet test "$TEST_PROJECT" --configuration Release --logger "trx"
+
+      - name: Pack
+        run: dotnet pack "$PROJECT" -c Release -p:ContinuousIntegrationBuild=true -o out
+
+      - name: Authenticate to nuget.org via Trusted Publishing
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER || 'DeadMoon0' }}
+
+      - name: Push
+        run: |
+          # The key below is short-lived and issued for this run only; it is never stored.
+          # --skip-duplicate makes a re-run of the same tag idempotent.
+          dotnet nuget push "out/*.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
+            --skip-duplicate

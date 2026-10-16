@@ -30,7 +30,7 @@
 
 **TestFramework.Azure** is the Azure extension package for TestFramework.Core. It provides ready-to-use implementations for:
 
-- **Triggers** — Azure Functions (HTTP, Managed, InProcess), sending Service Bus messages
+- **Triggers** — Azure Functions (HTTP, Managed), sending Service Bus messages; in-process execution and attribute-driven endpoint selection come with the companion package **TestFramework.Azure.Functions**
 - **Artifacts** — Blob Storage, Table Storage, Cosmos DB, SQL Server (EF Core) — automatic setup, versioning, and teardown
 - **Events** — Receiving Service Bus messages (with temporary subscriptions)
 - **Configuration** — Central management of connection strings and service settings via typed identifiers
@@ -108,7 +108,7 @@ C4Context
     Rel(azure_tf, cosmos, "Upsert / Read / Delete items")
     Rel(azure_tf, sql, "EF Core CRUD + migrations")
     Rel(azure_tf, sb, "Send / Receive messages")
-    Rel(azure_tf, func, "HTTP / Managed / InProcess trigger")
+    Rel(azure_tf, func, "HTTP / Managed trigger")
     Rel(azure_tf, xunit, "ITestOutputHelper for logging")
 ```
 
@@ -130,7 +130,6 @@ graph TB
         MAC[Microsoft.Azure.Cosmos]
         EFC[Microsoft.EntityFrameworkCore]
         EFCS[EFCore.SqlServer]
-        AFW[Azure.Functions.Worker]
     end
     subgraph Project references
         CORE[TestFramework.Core]
@@ -140,7 +139,6 @@ graph TB
     ATF --> ART
     ATF --> EVT
     TRG --> ASB
-    TRG --> AFW
     EVT --> ASB
     ART --> ADT
     ART --> ABLOB
@@ -150,6 +148,13 @@ graph TB
     ATF --> CORE
     CFG --> CONF
 ```
+
+The base package references neither ASP.NET Core nor the Azure Functions Worker, and a convention test holds it to
+that. Both are needed only to run a function in-process (`HttpRequest`, `IActionResult`) and to read its `[Function]`
+attribute, so those live in **TestFramework.Azure.Functions**, which references TestFramework.Azure, the
+`Microsoft.AspNetCore.App` framework and `Microsoft.Azure.Functions.Worker`. It adds no builder of its own: its entry
+points are extension methods on `AzureExt.FunctionAppTrigger` and `IFunctionAppHttpConnectionStage`, and it composes
+its request through the base's public `FunctionAppHttpPayloadBuilder`, the payload stage the remote call uses too.
 
 ---
 
@@ -177,7 +182,7 @@ graph TB
         subgraph Triggers
             FHTTP[HttpRemoteFunctionAppTrigger]
             FMAN[ManagedRemoteFunctionAppTrigger]
-            FIP["InProcessHttpFunctionAppTrigger&lt;T&gt;"]
+            FIP["InProcessHttpFunctionAppTrigger&lt;T&gt; (TestFramework.Azure.Functions)"]
             SBS[ServiceBusSendTrigger]
         end
         subgraph Artifacts
@@ -226,8 +231,9 @@ classDiagram
     }
     class FunctionAppTriggerProxy {
         +Http(id) IFunctionAppHttpConnectionStage
-        +Managed~T~(id, method) ManagedRemoteFunctionAppTrigger
-        +InProcessHttp~T~(action) IFunctionAppHttpPayloadStage
+        +ManagedFunction(id, name) ManagedRemoteFunctionAppTrigger
+        +Managed~T~(id, method) extension in TestFramework.Azure.Functions
+        +InProcessHttp~T~(action) extension in TestFramework.Azure.Functions
     }
     class ServiceBusTriggerProxy {
         +Send(id, message) ServiceBusSendTrigger
@@ -334,7 +340,7 @@ classDiagram
     }
     class InProcessHttpFunctionAppTrigger~TFunction~ {
         +Step~HttpResponseResultContext~
-        +Invokes function class directly in test process
+        +Invokes function class directly in test process (TestFramework.Azure.Functions)
     }
     Step~TResult~ <|-- HttpRemoteFunctionAppTrigger
     Step~TResult~ <|-- ManagedRemoteFunctionAppTrigger
@@ -483,6 +489,8 @@ sequenceDiagram
 ```
 
 ### 6.3 Scenario: InProcess Function App Test
+
+Needs the **TestFramework.Azure.Functions** package and `using TestFramework.Azure.Functions;`.
 
 ```mermaid
 sequenceDiagram
@@ -640,7 +648,8 @@ public record StorageAccountIdentifier(string Identifier)
 | **Ping check** | Optional | Optional | Not needed |
 | **Debugging** | Not possible | Not possible | Full breakpoint debugging |
 | **Prerequisite** | Deployed + online | Deployed + online + AdminCode | Project reference to FunctionApp |
-| **Builder** | `AzureExt.Trigger.FunctionApp.Http(id)` | `AzureExt.Trigger.FunctionApp.Managed<T>(id, method)` | `AzureExt.Trigger.FunctionApp.InProcessHttp<T>(action)` |
+| **Builder** | `AzureExt.Trigger.FunctionApp.Http(id)` | `AzureExt.Trigger.FunctionApp.ManagedFunction(id, name)`, or `Managed<T>(id, method)` | `AzureExt.Trigger.FunctionApp.InProcessHttp<T>(action)` |
+| **Package** | TestFramework.Azure | TestFramework.Azure by name; TestFramework.Azure.Functions by attribute | TestFramework.Azure.Functions |
 
 ### 8.4 Supported IActionResult Types (InProcess)
 
@@ -761,7 +770,7 @@ stateDiagram-v2
 
 **Context:** InProcess tests need access to DI services and variables without starting the Azure Functions host.
 
-**Decision:** `FunctionAppHttpInProcessCallProxy` provides `HttpRequest`, `GetService()`, and `GetVariable()`. The function class is instantiated directly.
+**Decision:** `FunctionAppHttpInProcessCallProxy` provides `HttpRequest`, `GetService()`, and `GetVariable()`. The function class is resolved from the run's services. The trigger and the proxy live in TestFramework.Azure.Functions, because they need ASP.NET Core, which the base package does not bring.
 
 **Consequence:** Full debugging support; only HTTP triggers are supported in-process.
 
@@ -830,7 +839,7 @@ mindmap
 | **ArtifactFinder** | Query logic for finding artifacts (Cosmos SQL, EF Core LINQ, OData filter) |
 | **Event** | Step that waits for an asynchronous external event (e.g. receive Service Bus message) |
 | **Temp Subscription** | One-off Service Bus topic subscription with server-side filter, auto-deleted after test |
-| **InProcess trigger** | Function invocation directly in the test process — no deployment needed, full debugging |
+| **InProcess trigger** | Function invocation directly in the test process — no deployment needed, full debugging; in TestFramework.Azure.Functions |
 | **Managed trigger** | Function invocation via admin endpoint (POST /admin/functions/{name}) |
 | **Remote HTTP trigger** | Function invocation via the normal HTTP endpoint with a function key |
 | **DbContext Registry** | Maps `SqlDatabaseIdentifier` → EF Core `DbContext` type |

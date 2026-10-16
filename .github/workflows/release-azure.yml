@@ -5,8 +5,8 @@ name: Release TestFramework.Azure
 # Trigger: push a package-prefixed tag, e.g.
 #     git tag Azure-v<version> && git push origin Azure-v<version>
 #
-# This repo produces one package. The tag is prefixed anyway so the tagging convention
-# is the same across every TestFramework repo.
+# This repo produces two packages, this one and TestFramework.Azure.Functions; each has its own tag
+# prefix and workflow, so a tag releases exactly one of them. 'Azure-v*' does not match 'AzureFunctions-v*'.
 #
 # The tag is the source of truth: the job refuses to publish unless the packed project's
 # <Version> matches the version in the tag.

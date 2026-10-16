@@ -8,7 +8,7 @@ If you are new: TestFramework.Core runs your timeline, and this package adds Azu
 You usually install and learn TestFramework.Core first, then add TestFramework.Azure when your tests need Azure resources.
 
 TestFramework.Azure adds fluent building blocks for:
-- Azure Function App calls (remote and in-process)
+- Azure Function App calls (remote and managed; in-process with `TestFramework.Azure.Functions`)
 - Azure Logic App calls (Standard and Consumption, stateful and stateless)
 - Service Bus send/receive flows
 - Azure artifacts (SQL, Cosmos DB, Table Storage, Blob Storage)
@@ -223,11 +223,12 @@ Example JSON:
 ## Sample: Function App HTTP Call
 
 ```csharp
+using System.Net.Http;
 using TestFramework.Azure;
 using TestFramework.Core.Timelines;
 
 Timeline timeline = Timeline.Create()
-    .Trigger(AzureExt.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<HttpTests>(nameof(HttpTests.Run)).Call())
+    .Trigger(AzureExt.Trigger.FunctionApp.Http("Default").SelectFunction("Run", HttpMethod.Post).Call())
     .Build();
 
 // The provider owns the cached Azure SDK clients - a Service Bus connection, a Cosmos pool - so dispose it.
@@ -237,30 +238,44 @@ TimelineRun run = await timeline.SetupRun(services).RunAsync();
 run.EnsureRanToCompletion();
 ```
 
-`SelectEndpointWithMethod<T>(...)` expects the target method to carry both a `[Function(...)]` attribute and a parameter marked with `[HttpTrigger(...)]`.
+`SelectFunction(name, method)` calls `{RoutePrefix}/{name}` and needs nothing from the function's code. To read the
+route and verb off the function method's `[Function]` and `[HttpTrigger]` attributes instead, add
+`TestFramework.Azure.Functions` and use `SelectEndpointWithMethod<T>(...)` (see below).
 
 ## Function App Execution Modes
 
-`AzureExt.Trigger.FunctionApp` exposes three different execution styles:
+`AzureExt.Trigger.FunctionApp` exposes these execution styles:
 
-| Mode | Use when | Runtime dependency | Typical benefit |
-|------|----------|--------------------|-----------------|
-| `Http(...)` | you want to call a deployed or container-hosted Function App over HTTP | reachable HTTP host plus `FunctionAppConfig` | closest to production wiring |
-| `Managed<T>(identifier, method)` | you want framework-managed invocation of a known function entry point | the function type is available to the test process | avoids hand-written HTTP request setup |
-| `InProcessHttp<T>(...)` | you want to execute the function handler directly in-process | the function type and request delegate are available in the test process | fastest feedback and easiest offline unit-style validation |
+| Mode | Package | Use when | Runtime dependency |
+|------|---------|----------|--------------------|
+| `Http(...)` | `TestFramework.Azure` | you want to call a deployed or container-hosted Function App over HTTP | reachable HTTP host plus `FunctionAppConfig` |
+| `ManagedFunction(identifier, name)` | `TestFramework.Azure` | you want the host to run a non-HTTP function (timer, queue) through its admin endpoint | reachable host plus its master key as `AdminCode` |
+| `Managed<T>(identifier, method)` | `TestFramework.Azure.Functions` | the same, with the function name read off the method's `[Function]` attribute | as above, plus the function type in the test process |
+| `InProcessHttp<T>(...)` | `TestFramework.Azure.Functions` | you want to execute the function handler directly in-process | the function type registered in the run's services |
 
-Choose `Http(...)` for end-to-end behavior, `Managed<T>(...)` when you still want a Function App abstraction without a remote hop, and `InProcessHttp<T>(...)` when the test should stay entirely local to the current process.
+Choose `Http(...)` for end-to-end behavior, `ManagedFunction(...)` or `Managed<T>(...)` for a function that has no
+HTTP trigger, and `InProcessHttp<T>(...)` when the test should stay entirely local to the current process.
 
-## `InProcessHttp(...)` Overload Guide
+The last two need ASP.NET Core and the Azure Functions Worker, so they live in their own package and this one brings
+neither:
 
-Use the smallest overload that matches what your function returns:
+```bash
+dotnet add package TestFramework.Azure.Functions
+```
 
-- `InProcessHttp<T>((request, context) => { ... })` for synchronous handlers that return no result.
-- `InProcessHttp<T>((request, context) => Task.CompletedTask)` for asynchronous handlers that return no result.
-- `InProcessHttp<T>((request, context) => new OkResult())` for synchronous handlers that return `IActionResult`.
-- `InProcessHttp<T>((request, context) => Task.FromResult<IActionResult>(...))` for asynchronous handlers that return `IActionResult`.
+```csharp
+using TestFramework.Azure;
+using TestFramework.Azure.Functions;
 
-For remote calls, the equivalent decision point is different: start with `Http(...)`, then choose either `SelectEndpointWithMethod<T>(...)` when the route can be inferred from the function metadata, `SelectFunction(name, method)` when you want the normal `api/{functionName}` route without spelling out the prefix yourself, or `SelectEndpoint(path, method)` when the test should supply the path and HTTP verb explicitly.
+AzureExt.Trigger.FunctionApp.InProcessHttp<HttpTests>((function, call) => function.Run(call.HttpRequest)).Call();
+```
+
+The call reads the same as before the split; only the package and the `using` are new. Its README covers the
+`InProcessHttp(...)` overloads and `SelectEndpointWithMethod<T>(...)`.
+
+For remote calls, start with `Http(...)`, then choose `SelectFunction(name, method)` when you want the normal
+`api/{functionName}` route without spelling out the prefix yourself, or `SelectEndpoint(path, method)` when the test
+should supply the path and HTTP verb explicitly.
 
 Example with explicit path, body, and headers:
 
