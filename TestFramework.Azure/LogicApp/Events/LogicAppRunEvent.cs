@@ -92,7 +92,7 @@ public sealed class LogicAppRunEvent
     /// </summary>
     /// <returns>The required Azure environment resources.</returns>
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.LogicApp, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.LogicApp, identifier)];
 
     /// <summary>
     /// Polls the Logic App management API for the targeted run.

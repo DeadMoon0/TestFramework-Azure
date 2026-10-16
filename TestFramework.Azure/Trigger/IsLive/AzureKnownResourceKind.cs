@@ -47,12 +47,12 @@ internal static class AzureKnownResourceKindResolver
     {
         return resourceKind switch
         {
-            AzureEnvironmentResourceKinds.FunctionApp => AzureKnownResourceKind.FunctionApp,
-            AzureEnvironmentResourceKinds.LogicApp => AzureKnownResourceKind.LogicApp,
-            AzureEnvironmentResourceKinds.ServiceBus => AzureKnownResourceKind.ServiceBus,
-            AzureEnvironmentResourceKinds.Storage => AzureKnownResourceKind.Storage,
-            AzureEnvironmentResourceKinds.Cosmos => AzureKnownResourceKind.Cosmos,
-            AzureEnvironmentResourceKinds.Sql => AzureKnownResourceKind.Sql,
+            AzureResourceKinds.FunctionApp => AzureKnownResourceKind.FunctionApp,
+            AzureResourceKinds.LogicApp => AzureKnownResourceKind.LogicApp,
+            AzureResourceKinds.ServiceBus => AzureKnownResourceKind.ServiceBus,
+            AzureResourceKinds.Storage => AzureKnownResourceKind.Storage,
+            AzureResourceKinds.Cosmos => AzureKnownResourceKind.Cosmos,
+            AzureResourceKinds.Sql => AzureKnownResourceKind.Sql,
             _ => AzureKnownResourceKind.Unknown
         };
     }

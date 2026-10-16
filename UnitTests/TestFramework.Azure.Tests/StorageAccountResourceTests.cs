@@ -152,7 +152,7 @@ public class StorageAccountResourceTests(ITestOutputHelper output)
         public override Task<object?> CreateAsync(IEnvironmentProvider environment, RunContext context)
         {
             context.Resources?.Produce(
-                AzureEnvironmentResourceKinds.StorageKind,
+                AzureResourceKinds.StorageKind,
                 identifier,
                 ValueNames.ConnectionString,
                 ResourceVantage.Host,

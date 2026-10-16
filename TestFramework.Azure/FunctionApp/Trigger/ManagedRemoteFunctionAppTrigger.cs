@@ -85,5 +85,5 @@ internal class ManagedRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifi
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.FunctionApp, appIdentifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.FunctionApp, appIdentifier)];
 }

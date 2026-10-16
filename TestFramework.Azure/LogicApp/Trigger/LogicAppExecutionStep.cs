@@ -58,7 +58,7 @@ internal sealed class LogicAppExecutionStep(
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.LogicApp, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.LogicApp, identifier)];
 
     private async Task<LogicAppExecutionResult> ExecuteHttpAsync(RunContext context, CancellationToken cancellationToken)
     {

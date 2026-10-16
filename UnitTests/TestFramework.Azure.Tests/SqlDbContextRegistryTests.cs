@@ -257,7 +257,7 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
         public override Task<object?> CreateAsync(IEnvironmentProvider environment, RunContext context)
         {
             PublishOn(context).Produce(
-                AzureEnvironmentResourceKinds.SqlKind,
+                AzureResourceKinds.SqlKind,
                 identifier,
                 ValueNames.ConnectionString,
                 ResourceVantage.Host,

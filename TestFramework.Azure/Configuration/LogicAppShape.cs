@@ -35,7 +35,7 @@ internal sealed class LogicAppShape(IConfigProvider provider) : ConfigShape<Logi
     public override string Section => DefaultConfigProvider.LogicAppSelector;
 
     /// <inheritdoc />
-    public override ResourceKind Kind => AzureEnvironmentResourceKinds.LogicAppKind;
+    public override ResourceKind Kind => AzureResourceKinds.LogicAppKind;
 
     /// <inheritdoc />
     public override IReadOnlyList<string> Identifiers(IConfiguration configuration)

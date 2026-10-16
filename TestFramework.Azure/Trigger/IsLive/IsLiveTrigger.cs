@@ -175,7 +175,7 @@ internal abstract class AzureIsLiveTriggerBase(string resourceKind, string resou
         new StepInstance<Step<AzureIsLiveResult>, AzureIsLiveResult>(this);
 }
 
-internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureEnvironmentResourceKinds.FunctionApp, identifier, alivenessLevel), IHasEnvironmentRequirements
+internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.FunctionApp, identifier, alivenessLevel), IHasEnvironmentRequirements
 {
     private static readonly Uri HostStatusUri = new("admin/host/status", UriKind.Relative);
 
@@ -221,10 +221,10 @@ internal sealed class FunctionAppIsLiveTrigger(FunctionAppIdentifier identifier,
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.FunctionApp, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.FunctionApp, identifier)];
 }
 
-internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureEnvironmentResourceKinds.LogicApp, identifier, alivenessLevel), IHasEnvironmentRequirements
+internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.LogicApp, identifier, alivenessLevel), IHasEnvironmentRequirements
 {
     private static readonly Uri HostStatusUri = new("admin/host/status", UriKind.Relative);
 
@@ -291,10 +291,10 @@ internal sealed class LogicAppIsLiveTrigger(LogicAppIdentifier identifier, Varia
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.LogicApp, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.LogicApp, identifier)];
 }
 
-internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureEnvironmentResourceKinds.ServiceBus, identifier, alivenessLevel), IHasEnvironmentRequirements
+internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.ServiceBus, identifier, alivenessLevel), IHasEnvironmentRequirements
 {
     public override string Name => "ServiceBus IsLive Trigger";
 
@@ -318,10 +318,10 @@ internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, V
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.ServiceBus, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.ServiceBus, identifier)];
 }
 
-internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureEnvironmentResourceKinds.Storage, identifier, alivenessLevel), IHasEnvironmentRequirements
+internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.Storage, identifier, alivenessLevel), IHasEnvironmentRequirements
 {
     public override string Name => "Blob Storage IsLive Trigger";
 
@@ -345,10 +345,10 @@ internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifi
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.Storage, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.Storage, identifier)];
 }
 
-internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureEnvironmentResourceKinds.Storage, identifier, alivenessLevel), IHasEnvironmentRequirements
+internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.Storage, identifier, alivenessLevel), IHasEnvironmentRequirements
 {
     public override string Name => "Table Storage IsLive Trigger";
 
@@ -373,10 +373,10 @@ internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identif
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.Storage, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.Storage, identifier)];
 }
 
-internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureEnvironmentResourceKinds.Cosmos, identifier, alivenessLevel), IHasEnvironmentRequirements
+internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.Cosmos, identifier, alivenessLevel), IHasEnvironmentRequirements
 {
     public override string Name => "Cosmos Container IsLive Trigger";
 
@@ -420,7 +420,7 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.Cosmos, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.Cosmos, identifier)];
 
     private async Task<AzureIsLiveResult?> ExecuteWithTimeoutAsync(VariableStore variableStore, TimeSpan timeout, CancellationToken cancellationToken, Func<CancellationToken, Task> action, string timeoutMessage)
     {
@@ -444,7 +444,7 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
     }
 }
 
-internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureEnvironmentResourceKinds.Sql, identifier, alivenessLevel), IHasEnvironmentRequirements
+internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.Sql, identifier, alivenessLevel), IHasEnvironmentRequirements
 {
     public override string Name => "SqlDatabase IsLive Trigger";
 
@@ -465,5 +465,5 @@ internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier,
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.Sql, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.Sql, identifier)];
 }

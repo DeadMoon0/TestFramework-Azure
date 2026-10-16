@@ -98,7 +98,7 @@ public class AzureSurfaceTests
 
         EnvironmentRequirement requirement = Assert.Single(((IHasEnvironmentRequirements)trigger).GetEnvironmentRequirements(null!));
 
-        Assert.Equal(AzureEnvironmentResourceKinds.ServiceBus, requirement.ResourceKind);
+        Assert.Equal(AzureResourceKinds.ServiceBus, requirement.ResourceKind);
         Assert.Equal("bus", requirement.ResourceIdentifier);
     }
 
@@ -108,7 +108,7 @@ public class AzureSurfaceTests
         LogicAppIdentifier identifier = "logic";
 
         Assert.Equal("logic", identifier.ToString());
-        Assert.Equal("azure.logicapp", AzureEnvironmentResourceKinds.LogicApp);
+        Assert.Equal("azure.logicapp", AzureResourceKinds.LogicApp);
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public class AzureSurfaceTests
     public void AzureIsLiveResult_ExposesKnownResourceKind()
     {
         Azure.Trigger.IsLive.AzureIsLiveResult result = new(
-            AzureEnvironmentResourceKinds.FunctionApp,
+            AzureResourceKinds.FunctionApp,
             "func",
             AlivenessLevel.Authenticated,
             null);

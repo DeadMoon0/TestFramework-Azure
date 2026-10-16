@@ -34,7 +34,7 @@ internal sealed class SqlDatabaseShape(IConfigProvider provider) : ConfigShape<S
     public override string Section => DefaultConfigProvider.SqlDatabaseSelector;
 
     /// <inheritdoc />
-    public override ResourceKind Kind => AzureEnvironmentResourceKinds.SqlKind;
+    public override ResourceKind Kind => AzureResourceKinds.SqlKind;
 
     /// <inheritdoc />
     public override IReadOnlyList<string> Identifiers(IConfiguration configuration)
@@ -67,7 +67,7 @@ internal sealed class SqlDatabaseShape(IConfigProvider provider) : ConfigShape<S
 
         if (config.DatabaseName is { Length: > 0 } databaseName)
         {
-            values[new ValueKey(AzureEnvironmentResourceKinds.DatabaseNameValue)] = databaseName;
+            values[new ValueKey(AzureResourceKinds.DatabaseNameValue)] = databaseName;
         }
 
         return values;
@@ -82,7 +82,7 @@ internal sealed class SqlDatabaseShape(IConfigProvider provider) : ConfigShape<S
         return new SqlDatabaseConfig
         {
             ConnectionString = Text(values, ValueNames.ConnectionString) ?? throw Missing(ValueNames.ConnectionString, identifier, values),
-            DatabaseName = Text(values, AzureEnvironmentResourceKinds.DatabaseNameValue) ?? throw Missing(AzureEnvironmentResourceKinds.DatabaseNameValue, identifier, values),
+            DatabaseName = Text(values, AzureResourceKinds.DatabaseNameValue) ?? throw Missing(AzureResourceKinds.DatabaseNameValue, identifier, values),
         };
     }
 

@@ -36,7 +36,7 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
         Assert.Equal(
             "http://localhost:7071/",
             await Read(
-                AzureEnvironmentResourceKinds.FunctionApp,
+                AzureResourceKinds.FunctionApp,
                 "orders-fn",
                 ValueNames.BaseUrl,
                 ("FunctionApp:orders-fn:BaseUrl", "http://localhost:7071/"),
@@ -45,9 +45,9 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
         Assert.Equal(
             "api",
             await Read(
-                AzureEnvironmentResourceKinds.FunctionApp,
+                AzureResourceKinds.FunctionApp,
                 "orders-fn",
-                AzureEnvironmentResourceKinds.RoutePrefixValue,
+                AzureResourceKinds.RoutePrefixValue,
                 ("FunctionApp:orders-fn:BaseUrl", "http://localhost:7071/"),
                 ("FunctionApp:orders-fn:Code", "secret-key")));
     }
@@ -72,7 +72,7 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
         // Reachable, because something has to authenticate with it.
         Assert.Equal(
             "secret-key",
-            await Read(AzureEnvironmentResourceKinds.FunctionApp, "orders-fn", AzureEnvironmentResourceKinds.CodeValue, configured));
+            await Read(AzureResourceKinds.FunctionApp, "orders-fn", AzureResourceKinds.CodeValue, configured));
 
         // And absent from every listing.
         string listed = await Listing(configured);
@@ -96,15 +96,15 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
 
         Assert.Equal(
             "Endpoint=sb://localhost;SharedAccessKeyName=x;SharedAccessKey=y",
-            await Read(AzureEnvironmentResourceKinds.ServiceBus, "orders-bus", ValueNames.ConnectionString, configured));
+            await Read(AzureResourceKinds.ServiceBus, "orders-bus", ValueNames.ConnectionString, configured));
 
         Assert.Equal(
             "orders",
-            await Read(AzureEnvironmentResourceKinds.ServiceBus, "orders-bus", AzureEnvironmentResourceKinds.TopicNameValue, configured));
+            await Read(AzureResourceKinds.ServiceBus, "orders-bus", AzureResourceKinds.TopicNameValue, configured));
 
         Assert.Equal(
             "orders-worker",
-            await Read(AzureEnvironmentResourceKinds.ServiceBus, "orders-bus", AzureEnvironmentResourceKinds.SubscriptionNameValue, configured));
+            await Read(AzureResourceKinds.ServiceBus, "orders-bus", AzureResourceKinds.SubscriptionNameValue, configured));
     }
 
     [Fact]
@@ -118,11 +118,11 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
 
         Assert.Equal(
             "UseDevelopmentStorage=true",
-            await Read(AzureEnvironmentResourceKinds.Storage, "files", ValueNames.ConnectionString, configured));
+            await Read(AzureResourceKinds.Storage, "files", ValueNames.ConnectionString, configured));
 
         Assert.Equal(
             "documents",
-            await Read(AzureEnvironmentResourceKinds.Storage, "files", AzureEnvironmentResourceKinds.BlobContainerNameValue, configured));
+            await Read(AzureResourceKinds.Storage, "files", AzureResourceKinds.BlobContainerNameValue, configured));
     }
 
     [Fact]
@@ -135,8 +135,8 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
             ("CosmosDb:orders:ContainerName", "orders"),
         ];
 
-        Assert.Equal("shop", await Read(AzureEnvironmentResourceKinds.Cosmos, "orders", AzureEnvironmentResourceKinds.DatabaseNameValue, configured));
-        Assert.Equal("orders", await Read(AzureEnvironmentResourceKinds.Cosmos, "orders", AzureEnvironmentResourceKinds.ContainerNameValue, configured));
+        Assert.Equal("shop", await Read(AzureResourceKinds.Cosmos, "orders", AzureResourceKinds.DatabaseNameValue, configured));
+        Assert.Equal("orders", await Read(AzureResourceKinds.Cosmos, "orders", AzureResourceKinds.ContainerNameValue, configured));
     }
 
     [Fact]
@@ -150,9 +150,9 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
 
         Assert.Equal(
             "Server=localhost;Database=orders;Integrated Security=true",
-            await Read(AzureEnvironmentResourceKinds.Sql, "orders-db", ValueNames.ConnectionString, configured));
+            await Read(AzureResourceKinds.Sql, "orders-db", ValueNames.ConnectionString, configured));
 
-        Assert.Equal("orders", await Read(AzureEnvironmentResourceKinds.Sql, "orders-db", AzureEnvironmentResourceKinds.DatabaseNameValue, configured));
+        Assert.Equal("orders", await Read(AzureResourceKinds.Sql, "orders-db", AzureResourceKinds.DatabaseNameValue, configured));
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
         => Assert.Equal(
             "https://orders.azurewebsites.net/",
             await Read(
-                AzureEnvironmentResourceKinds.LogicApp,
+                AzureResourceKinds.LogicApp,
                 "orders-flow",
                 ValueNames.BaseUrl,
                 ("LogicApp:orders-flow:HostingMode", "Standard"),
@@ -173,7 +173,7 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
         => Assert.Equal(
             "https://invoke.example/workflow",
             await Read(
-                AzureEnvironmentResourceKinds.LogicApp,
+                AzureResourceKinds.LogicApp,
                 "orders-flow",
                 ValueNames.BaseUrl,
                 ("LogicApp:orders-flow:HostingMode", "Consumption"),
@@ -187,7 +187,7 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
         Assert.Equal(
             "UseDevelopmentStorage=true",
             await Read(
-                AzureEnvironmentResourceKinds.Storage,
+                AzureResourceKinds.Storage,
                 "files",
                 ValueNames.ConnectionString,
                 ResourceVantage.Network,
@@ -203,7 +203,7 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
     private async Task<string> Listing(params (string Key, string Value)[] configured)
     {
         Timeline timeline = Timeline.Create()
-            .Trigger(new ReadsValueStep(AzureEnvironmentResourceKinds.FunctionApp, "orders-fn", ValueNames.BaseUrl, ResourceVantage.Host)).Label("reads")
+            .Trigger(new ReadsValueStep(AzureResourceKinds.FunctionApp, "orders-fn", ValueNames.BaseUrl, ResourceVantage.Host)).Label("reads")
             .Build();
 
         TimelineRun run = await timeline.SetupRun(Configured(configured), output.WriteLine).RunAsync();

@@ -35,7 +35,7 @@ internal sealed class ServiceBusShape(IConfigProvider provider) : ConfigShape<Se
     public override string Section => DefaultConfigProvider.ServiceBusSelector;
 
     /// <inheritdoc />
-    public override ResourceKind Kind => AzureEnvironmentResourceKinds.ServiceBusKind;
+    public override ResourceKind Kind => AzureResourceKinds.ServiceBusKind;
 
     /// <inheritdoc />
     public override IReadOnlyList<string> Identifiers(IConfiguration configuration)
@@ -68,20 +68,20 @@ internal sealed class ServiceBusShape(IConfigProvider provider) : ConfigShape<Se
 
         if (config.QueueName is { Length: > 0 } queueName)
         {
-            values[new ValueKey(AzureEnvironmentResourceKinds.QueueNameValue)] = queueName;
+            values[new ValueKey(AzureResourceKinds.QueueNameValue)] = queueName;
         }
 
         if (config.TopicName is { Length: > 0 } topicName)
         {
-            values[new ValueKey(AzureEnvironmentResourceKinds.TopicNameValue)] = topicName;
+            values[new ValueKey(AzureResourceKinds.TopicNameValue)] = topicName;
         }
 
         if (config.SubscriptionName is { Length: > 0 } subscriptionName)
         {
-            values[new ValueKey(AzureEnvironmentResourceKinds.SubscriptionNameValue)] = subscriptionName;
+            values[new ValueKey(AzureResourceKinds.SubscriptionNameValue)] = subscriptionName;
         }
 
-        values[new ValueKey(AzureEnvironmentResourceKinds.RequiredSessionValue)] = config.RequiredSession ? "true" : "false";
+        values[new ValueKey(AzureResourceKinds.RequiredSessionValue)] = config.RequiredSession ? "true" : "false";
 
         return values;
     }
@@ -99,10 +99,10 @@ internal sealed class ServiceBusShape(IConfigProvider provider) : ConfigShape<Se
         return new ServiceBusConfig
         {
             ConnectionString = Text(values, ValueNames.ConnectionString) ?? throw Missing(ValueNames.ConnectionString, identifier, values),
-            QueueName = Text(values, AzureEnvironmentResourceKinds.QueueNameValue),
-            TopicName = Text(values, AzureEnvironmentResourceKinds.TopicNameValue),
-            SubscriptionName = Text(values, AzureEnvironmentResourceKinds.SubscriptionNameValue),
-            RequiredSession = Flag(values, AzureEnvironmentResourceKinds.RequiredSessionValue, identifier, fallback: false),
+            QueueName = Text(values, AzureResourceKinds.QueueNameValue),
+            TopicName = Text(values, AzureResourceKinds.TopicNameValue),
+            SubscriptionName = Text(values, AzureResourceKinds.SubscriptionNameValue),
+            RequiredSession = Flag(values, AzureResourceKinds.RequiredSessionValue, identifier, fallback: false),
         }.EnsureNamesOneEntity(identifier);
     }
 

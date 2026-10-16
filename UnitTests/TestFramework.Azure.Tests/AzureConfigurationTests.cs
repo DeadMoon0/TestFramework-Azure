@@ -1872,7 +1872,7 @@ public class AzureConfigurationTests
 
         Assert.True(run.VariableStore.TryGetVariable<TestFramework.Azure.Trigger.IsLive.AzureIsLiveResult>("probeResult", out TestFramework.Azure.Trigger.IsLive.AzureIsLiveResult? result));
         Assert.NotNull(result);
-        Assert.Equal(AzureEnvironmentResourceKinds.FunctionApp, result!.ResourceKind);
+        Assert.Equal(AzureResourceKinds.FunctionApp, result!.ResourceKind);
         Assert.Equal("func", result.ResourceIdentifier);
         Assert.Equal(AlivenessLevel.Authenticated, result.AlivenessLevel);
         Assert.Equal(HttpStatusCode.OK, result.StatusCode);

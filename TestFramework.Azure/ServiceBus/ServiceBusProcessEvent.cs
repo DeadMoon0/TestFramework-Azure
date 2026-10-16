@@ -204,7 +204,7 @@ public sealed class ServiceBusProcessEvent
     /// </summary>
     /// <returns>The required Azure environment resources.</returns>
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.ServiceBus, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.ServiceBus, identifier)];
 
 
     // ── DoEventPolling ────────────────────────────────────────────────────────

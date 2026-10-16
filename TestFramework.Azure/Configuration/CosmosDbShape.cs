@@ -35,7 +35,7 @@ internal sealed class CosmosDbShape(IConfigProvider provider) : ConfigShape<Cosm
     public override string Section => DefaultConfigProvider.CosmosDbSelector;
 
     /// <inheritdoc />
-    public override ResourceKind Kind => AzureEnvironmentResourceKinds.CosmosKind;
+    public override ResourceKind Kind => AzureResourceKinds.CosmosKind;
 
     /// <inheritdoc />
     public override IReadOnlyList<string> Identifiers(IConfiguration configuration)
@@ -68,20 +68,20 @@ internal sealed class CosmosDbShape(IConfigProvider provider) : ConfigShape<Cosm
 
         if (config.DatabaseName is { Length: > 0 } databaseName)
         {
-            values[new ValueKey(AzureEnvironmentResourceKinds.DatabaseNameValue)] = databaseName;
+            values[new ValueKey(AzureResourceKinds.DatabaseNameValue)] = databaseName;
         }
 
         if (config.ContainerName is { Length: > 0 } containerName)
         {
-            values[new ValueKey(AzureEnvironmentResourceKinds.ContainerNameValue)] = containerName;
+            values[new ValueKey(AzureResourceKinds.ContainerNameValue)] = containerName;
         }
 
         if (config.ProvisionedThroughput is { } throughput)
         {
-            values[new ValueKey(AzureEnvironmentResourceKinds.ProvisionedThroughputValue)] = throughput.ToString(CultureInfo.InvariantCulture);
+            values[new ValueKey(AzureResourceKinds.ProvisionedThroughputValue)] = throughput.ToString(CultureInfo.InvariantCulture);
         }
 
-        values[new ValueKey(AzureEnvironmentResourceKinds.AllowSchemaCreationValue)] = config.AllowSchemaCreation ? "true" : "false";
+        values[new ValueKey(AzureResourceKinds.AllowSchemaCreationValue)] = config.AllowSchemaCreation ? "true" : "false";
 
         return values;
     }
@@ -100,18 +100,18 @@ internal sealed class CosmosDbShape(IConfigProvider provider) : ConfigShape<Cosm
         CosmosContainerDbConfig config = new CosmosContainerDbConfig
         {
             ConnectionString = Text(values, ValueNames.ConnectionString) ?? throw Missing(ValueNames.ConnectionString, identifier, values),
-            DatabaseName = Text(values, AzureEnvironmentResourceKinds.DatabaseNameValue) ?? throw Missing(AzureEnvironmentResourceKinds.DatabaseNameValue, identifier, values),
-            ContainerName = Text(values, AzureEnvironmentResourceKinds.ContainerNameValue) ?? throw Missing(AzureEnvironmentResourceKinds.ContainerNameValue, identifier, values),
-            AllowSchemaCreation = Flag(values, AzureEnvironmentResourceKinds.AllowSchemaCreationValue, identifier, fallback: false),
+            DatabaseName = Text(values, AzureResourceKinds.DatabaseNameValue) ?? throw Missing(AzureResourceKinds.DatabaseNameValue, identifier, values),
+            ContainerName = Text(values, AzureResourceKinds.ContainerNameValue) ?? throw Missing(AzureResourceKinds.ContainerNameValue, identifier, values),
+            AllowSchemaCreation = Flag(values, AzureResourceKinds.AllowSchemaCreationValue, identifier, fallback: false),
         };
 
-        if (values.TryGetValue(AzureEnvironmentResourceKinds.ProvisionedThroughputValue, out string? throughput))
+        if (values.TryGetValue(AzureResourceKinds.ProvisionedThroughputValue, out string? throughput))
         {
             config = config with
             {
                 ProvisionedThroughput = int.TryParse(throughput, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed)
                     ? parsed
-                    : throw Unreadable(throughput, identifier, AzureEnvironmentResourceKinds.ProvisionedThroughputValue, "a whole number of request units"),
+                    : throw Unreadable(throughput, identifier, AzureResourceKinds.ProvisionedThroughputValue, "a whole number of request units"),
             };
         }
 

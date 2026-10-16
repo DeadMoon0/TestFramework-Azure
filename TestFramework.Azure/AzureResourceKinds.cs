@@ -4,7 +4,7 @@ namespace TestFramework.Azure;
 /// <summary>
 /// Canonical Azure resource kind names used for environment requirements.
 /// </summary>
-public static class AzureEnvironmentResourceKinds
+public static class AzureResourceKinds
 {
     /// <summary>
     /// Function App environment requirement kind.

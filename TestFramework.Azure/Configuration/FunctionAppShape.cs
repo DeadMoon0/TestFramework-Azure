@@ -38,7 +38,7 @@ internal sealed class FunctionAppShape(IConfigProvider provider) : ConfigShape<F
     public override string Section => DefaultConfigProvider.FunctionAppBaseSelector;
 
     /// <inheritdoc />
-    public override ResourceKind Kind => AzureEnvironmentResourceKinds.FunctionAppKind;
+    public override ResourceKind Kind => AzureResourceKinds.FunctionAppKind;
 
     /// <inheritdoc />
     public override IReadOnlyList<string> Identifiers(IConfiguration configuration)
@@ -73,16 +73,16 @@ internal sealed class FunctionAppShape(IConfigProvider provider) : ConfigShape<F
         // and skipping it because it is empty would make the reader fall back to the default "api", which is
         // the opposite of what was asked for. "Absent" and "empty" are different answers for a non-nullable
         // property with a default, and only the one that was never written down may take the default.
-        values[new ValueKey(AzureEnvironmentResourceKinds.RoutePrefixValue)] = config.RoutePrefix;
+        values[new ValueKey(AzureResourceKinds.RoutePrefixValue)] = config.RoutePrefix;
 
         if (config.Code is { Length: > 0 } code)
         {
-            values[new ValueKey(AzureEnvironmentResourceKinds.CodeValue)] = code;
+            values[new ValueKey(AzureResourceKinds.CodeValue)] = code;
         }
 
         if (config.AdminCode is { Length: > 0 } adminCode)
         {
-            values[new ValueKey(AzureEnvironmentResourceKinds.AdminCodeValue)] = adminCode;
+            values[new ValueKey(AzureResourceKinds.AdminCodeValue)] = adminCode;
         }
 
         return values;
@@ -102,12 +102,12 @@ internal sealed class FunctionAppShape(IConfigProvider provider) : ConfigShape<F
         FunctionAppConfig config = new FunctionAppConfig
         {
             BaseUrl = Text(values, ValueNames.BaseUrl) ?? throw Missing(ValueNames.BaseUrl, identifier, values),
-            Code = Text(values, AzureEnvironmentResourceKinds.CodeValue),
-            AdminCode = Text(values, AzureEnvironmentResourceKinds.AdminCodeValue),
+            Code = Text(values, AzureResourceKinds.CodeValue),
+            AdminCode = Text(values, AzureResourceKinds.AdminCodeValue),
         };
 
         // Presence, not emptiness - see the note in Values.
-        if (values.TryGetValue(AzureEnvironmentResourceKinds.RoutePrefixValue, out string? routePrefix))
+        if (values.TryGetValue(AzureResourceKinds.RoutePrefixValue, out string? routePrefix))
         {
             config = config with { RoutePrefix = routePrefix };
         }

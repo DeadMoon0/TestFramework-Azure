@@ -133,5 +133,5 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureEnvironmentResourceKinds.FunctionApp, appIdentifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.FunctionApp, appIdentifier)];
 }
