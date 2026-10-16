@@ -2,7 +2,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 
-namespace TestFramework.Azure.DB.CosmosDB;
+namespace TestFramework.Azure.DB.CosmosDb;
 
 /// <summary>
 /// Makes a Cosmos database and container exist, for a package that provisions the account they live in.
@@ -36,7 +36,7 @@ public static class CosmosSchema
     /// <param name="cancellationToken">Stops the work.</param>
     /// <returns>A task that completes when both exist.</returns>
     public static Task EnsureExistsAsync(
-        CosmosContainerDbConfig config,
+        CosmosDbConfig config,
         string partitionKeyPath,
         CancellationToken cancellationToken)
         => CosmosSchemaRestClient.EnsureDatabaseAndContainerExistAsync(config, partitionKeyPath, cancellationToken);

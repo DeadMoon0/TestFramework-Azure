@@ -1,6 +1,6 @@
 ﻿using TestFramework.Core.Artifacts;
 
-namespace TestFramework.Azure.DB.CosmosDB;
+namespace TestFramework.Azure.DB.CosmosDb;
 
 /// <summary>
 /// Static artifact kind for Cosmos DB item artifacts.

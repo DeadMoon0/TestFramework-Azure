@@ -65,21 +65,14 @@ internal static class FunctionAppMethodAnalyzer
 
         foreach (ParameterInfo parameter in method.GetParameters())
         {
-            // Matched by name: [HttpTrigger] comes from the Worker's HTTP extension package, not the Worker itself, and a
-            // function project brings whichever HTTP extension it uses. Only Methods and Route are read off it.
-            Attribute? httpAttr = parameter.GetCustomAttributes()
-                .FirstOrDefault(a => a.GetType().Name == "HttpTriggerAttribute");
+            HttpTriggerAttribute? httpAttr = parameter.GetCustomAttribute<HttpTriggerAttribute>();
 
             if (httpAttr is null) continue;
-
-            Type attrType = httpAttr.GetType();
-            string[]? methods = attrType.GetProperty("Methods")?.GetValue(httpAttr) as string[];
-            string? route = attrType.GetProperty("Route")?.GetValue(httpAttr) as string;
 
             // Routes are emitted RELATIVE to the host's route prefix. The prefix is applied once, by
             // the trigger, from FunctionAppConfig.RoutePrefix - a custom Route must not lose it, and a
             // missing Route must not hardcode it.
-            return new HttpTriggerMetadata(route ?? functionAttr.Name, methods);
+            return new HttpTriggerMetadata(httpAttr.Route ?? functionAttr.Name, httpAttr.Methods);
         }
 
         throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(

@@ -19,8 +19,8 @@ using Newtonsoft.Json;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Extensions;
 using TestFramework.Azure.Configuration.SpecificConfigs;
-using TestFramework.Azure.DB.CosmosDB;
-using TestFramework.Azure.DB.SqlServer;
+using TestFramework.Azure.DB.CosmosDb;
+using TestFramework.Azure.DB.SqlDatabase;
 using TestFramework.Azure.Exceptions;
 using TestFramework.Azure.FunctionApp;
 using TestFramework.Azure.FunctionApp.Results;
@@ -52,7 +52,7 @@ public class AzureConfigurationTests
         AssertIdentifierRoundTrip("logic", value => (LogicAppIdentifier)value, id => (string)id);
         AssertIdentifierRoundTrip("func", value => (FunctionAppIdentifier)value, id => (string)id);
         AssertIdentifierRoundTrip("storage", value => (StorageAccountIdentifier)value, id => (string)id);
-        AssertIdentifierRoundTrip("cosmos", value => (CosmosContainerIdentifier)value, id => (string)id);
+        AssertIdentifierRoundTrip("cosmos", value => (CosmosDbIdentifier)value, id => (string)id);
         AssertIdentifierRoundTrip("bus", value => (ServiceBusIdentifier)value, id => (string)id);
         AssertIdentifierRoundTrip("sql", value => (SqlDatabaseIdentifier)value, id => (string)id);
     }
@@ -70,7 +70,7 @@ public class AzureConfigurationTests
             ["LogicApp:workflow:Consumption:WorkflowResourceId"] = "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor",
             ["ServiceBus:orders:ConnectionString"] = "Endpoint=sb://orders/",
             ["ServiceBus:orders:QueueName"] = "orders",
-            ["ServiceBus:orders:RequiredSession"] = "true",
+            ["ServiceBus:orders:RequiresSession"] = "true",
             ["FunctionApp:notify:BaseUrl"] = "https://example.test",
             ["FunctionApp:notify:Code"] = "secret",
         });
@@ -79,7 +79,7 @@ public class AzureConfigurationTests
     LogicAppConfig logicAppConfig = provider.LoadLogicAppConfig(configuration, "workflow");
         ServiceBusConfig busConfig = provider.LoadServiceBusConfig(configuration, "orders");
         FunctionAppConfig functionAppConfig = provider.LoadFunctionAppConfig(configuration, "notify");
-        CosmosContainerDbConfig cosmosConfig = provider.LoadCosmosDbConfig(BuildConfiguration(new Dictionary<string, string?>
+        CosmosDbConfig cosmosConfig = provider.LoadCosmosDbConfig(BuildConfiguration(new Dictionary<string, string?>
         {
             ["CosmosDb:cosmos:ConnectionString"] = "AccountEndpoint=https://cosmos.test/",
             ["CosmosDb:cosmos:DatabaseName"] = "db",
@@ -97,7 +97,7 @@ public class AzureConfigurationTests
         Assert.Equal("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Logic/workflows/OrderProcessor", logicAppConfig.Consumption.WorkflowResourceId);
         Assert.Equal("Endpoint=sb://orders/", busConfig.ConnectionString);
         Assert.Equal("orders", busConfig.EntityName);
-        Assert.True(busConfig.RequiredSession);
+        Assert.True(busConfig.RequiresSession);
         Assert.Equal("https://example.test", functionAppConfig.BaseUrl);
         Assert.Equal("secret", functionAppConfig.Code);
         Assert.Equal("items", cosmosConfig.ContainerName);
@@ -135,6 +135,51 @@ public class AzureConfigurationTests
             () => provider.LoadServiceBusConfig(BuildConfiguration([]), "orders"));
 
         Assert.Contains("there is no 'ServiceBus:orders' entry", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("StorageAccount", "QueueContainerName", "QueueName")]
+    [InlineData("StorageAccount", "TableContainerName", "TableName")]
+    [InlineData("ServiceBus", "RequiredSession", "RequiresSession")]
+    public void ASettingSpelledByItsOldName_IsRefused_NamingTheEntryAndTheNewName(string section, string oldName, string newName)
+    {
+        // Read as it is, the entry would load as if the setting were absent. There is no bridge from the old name.
+        IConfiguration configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            [$"{section}:main:ConnectionString"] = "UseDevelopmentStorage=true",
+            [$"{section}:main:QueueName"] = "orders",
+            [$"{section}:main:{oldName}"] = "true",
+        });
+        DefaultConfigProvider provider = new();
+
+        FrameworkConfigurationException exception = Assert.Throws<FrameworkConfigurationException>(() => section == "ServiceBus"
+            ? provider.LoadServiceBusConfig(configuration, "main")
+            : provider.LoadStorageAccountConfig(configuration, "main"));
+
+        Assert.Contains($"'{section}:main:{oldName}'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains($"'{newName}'", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnEntrySpelledWithTheNewNames_Loads()
+    {
+        IConfiguration configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["StorageAccount:main:ConnectionString"] = "UseDevelopmentStorage=true",
+            ["StorageAccount:main:QueueName"] = "orders",
+            ["StorageAccount:main:TableName"] = "audit",
+            ["ServiceBus:main:ConnectionString"] = "Endpoint=sb://orders/",
+            ["ServiceBus:main:QueueName"] = "orders",
+            ["ServiceBus:main:RequiresSession"] = "true",
+        });
+        DefaultConfigProvider provider = new();
+
+        StorageAccountConfig storage = provider.LoadStorageAccountConfig(configuration, "main");
+        ServiceBusConfig bus = provider.LoadServiceBusConfig(configuration, "main");
+
+        Assert.Equal("orders", storage.QueueName);
+        Assert.Equal("audit", storage.TableName);
+        Assert.True(bus.RequiresSession);
     }
 
     [Fact]
@@ -191,7 +236,7 @@ public class AzureConfigurationTests
         Assert.Equal("https://logic.test", run.Configured<LogicAppConfig>("logic-app").Standard.BaseUrl);
         Assert.Equal("OrderProcessor", run.Configured<LogicAppConfig>("logic-app").WorkflowName);
         Assert.Equal("https://functions.test", run.Configured<FunctionAppConfig>("func").BaseUrl);
-        Assert.Equal("db", run.Configured<CosmosContainerDbConfig>("cosmos").DatabaseName);
+        Assert.Equal("db", run.Configured<CosmosDbConfig>("cosmos").DatabaseName);
         Assert.Equal("queue", run.Configured<ServiceBusConfig>("bus").EntityName);
         Assert.Equal("blob", run.Configured<StorageAccountConfig>("storage").BlobContainerNameRequired);
         Assert.Equal("main", run.Configured<SqlDatabaseConfig>("sql").DatabaseName);
@@ -219,7 +264,7 @@ public class AzureConfigurationTests
             },
         });
 
-        IReadOnlyDictionary<string, string> cosmos = exporter.ExportCosmosDbConfig("cosmos", new CosmosContainerDbConfig
+        IReadOnlyDictionary<string, string> cosmos = exporter.ExportCosmosDbConfig("cosmos", new CosmosDbConfig
         {
             ConnectionString = "AccountEndpoint=https://cosmos.test/",
             DatabaseName = "db",
@@ -231,7 +276,7 @@ public class AzureConfigurationTests
             QueueName = null,
             TopicName = "orders",
             SubscriptionName = "Default",
-            RequiredSession = false,
+            RequiresSession = false,
         });
 
         Assert.Equal("https://logic.test", logicApp["LogicApp:logic:Standard:BaseUrl"]);
@@ -247,7 +292,7 @@ public class AzureConfigurationTests
         Assert.Equal("Endpoint=sb://localhost/;UseDevelopmentEmulator=true;", serviceBus["ServiceBus:bus:ConnectionString"]);
         Assert.Equal("orders", serviceBus["ServiceBus:bus:TopicName"]);
         Assert.Equal("Default", serviceBus["ServiceBus:bus:SubscriptionName"]);
-        Assert.Equal(bool.FalseString, serviceBus["ServiceBus:bus:RequiredSession"]);
+        Assert.Equal(bool.FalseString, serviceBus["ServiceBus:bus:RequiresSession"]);
     }
 
     [Fact]
@@ -262,7 +307,7 @@ public class AzureConfigurationTests
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
-                RequiredSession = true,
+                RequiresSession = true,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender) });
         });
@@ -288,7 +333,7 @@ public class AzureConfigurationTests
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
-                RequiredSession = true,
+                RequiresSession = true,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender) });
         });
@@ -318,7 +363,7 @@ public class AzureConfigurationTests
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender) });
         });
@@ -354,7 +399,7 @@ public class AzureConfigurationTests
             QueueName = "orders",
             TopicName = null,
             SubscriptionName = null,
-            RequiredSession = false,
+            RequiresSession = false,
         };
 
         // Through the resolver, because that is now the only way to obtain what a factory takes - and it
@@ -395,7 +440,7 @@ public class AzureConfigurationTests
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender) });
         });
@@ -428,7 +473,7 @@ public class AzureConfigurationTests
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
-                RequiredSession = true,
+                RequiresSession = true,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender) });
         });
@@ -2148,7 +2193,7 @@ public class AzureConfigurationTests
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
         });
@@ -2172,7 +2217,7 @@ public class AzureConfigurationTests
                 QueueName = "orders",
                 TopicName = null,
                 SubscriptionName = null,
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
         });
@@ -2186,7 +2231,7 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task BlobStorageIsLiveTrigger_UsesContainerValidation()
+    public async Task StorageAccountBlobIsLiveTrigger_UsesContainerValidation()
     {
         FakeBlobContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
@@ -2195,8 +2240,8 @@ public class AzureConfigurationTests
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
-                QueueContainerName = null,
-                TableContainerName = "table",
+                QueueName = null,
+                TableName = "table",
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
         });
@@ -2209,7 +2254,7 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task BlobStorageIsLiveTrigger_AuthenticatedLevel_UsesServiceValidation()
+    public async Task StorageAccountBlobIsLiveTrigger_AuthenticatedLevel_UsesServiceValidation()
     {
         FakeBlobContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
@@ -2218,8 +2263,8 @@ public class AzureConfigurationTests
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
-                QueueContainerName = null,
-                TableContainerName = "table",
+                QueueName = null,
+                TableName = "table",
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
         });
@@ -2233,7 +2278,7 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task TableStorageIsLiveTrigger_UsesTableValidation()
+    public async Task StorageAccountTableIsLiveTrigger_UsesTableValidation()
     {
         FakeTableAdapter table = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
@@ -2242,8 +2287,8 @@ public class AzureConfigurationTests
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
-                QueueContainerName = null,
-                TableContainerName = "table",
+                QueueName = null,
+                TableName = "table",
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
@@ -2257,7 +2302,7 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task TableStorageIsLiveTrigger_AuthenticatedLevel_UsesServiceValidation()
+    public async Task StorageAccountTableIsLiveTrigger_AuthenticatedLevel_UsesServiceValidation()
     {
         FakeTableAdapter table = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
@@ -2266,8 +2311,8 @@ public class AzureConfigurationTests
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
-                QueueContainerName = null,
-                TableContainerName = "table",
+                QueueName = null,
+                TableName = "table",
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
@@ -2282,12 +2327,12 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task CosmosContainerIsLiveTrigger_UsesContainerValidation()
+    public async Task CosmosDbIsLiveTrigger_UsesContainerValidation()
     {
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
@@ -2296,7 +2341,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
-        var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos");
+        var trigger = AzureExt.Trigger.IsLive.CosmosDb("cosmos");
 
         await trigger.Execute(runtime.Context);
 
@@ -2304,12 +2349,12 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task CosmosContainerIsLiveTrigger_AuthenticatedLevel_DoesNotRequireContainerValidation()
+    public async Task CosmosDbIsLiveTrigger_AuthenticatedLevel_DoesNotRequireContainerValidation()
     {
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
@@ -2318,7 +2363,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
-        var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Authenticated);
+        var trigger = AzureExt.Trigger.IsLive.CosmosDb("cosmos", AlivenessLevel.Authenticated);
         trigger.TimeoutOptions.Timeout = Var.Const(TimeSpan.FromMilliseconds(150));
 
         await trigger.Execute(runtime.Context);
@@ -2329,12 +2374,12 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task CosmosContainerIsLiveTrigger_ReachableLevel_UsesEndpointReachabilityValidation()
+    public async Task CosmosDbIsLiveTrigger_ReachableLevel_UsesEndpointReachabilityValidation()
     {
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
@@ -2343,7 +2388,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
-        var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Reachable);
+        var trigger = AzureExt.Trigger.IsLive.CosmosDb("cosmos", AlivenessLevel.Reachable);
         trigger.TimeoutOptions.Timeout = Var.Const(TimeSpan.FromMilliseconds(150));
 
         await trigger.Execute(runtime.Context);
@@ -2354,12 +2399,12 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task CosmosContainerIsLiveTrigger_UsesConfiguredTimeoutForLocalEndpoint()
+    public async Task CosmosDbIsLiveTrigger_UsesConfiguredTimeoutForLocalEndpoint()
     {
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://localhost:8081/;AccountKey=emulator;",
                 DatabaseName = "db",
@@ -2368,7 +2413,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
-        var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos");
+        var trigger = AzureExt.Trigger.IsLive.CosmosDb("cosmos");
         trigger.TimeoutOptions.Timeout = Var.Const(TimeSpan.FromMilliseconds(150));
 
         await trigger.Execute(runtime.Context);
@@ -2377,7 +2422,7 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task CosmosContainerIsLiveTrigger_TimesOutHungValidation()
+    public async Task CosmosDbIsLiveTrigger_TimesOutHungValidation()
     {
         FakeCosmosContainerAdapter container = new()
         {
@@ -2385,7 +2430,7 @@ public class AzureConfigurationTests
         };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://localhost:8081/;AccountKey=emulator;",
                 DatabaseName = "db",
@@ -2394,7 +2439,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
-        var trigger = AzureExt.Trigger.IsLive.Cosmos("cosmos");
+        var trigger = AzureExt.Trigger.IsLive.CosmosDb("cosmos");
         trigger.TimeoutOptions.Timeout = Var.Const(TimeSpan.FromMilliseconds(50));
 
         FrameworkTimeoutException exception = await Assert.ThrowsAsync<FrameworkTimeoutException>(() =>
@@ -2411,7 +2456,7 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
@@ -2420,7 +2465,7 @@ public class AzureConfigurationTests
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { CosmosFactory = new FakeCosmosComponentFactory(container) });
         });
 
-        CosmosDbItemArtifactReference<TestItem> reference = AzureExt.Artifact.DB.CosmosRef<TestItem>("cosmos", "41", new PartitionKey("tenant-1"));
+        CosmosDbItemArtifactReference<TestItem> reference = AzureExt.Artifact.DB.CosmosDbRef<TestItem>("cosmos", "41", new PartitionKey("tenant-1"));
         CosmosDbItemArtifactData<TestItem> data = new(new TestItem("42", "tenant-1", "Ada"));
         runtime.Context.Artifacts.Add<CosmosDbItemArtifactDescriber<TestItem>, CosmosDbItemArtifactData<TestItem>, CosmosDbItemArtifactReference<TestItem>>("item", reference, data);
 
@@ -2438,7 +2483,7 @@ public class AzureConfigurationTests
         FakeCosmosContainerAdapter container = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
@@ -2475,7 +2520,7 @@ public class AzureConfigurationTests
         };
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
@@ -2503,7 +2548,7 @@ public class AzureConfigurationTests
         container.QueryItems.Add(new TestItem("2", "p2", "Grace"));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
-            services.Declare("cosmos", new CosmosContainerDbConfig
+            services.Declare("cosmos", new CosmosDbConfig
             {
                 ConnectionString = "AccountEndpoint=https://cosmos.test/",
                 DatabaseName = "db",
@@ -2544,8 +2589,8 @@ public class AzureConfigurationTests
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
-                QueueContainerName = "queue",
-                TableContainerName = "table",
+                QueueName = "queue",
+                TableName = "table",
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
         });
@@ -2577,8 +2622,8 @@ public class AzureConfigurationTests
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
-                QueueContainerName = "queue",
-                TableContainerName = "table",
+                QueueName = "queue",
+                TableName = "table",
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { BlobFactory = new FakeBlobComponentFactory(container) });
         });
@@ -2595,7 +2640,7 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task TableStorageEntityArtifactDescriber_UsesUnifiedFactoryTable()
+    public async Task StorageAccountTableEntityArtifactDescriber_UsesUnifiedFactoryTable()
     {
         FakeTableAdapter table = new();
         RuntimeContext runtime = RuntimeContext.Create(services =>
@@ -2604,16 +2649,16 @@ public class AzureConfigurationTests
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
-                QueueContainerName = "queue",
-                TableContainerName = "table",
+                QueueName = "queue",
+                TableName = "table",
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
 
-        TableStorageEntityArtifactDescriber<TestTableEntity> describer = new();
-        TableStorageEntityArtifactReference<TestTableEntity> reference = new("storage", Var.Const("orders"), Var.Const("partition"), Var.Const("row"));
+        StorageAccountTableEntityArtifactDescriber<TestTableEntity> describer = new();
+        StorageAccountTableEntityArtifactReference<TestTableEntity> reference = new("storage", Var.Const("orders"), Var.Const("partition"), Var.Const("row"));
         TestTableEntity entity = new() { PartitionKey = "partition", RowKey = "row", Name = "Ada" };
-        TableStorageEntityArtifactData<TestTableEntity> data = new(entity);
+        StorageAccountTableEntityArtifactData<TestTableEntity> data = new(entity);
 
         await describer.Setup(runtime.Context, data, reference);
         await describer.Deconstruct(runtime.Context, reference);
@@ -2625,7 +2670,7 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task TableStorageEntityArtifactReference_ResolveToData_UsesUnifiedFactoryTable()
+    public async Task StorageAccountTableEntityArtifactReference_ResolveToData_UsesUnifiedFactoryTable()
     {
         FakeTableAdapter table = new()
         {
@@ -2637,15 +2682,15 @@ public class AzureConfigurationTests
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
-                QueueContainerName = "queue",
-                TableContainerName = "table",
+                QueueName = "queue",
+                TableName = "table",
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
 
-        TableStorageEntityArtifactReference<TestTableEntity> reference = new("storage", Var.Const("orders"), Var.Const("partition"), Var.Const("row"));
+        StorageAccountTableEntityArtifactReference<TestTableEntity> reference = new("storage", Var.Const("orders"), Var.Const("partition"), Var.Const("row"));
 
-        ArtifactResolveResult<TableStorageEntityArtifactDescriber<TestTableEntity>, TableStorageEntityArtifactData<TestTableEntity>, TableStorageEntityArtifactReference<TestTableEntity>> result =
+        ArtifactResolveResult<StorageAccountTableEntityArtifactDescriber<TestTableEntity>, StorageAccountTableEntityArtifactData<TestTableEntity>, StorageAccountTableEntityArtifactReference<TestTableEntity>> result =
             await reference.ResolveToDataAsync(runtime.Context, ArtifactVersionIdentifier.Default);
 
         Assert.True(result.Found);
@@ -2654,7 +2699,7 @@ public class AzureConfigurationTests
     }
 
     [Fact]
-    public async Task TableStorageEntityArtifactQueryFinder_FindMultiAsync_UsesUnifiedFactoryTable()
+    public async Task StorageAccountTableEntityArtifactQueryFinder_FindMultiAsync_UsesUnifiedFactoryTable()
     {
         FakeTableAdapter table = new();
         table.QueryResults.Add(new TestTableEntity { PartitionKey = "p1", RowKey = "r1", Name = "Ada" });
@@ -2665,13 +2710,13 @@ public class AzureConfigurationTests
             {
                 ConnectionString = "UseDevelopmentStorage=true",
                 BlobContainerName = "blob",
-                QueueContainerName = "queue",
-                TableContainerName = "table",
+                QueueName = "queue",
+                TableName = "table",
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { TableFactory = new FakeTableComponentFactory(table) });
         });
 
-        TableStorageEntityArtifactQueryFinder<TestTableEntity> finder = new("storage", Var.Const("orders"), "PartitionKey ne ''");
+        StorageAccountTableEntityArtifactQueryFinder<TestTableEntity> finder = new("storage", Var.Const("orders"), "PartitionKey ne ''");
 
         ArtifactFinderResultMulti results = await finder.FindMultiAsync(runtime.Context);
 
@@ -2692,7 +2737,7 @@ public class AzureConfigurationTests
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = "default-sub",
-                RequiredSession = true,
+                RequiresSession = true,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
         });
@@ -2720,7 +2765,7 @@ public class AzureConfigurationTests
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = "default-sub",
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(admin: administration) });
         });
@@ -2745,7 +2790,7 @@ public class AzureConfigurationTests
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = "default-sub",
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
@@ -2778,7 +2823,7 @@ public class AzureConfigurationTests
                 QueueName = "orders-queue",
                 TopicName = null,
                 SubscriptionName = null,
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = serviceBusFactory });
         });
@@ -2811,7 +2856,7 @@ public class AzureConfigurationTests
                 QueueName = "orders-session-queue",
                 TopicName = null,
                 SubscriptionName = null,
-                RequiredSession = true,
+                RequiresSession = true,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(sender: sender, pump: pump) });
         });
@@ -2902,7 +2947,7 @@ public class AzureConfigurationTests
                 QueueName = "orders-queue",
                 TopicName = null,
                 SubscriptionName = null,
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
@@ -2927,7 +2972,7 @@ public class AzureConfigurationTests
                 QueueName = "orders-queue",
                 TopicName = null,
                 SubscriptionName = null,
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
@@ -2952,7 +2997,7 @@ public class AzureConfigurationTests
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = null,
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
@@ -2980,7 +3025,7 @@ public class AzureConfigurationTests
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = null,
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { ServiceBusFactory = new FakeServiceBusComponentFactory(pump: pump) });
         });
@@ -3010,7 +3055,7 @@ public class AzureConfigurationTests
                 QueueName = null,
                 TopicName = "orders-topic",
                 SubscriptionName = null,
-                RequiredSession = false,
+                RequiresSession = false,
             });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory());
         });
@@ -3170,7 +3215,7 @@ public class AzureConfigurationTests
 
     private sealed class FakeCosmosComponentFactory(FakeCosmosContainerAdapter container) : ICosmosComponentFactory
     {
-        public ICosmosContainerAdapter CreateContainer(Resolved<CosmosContainerDbConfig> cosmos) => container;
+        public ICosmosContainerAdapter CreateContainer(Resolved<CosmosDbConfig> cosmos) => container;
     }
 
     private sealed class FakeCosmosContainerAdapter : ICosmosContainerAdapter
@@ -3669,11 +3714,11 @@ public class AzureConfigurationTests
         public string[] LoadAllFunctionAppIdentifier(IConfiguration configuration) => new[] { "func" };
         public FunctionAppConfig LoadFunctionAppConfig(IConfiguration configuration, string identifier) => new() { BaseUrl = "https://functions.test", Code = "function-code", AdminCode = "admin" };
         public string[] LoadAllStorageAccountIdentifier(IConfiguration configuration) => new[] { "storage" };
-        public StorageAccountConfig LoadStorageAccountConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "UseDevelopmentStorage=true", BlobContainerName = "blob", QueueContainerName = "queue", TableContainerName = "table" };
+        public StorageAccountConfig LoadStorageAccountConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "UseDevelopmentStorage=true", BlobContainerName = "blob", QueueName = "queue", TableName = "table" };
         public string[] LoadAllCosmosDbIdentifier(IConfiguration configuration) => new[] { "cosmos" };
-        public CosmosContainerDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "AccountEndpoint=https://cosmos.test/", DatabaseName = "db", ContainerName = "items" };
+        public CosmosDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "AccountEndpoint=https://cosmos.test/", DatabaseName = "db", ContainerName = "items" };
         public string[] LoadAllServiceBusIdentifier(IConfiguration configuration) => new[] { "bus" };
-        public ServiceBusConfig LoadServiceBusConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "Endpoint=sb://bus/", QueueName = "queue", TopicName = null, SubscriptionName = null, RequiredSession = false };
+        public ServiceBusConfig LoadServiceBusConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "Endpoint=sb://bus/", QueueName = "queue", TopicName = null, SubscriptionName = null, RequiresSession = false };
         public string[] LoadAllSqlDatabaseIdentifier(IConfiguration configuration) => new[] { "sql" };
         public SqlDatabaseConfig LoadSqlDatabaseConfig(IConfiguration configuration, string identifier) => new() { ConnectionString = "Server=(localdb)\\MSSQLLocalDB;", DatabaseName = "main" };
     }

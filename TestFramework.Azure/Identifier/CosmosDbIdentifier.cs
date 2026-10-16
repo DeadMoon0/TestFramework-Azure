@@ -7,19 +7,19 @@ namespace TestFramework.Azure.Identifier;
 /// </summary>
 /// <param name="Identifier">The configuration key that names the Cosmos DB entry.</param>
 [ClosedShape("An identifier is its name; anything more about a Cosmos container belongs in its configuration.")]
-public sealed record CosmosContainerIdentifier(string Identifier)
+public sealed record CosmosDbIdentifier(string Identifier)
 {
     /// <summary>
     /// Converts a typed identifier to its raw string representation.
     /// </summary>
     /// <param name="id">The typed identifier instance.</param>
-    public static implicit operator string(CosmosContainerIdentifier id) => id.Identifier;
+    public static implicit operator string(CosmosDbIdentifier id) => id.Identifier;
 
     /// <summary>
     /// Converts a raw configuration key to a typed Cosmos DB identifier.
     /// </summary>
     /// <param name="id">The raw configuration key.</param>
-    public static implicit operator CosmosContainerIdentifier(string id) => new CosmosContainerIdentifier(id);
+    public static implicit operator CosmosDbIdentifier(string id) => new CosmosDbIdentifier(id);
 
     /// <summary>
     /// Returns the raw identifier value.

@@ -8,13 +8,13 @@ using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Variables;
 
-namespace TestFramework.Azure.DB.SqlServer;
+namespace TestFramework.Azure.DB.SqlDatabase;
 
 /// <summary>
 /// Sets up and tears down SQL row artifacts.
 /// </summary>
 /// <typeparam name="TRow">The row entity type.</typeparam>
-public class AzureSqlRowArtifactDescriber<TRow> : ArtifactDescriber<AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactReference<TRow>>
+public class SqlDatabaseRowArtifactDescriber<TRow> : ArtifactDescriber<SqlDatabaseRowArtifactDescriber<TRow>, SqlDatabaseRowArtifactData<TRow>, SqlDatabaseRowArtifactReference<TRow>>
     where TRow : class
 {
     /// <summary>
@@ -39,7 +39,7 @@ public class AzureSqlRowArtifactDescriber<TRow> : ArtifactDescriber<AzureSqlRowA
     {
         ArgumentNullException.ThrowIfNull(instance);
 
-        if (instance.Reference is not AzureSqlRowArtifactReference<TRow>)
+        if (instance.Reference is not SqlDatabaseRowArtifactReference<TRow>)
             return null;
 
         return new JObject
@@ -59,7 +59,7 @@ public class AzureSqlRowArtifactDescriber<TRow> : ArtifactDescriber<AzureSqlRowA
     /// </summary>
     public override string? GetSetupParallelizationResourceKey(ArtifactInstanceGeneric artifactInstance)
     {
-        if (artifactInstance.Reference is not AzureSqlRowArtifactReference<TRow> reference)
+        if (artifactInstance.Reference is not SqlDatabaseRowArtifactReference<TRow> reference)
             return base.GetSetupParallelizationResourceKey(artifactInstance);
 
         return $"sql-row:{reference.DbIdentifier}";
@@ -68,7 +68,7 @@ public class AzureSqlRowArtifactDescriber<TRow> : ArtifactDescriber<AzureSqlRowA
     /// <summary>
     /// Ensures the referenced row exists during artifact setup.
     /// </summary>
-    public override async Task Setup(RunContext context, AzureSqlRowArtifactData<TRow> data, AzureSqlRowArtifactReference<TRow> reference)
+    public override async Task Setup(RunContext context, SqlDatabaseRowArtifactData<TRow> data, SqlDatabaseRowArtifactReference<TRow> reference)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
 
@@ -104,7 +104,7 @@ public class AzureSqlRowArtifactDescriber<TRow> : ArtifactDescriber<AzureSqlRowA
     /// <summary>
     /// Removes the referenced row during artifact cleanup.
     /// </summary>
-    public override async Task Deconstruct(RunContext context, AzureSqlRowArtifactReference<TRow> reference)
+    public override async Task Deconstruct(RunContext context, SqlDatabaseRowArtifactReference<TRow> reference)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
         await using DbContext dbContext = resolver.Resolve(context, reference.DbIdentifier);

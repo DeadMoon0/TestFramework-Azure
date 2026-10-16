@@ -19,8 +19,8 @@ namespace TestFramework.Azure.StorageAccount.Table;
 /// Reference to an Azure Table entity addressed by table name, partition key, and row key.
 /// </summary>
 /// <typeparam name="T">The table entity type.</typeparam>
-public class TableStorageEntityArtifactReference<T>
-    : ArtifactReference<TableStorageEntityArtifactReference<T>, TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>>
+public class StorageAccountTableEntityArtifactReference<T>
+    : ArtifactReference<StorageAccountTableEntityArtifactReference<T>, StorageAccountTableEntityArtifactDescriber<T>, StorageAccountTableEntityArtifactData<T>>
     where T : class, ITableEntity
 {
     private readonly VariableReference<string> _tableName;
@@ -38,7 +38,7 @@ public class TableStorageEntityArtifactReference<T>
     /// <param name="tableName">The table name variable.</param>
     /// <param name="partitionKey">The partition key variable.</param>
     /// <param name="rowKey">The row key variable.</param>
-    public TableStorageEntityArtifactReference(StorageAccountIdentifier identifier, VariableReference<string> tableName, VariableReference<string> partitionKey, VariableReference<string> rowKey)
+    public StorageAccountTableEntityArtifactReference(StorageAccountIdentifier identifier, VariableReference<string> tableName, VariableReference<string> partitionKey, VariableReference<string> rowKey)
     {
         Identifier = identifier;
         _tableName = tableName;
@@ -68,21 +68,21 @@ public class TableStorageEntityArtifactReference<T>
     /// <summary>
     /// Resolves the reference into concrete table entity artifact data.
     /// </summary>
-    public override async Task<ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
+    public override async Task<ArtifactResolveResult<StorageAccountTableEntityArtifactDescriber<T>, StorageAccountTableEntityArtifactData<T>, StorageAccountTableEntityArtifactReference<T>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
         ITableAdapter tableClient = context.Services.GetAzureComponentFactory()
             .Table.CreateTable(AzureResources.For<StorageAccountConfig>(context, Identifier), GetTableName(context.Variables));
         TableReadResponse<T> response = await tableClient.GetEntityAsync<T>(GetPartitionKey(context.Variables), GetRowKey(context.Variables), context.Deadline.Token);
         if (response.Found)
         {
-            return new ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>
+            return new ArtifactResolveResult<StorageAccountTableEntityArtifactDescriber<T>, StorageAccountTableEntityArtifactData<T>, StorageAccountTableEntityArtifactReference<T>>
             {
                 Found = true,
-                Data = new TableStorageEntityArtifactData<T>(response.Entity ?? throw new TestFramework.Core.Exceptions.FrameworkStateException("Found table response without entity.")) { Identifier = versionIdentifier }
+                Data = new StorageAccountTableEntityArtifactData<T>(response.Entity ?? throw new TestFramework.Core.Exceptions.FrameworkStateException("Found table response without entity.")) { Identifier = versionIdentifier }
             };
         }
 
-        return new ArtifactResolveResult<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>
+        return new ArtifactResolveResult<StorageAccountTableEntityArtifactDescriber<T>, StorageAccountTableEntityArtifactData<T>, StorageAccountTableEntityArtifactReference<T>>
         {
             Found = false
         };

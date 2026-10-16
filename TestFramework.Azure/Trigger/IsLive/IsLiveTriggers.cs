@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
-using TestFramework.Azure.DB.SqlServer;
+using TestFramework.Azure.DB.SqlDatabase;
 using TestFramework.Azure.FunctionApp;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
@@ -27,7 +27,7 @@ namespace TestFramework.Azure.Trigger.IsLive;
 /// <summary>
 /// Creates liveness triggers for supported Azure resource types.
 /// </summary>
-public class IsLiveTrigger
+public class IsLiveTriggers
 {
     /// <summary>
     /// Creates a Logic App liveness trigger using a constant aliveness level.
@@ -95,7 +95,7 @@ public class IsLiveTrigger
     /// <summary>
     /// Creates a Blob Storage liveness trigger using a variable aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> Blob(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new BlobStorageIsLiveTrigger(identifier, alivenessLevel);
+    public Step<AzureIsLiveResult> Blob(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new StorageAccountBlobIsLiveTrigger(identifier, alivenessLevel);
 
     /// <summary>
     /// Creates a Table Storage liveness trigger using a constant aliveness level.
@@ -112,41 +112,41 @@ public class IsLiveTrigger
     /// <summary>
     /// Creates a Table Storage liveness trigger using a variable aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> Table(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new TableStorageIsLiveTrigger(identifier, alivenessLevel);
+    public Step<AzureIsLiveResult> Table(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new StorageAccountTableIsLiveTrigger(identifier, alivenessLevel);
 
     /// <summary>
     /// Creates a Cosmos DB liveness trigger using a constant aliveness level.
     /// </summary>
     /// <remarks>Uses <c>AlivenessLevel.Resource</c> for <c>alivenessLevel</c>; the other overload states it.</remarks>
-    public Step<AzureIsLiveResult> Cosmos(CosmosContainerIdentifier identifier)
-        => this.Cosmos(identifier, AlivenessLevel.Resource);
+    public Step<AzureIsLiveResult> CosmosDb(CosmosDbIdentifier identifier)
+        => this.CosmosDb(identifier, AlivenessLevel.Resource);
 
     /// <summary>
     /// Creates a Cosmos DB liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> Cosmos(CosmosContainerIdentifier identifier, AlivenessLevel alivenessLevel) => Cosmos(identifier, Var.Const(alivenessLevel));
+    public Step<AzureIsLiveResult> CosmosDb(CosmosDbIdentifier identifier, AlivenessLevel alivenessLevel) => CosmosDb(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a Cosmos DB liveness trigger using a variable aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> Cosmos(CosmosContainerIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new CosmosContainerIsLiveTrigger(identifier, alivenessLevel);
+    public Step<AzureIsLiveResult> CosmosDb(CosmosDbIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new CosmosDbIsLiveTrigger(identifier, alivenessLevel);
 
     /// <summary>
     /// Creates a SQL database liveness trigger using a constant aliveness level.
     /// </summary>
     /// <remarks>Uses <c>AlivenessLevel.Resource</c> for <c>alivenessLevel</c>; the other overload states it.</remarks>
-    public Step<AzureIsLiveResult> Sql(SqlDatabaseIdentifier identifier)
-        => this.Sql(identifier, AlivenessLevel.Resource);
+    public Step<AzureIsLiveResult> SqlDatabase(SqlDatabaseIdentifier identifier)
+        => this.SqlDatabase(identifier, AlivenessLevel.Resource);
 
     /// <summary>
     /// Creates a SQL database liveness trigger using a constant aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> Sql(SqlDatabaseIdentifier identifier, AlivenessLevel alivenessLevel) => Sql(identifier, Var.Const(alivenessLevel));
+    public Step<AzureIsLiveResult> SqlDatabase(SqlDatabaseIdentifier identifier, AlivenessLevel alivenessLevel) => SqlDatabase(identifier, Var.Const(alivenessLevel));
 
     /// <summary>
     /// Creates a SQL database liveness trigger using a variable aliveness level.
     /// </summary>
-    public Step<AzureIsLiveResult> Sql(SqlDatabaseIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new SqlDatabaseIsLiveTrigger(identifier, alivenessLevel);
+    public Step<AzureIsLiveResult> SqlDatabase(SqlDatabaseIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) => new SqlDatabaseIsLiveTrigger(identifier, alivenessLevel);
 }
 
 internal abstract class AzureIsLiveTriggerBase(string resourceKind, string resourceIdentifier, VariableReference<AlivenessLevel> alivenessLevel) : Step<AzureIsLiveResult>
@@ -321,13 +321,13 @@ internal sealed class ServiceBusIsLiveTrigger(ServiceBusIdentifier identifier, V
         => [new EnvironmentRequirement(AzureResourceKinds.ServiceBus, identifier)];
 }
 
-internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.Storage, identifier, alivenessLevel), IHasEnvironmentRequirements
+internal sealed class StorageAccountBlobIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.StorageAccount, identifier, alivenessLevel), IHasEnvironmentRequirements
 {
-    public override string Name => "Blob Storage IsLive Trigger";
+    public override string Name => "StorageAccount Blob IsLive Trigger";
 
     public override string Description => "Checks whether the configured Blob container is reachable with the configured credentials.";
 
-    public override Step<AzureIsLiveResult> Clone() => new BlobStorageIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
+    public override Step<AzureIsLiveResult> Clone() => new StorageAccountBlobIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
@@ -345,23 +345,23 @@ internal sealed class BlobStorageIsLiveTrigger(StorageAccountIdentifier identifi
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureResourceKinds.Storage, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.StorageAccount, identifier)];
 }
 
-internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.Storage, identifier, alivenessLevel), IHasEnvironmentRequirements
+internal sealed class StorageAccountTableIsLiveTrigger(StorageAccountIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.StorageAccount, identifier, alivenessLevel), IHasEnvironmentRequirements
 {
-    public override string Name => "Table Storage IsLive Trigger";
+    public override string Name => "StorageAccount Table IsLive Trigger";
 
     public override string Description => "Checks whether the configured Table storage table is reachable with the configured credentials.";
 
-    public override Step<AzureIsLiveResult> Clone() => new TableStorageIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
+    public override Step<AzureIsLiveResult> Clone() => new StorageAccountTableIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
         Resolved<StorageAccountConfig> account = AzureResources.For<StorageAccountConfig>(context, identifier);
         ITableAdapter table = context.Services.GetAzureComponentFactory()
-            .Table.CreateTable(account, account.Value.TableContainerNameRequired);
+            .Table.CreateTable(account, account.Value.TableNameRequired);
         if (currentAlivenessLevel == AlivenessLevel.Resource)
         {
             await table.ValidateConnectionAsync(context.Deadline.Token);
@@ -373,21 +373,21 @@ internal sealed class TableStorageIsLiveTrigger(StorageAccountIdentifier identif
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureResourceKinds.Storage, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.StorageAccount, identifier)];
 }
 
-internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.Cosmos, identifier, alivenessLevel), IHasEnvironmentRequirements
+internal sealed class CosmosDbIsLiveTrigger(CosmosDbIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.CosmosDb, identifier, alivenessLevel), IHasEnvironmentRequirements
 {
-    public override string Name => "Cosmos Container IsLive Trigger";
+    public override string Name => "CosmosDb IsLive Trigger";
 
     public override string Description => "Checks whether the configured Cosmos container is reachable with the configured credentials.";
 
-    public override Step<AzureIsLiveResult> Clone() => new CosmosContainerIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
+    public override Step<AzureIsLiveResult> Clone() => new CosmosDbIsLiveTrigger(identifier, AlivenessLevelReference).WithClonedOptions(this);
 
     public override async Task<AzureIsLiveResult?> Execute(RunContext context)
     {
         AlivenessLevel currentAlivenessLevel = GetAlivenessLevel(context.Variables);
-        Resolved<CosmosContainerDbConfig> cosmos = AzureResources.For<CosmosContainerDbConfig>(context, identifier);
+        Resolved<CosmosDbConfig> cosmos = AzureResources.For<CosmosDbConfig>(context, identifier);
         TimeSpan timeout = TimeoutOptions.Timeout.GetValue(context.Variables);
         if (timeout <= TimeSpan.Zero)
         {
@@ -420,7 +420,7 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureResourceKinds.Cosmos, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.CosmosDb, identifier)];
 
     private async Task<AzureIsLiveResult?> ExecuteWithTimeoutAsync(VariableStore variableStore, TimeSpan timeout, CancellationToken cancellationToken, Func<CancellationToken, Task> action, string timeoutMessage)
     {
@@ -444,7 +444,7 @@ internal sealed class CosmosContainerIsLiveTrigger(CosmosContainerIdentifier ide
     }
 }
 
-internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.Sql, identifier, alivenessLevel), IHasEnvironmentRequirements
+internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier, VariableReference<AlivenessLevel> alivenessLevel) : AzureIsLiveTriggerBase(AzureResourceKinds.SqlDatabase, identifier, alivenessLevel), IHasEnvironmentRequirements
 {
     public override string Name => "SqlDatabase IsLive Trigger";
 
@@ -465,5 +465,5 @@ internal sealed class SqlDatabaseIsLiveTrigger(SqlDatabaseIdentifier identifier,
     }
 
     public IReadOnlyCollection<EnvironmentRequirement> GetEnvironmentRequirements(VariableStore variableStore)
-        => [new EnvironmentRequirement(AzureResourceKinds.Sql, identifier)];
+        => [new EnvironmentRequirement(AzureResourceKinds.SqlDatabase, identifier)];
 }

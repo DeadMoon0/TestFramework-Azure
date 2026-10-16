@@ -38,7 +38,7 @@ public interface IConfigExporter
     /// <param name="identifier">The logical identifier to export under.</param>
     /// <param name="config">The configuration record to flatten.</param>
     /// <returns>A key/value map suitable for configuration providers such as in-memory collections.</returns>
-    IReadOnlyDictionary<string, string> ExportCosmosDbConfig(string identifier, CosmosContainerDbConfig config);
+    IReadOnlyDictionary<string, string> ExportCosmosDbConfig(string identifier, CosmosDbConfig config);
 
     /// <summary>
     /// Exports a Service Bus configuration record.

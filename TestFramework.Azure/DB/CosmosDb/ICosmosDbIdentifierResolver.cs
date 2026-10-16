@@ -1,6 +1,6 @@
 ﻿using Microsoft.Azure.Cosmos;
 
-namespace TestFramework.Azure.DB.CosmosDB;
+namespace TestFramework.Azure.DB.CosmosDb;
 
 /// <summary>
 /// Resolves document identity fields used by Cosmos DB artifacts and query finders.

@@ -70,7 +70,7 @@ public interface IConfigProvider
     /// <param name="configuration">The configuration source to inspect.</param>
     /// <param name="identifier">The logical Cosmos DB identifier used by the Azure DSL.</param>
     /// <returns>The resolved Cosmos DB container configuration.</returns>
-    public CosmosContainerDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier);
+    public CosmosDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier);
 
     /// <summary>
     /// Returns every configured Service Bus identifier.

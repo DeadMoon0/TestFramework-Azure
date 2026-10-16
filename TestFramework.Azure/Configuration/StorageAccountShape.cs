@@ -34,7 +34,7 @@ internal sealed class StorageAccountShape(IConfigProvider provider) : ConfigShap
     public override string Section => DefaultConfigProvider.StorageAccountSelector;
 
     /// <inheritdoc />
-    public override ResourceKind Kind => AzureResourceKinds.StorageKind;
+    public override ResourceKind Kind => AzureResourceKinds.StorageAccountKind;
 
     /// <inheritdoc />
     public override IReadOnlyList<string> Identifiers(IConfiguration configuration)
@@ -65,9 +65,9 @@ internal sealed class StorageAccountShape(IConfigProvider provider) : ConfigShap
             values[new ValueKey(ValueNames.ConnectionString, ResourceVantage.Network)] = connectionString;
         }
 
-        if (config.QueueContainerName is { Length: > 0 } queueContainer)
+        if (config.QueueName is { Length: > 0 } queueName)
         {
-            values[new ValueKey(AzureResourceKinds.QueueNameValue)] = queueContainer;
+            values[new ValueKey(AzureResourceKinds.QueueNameValue)] = queueName;
         }
 
         if (config.BlobContainerName is { Length: > 0 } blobContainer)
@@ -75,9 +75,9 @@ internal sealed class StorageAccountShape(IConfigProvider provider) : ConfigShap
             values[new ValueKey(AzureResourceKinds.BlobContainerNameValue)] = blobContainer;
         }
 
-        if (config.TableContainerName is { Length: > 0 } tableContainer)
+        if (config.TableName is { Length: > 0 } tableName)
         {
-            values[new ValueKey(AzureResourceKinds.TableContainerNameValue)] = tableContainer;
+            values[new ValueKey(AzureResourceKinds.TableNameValue)] = tableName;
         }
 
         return values;
@@ -96,9 +96,9 @@ internal sealed class StorageAccountShape(IConfigProvider provider) : ConfigShap
         return new StorageAccountConfig
         {
             ConnectionString = Text(values, ValueNames.ConnectionString) ?? throw Missing(ValueNames.ConnectionString, identifier, values),
-            QueueContainerName = Text(values, AzureResourceKinds.QueueNameValue),
+            QueueName = Text(values, AzureResourceKinds.QueueNameValue),
             BlobContainerName = Text(values, AzureResourceKinds.BlobContainerNameValue),
-            TableContainerName = Text(values, AzureResourceKinds.TableContainerNameValue),
+            TableName = Text(values, AzureResourceKinds.TableNameValue),
         };
     }
 

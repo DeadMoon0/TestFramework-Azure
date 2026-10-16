@@ -23,7 +23,7 @@ public sealed record StorageAccountConfig
     /// <summary>
     /// Optional queue name when queue-backed storage operations need a default queue.
     /// </summary>
-    public string? QueueContainerName { get; init; }
+    public string? QueueName { get; init; }
 
     /// <summary>
     /// Optional blob container name used by blob artifact helpers and blob liveness checks.
@@ -33,12 +33,12 @@ public sealed record StorageAccountConfig
     /// <summary>
     /// Optional table name used by table artifact helpers and table liveness checks.
     /// </summary>
-    public string? TableContainerName { get; init; }
+    public string? TableName { get; init; }
 
     /// <summary>
     /// Gets the configured queue name or throws when no queue name has been supplied.
     /// </summary>
-    public string QueueContainerNameRequired => QueueContainerName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("QueueContainerName is required.");
+    public string QueueNameRequired => QueueName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("QueueName is required.");
 
     /// <summary>
     /// Gets the configured blob container name or throws when no blob container name has been supplied.
@@ -48,5 +48,5 @@ public sealed record StorageAccountConfig
     /// <summary>
     /// Gets the configured table name or throws when no table name has been supplied.
     /// </summary>
-    public string TableContainerNameRequired => TableContainerName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("TableContainerName is required.");
+    public string TableNameRequired => TableName ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException("TableName is required.");
 }

@@ -69,7 +69,7 @@ public class ReadmeSamplesTests
             RunContext run = RunContext.Detached(provider);
 
             Assert.Equal("https://functions.test/", run.Configured<FunctionAppConfig>("Default").BaseUrl);
-            Assert.Equal("Orders", run.Configured<CosmosContainerDbConfig>("MainDb").ContainerName);
+            Assert.Equal("Orders", run.Configured<CosmosDbConfig>("MainDb").ContainerName);
             Assert.Equal("orders", run.Configured<ServiceBusConfig>("MainSBQueue").EntityName);
         }
         finally
@@ -458,7 +458,7 @@ public class ReadmeSamplesTests
 
         using ServiceProvider provider = (ServiceProvider)config.BuildServiceProvider();
         ICosmosClientOptionsProvider optionsProvider = provider.GetRequiredService<ICosmosClientOptionsProvider>();
-        CosmosContainerDbConfig cosmosConfig = RunContext.Detached(provider).Configured<CosmosContainerDbConfig>("MainDb");
+        CosmosDbConfig cosmosConfig = RunContext.Detached(provider).Configured<CosmosDbConfig>("MainDb");
 
         Assert.Equal(ConnectionMode.Gateway, optionsProvider.CreateOptions(cosmosConfig).ConnectionMode);
     }
@@ -466,7 +466,7 @@ public class ReadmeSamplesTests
     [Fact]
     public void FindDataArtifact_CreatesCosmosQueryFinderFromReadmeSample()
     {
-        object finder = AzureExt.ArtifactFinder.DB.CosmosQuery<ReadmeCosmosItem>(
+        object finder = AzureExt.ArtifactFinder.DB.CosmosDbQuery<ReadmeCosmosItem>(
             "MainDb",
             new QueryDefinition("SELECT * FROM c WHERE c.number = 1"));
 
@@ -527,7 +527,7 @@ public class ReadmeSamplesTests
 
     private sealed class NotSupportedCosmosFactory : ICosmosComponentFactory
     {
-        public ICosmosContainerAdapter CreateContainer(Resolved<CosmosContainerDbConfig> cosmos) => throw new NotSupportedException();
+        public ICosmosContainerAdapter CreateContainer(Resolved<CosmosDbConfig> cosmos) => throw new NotSupportedException();
     }
 
     private sealed class NotSupportedBlobFactory : IBlobComponentFactory

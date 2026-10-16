@@ -33,7 +33,7 @@ public sealed class ConfigRecordTextTests
 
         Assert.Equal(
             [
-                "CosmosContainerDbConfig.ConnectionString",
+                "CosmosDbConfig.ConnectionString",
                 "FunctionAppConfig.AdminCode",
                 "FunctionAppConfig.Code",
                 "LogicAppConsumptionConfig.InvokeUrl",

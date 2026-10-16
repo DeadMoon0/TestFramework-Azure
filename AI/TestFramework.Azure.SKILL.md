@@ -50,8 +50,8 @@
     - AzureExt.Event.LogicApp.RunCompleted("logic", runId, workflowName) is for stateful workflows only
     - AzureExt.Trigger.ServiceBus.Send("configName", message)
     - AzureExt.Event.ServiceBus.MessageReceived("configName").WithMessageId(v).WithCorrelationId(v).Where(v).CompleteMessage(false).WithTempSubscription(); each narrowing returns a new event
-    - AzureExt.Trigger.IsLive.Cosmos("configName")
-    - AzureExt.ArtifactFinder.DB.CosmosQuery<T>("configName", queryDefinition)
+    - AzureExt.Trigger.IsLive.CosmosDb("configName")
+    - AzureExt.ArtifactFinder.DB.CosmosDbQuery<T>("configName", queryDefinition)
     - Config extensions such as LoadAzureConfig() prepare Azure-specific configuration.
 
     Operational hint:
@@ -71,7 +71,7 @@
 
 <config_model>
     Important configuration ideas:
-    - identifiers such as FunctionAppIdentifier, ServiceBusIdentifier, CosmosContainerIdentifier, SqlDatabaseIdentifier, and StorageAccountIdentifier are thin named wrappers
+    - identifiers such as FunctionAppIdentifier, ServiceBusIdentifier, CosmosDbIdentifier, SqlDatabaseIdentifier, and StorageAccountIdentifier are thin named wrappers
     - LoadAzureConfig declares which sections the package reads; the run reads them once before the first step, and a container can publish an entry at run time
     - LoadAzureConfig() is the standard preparation path when using TestFramework.Config
     - named config entries are the boundary between the test timeline and the real Azure environment
@@ -155,8 +155,8 @@
     - IConfigProvider: project-to-TestFramework.Azure config adapter seam
     - DefaultConfigProvider: default reader for the package's standard section names
     - ConfigLoader: registers one config shape per Azure resource kind, which tells the run how to read and publish that kind
-    - FunctionAppIdentifier / ServiceBusIdentifier / CosmosContainerIdentifier / SqlDatabaseIdentifier / StorageAccountIdentifier: named identifiers that bind test code to configured resources
-    - FunctionAppConfig / ServiceBusConfig / CosmosContainerDbConfig / SqlDatabaseConfig / StorageAccountConfig: concrete config records resolved from IConfiguration
+    - FunctionAppIdentifier / ServiceBusIdentifier / CosmosDbIdentifier / SqlDatabaseIdentifier / StorageAccountIdentifier: named identifiers that bind test code to configured resources
+    - FunctionAppConfig / ServiceBusConfig / CosmosDbConfig / SqlDatabaseConfig / StorageAccountConfig: concrete config records resolved from IConfiguration
 
     Discovery heuristics for the agent:
     - If users talk about "our config naming", "mapping our settings", or "custom Azure config", they usually need IConfigProvider.

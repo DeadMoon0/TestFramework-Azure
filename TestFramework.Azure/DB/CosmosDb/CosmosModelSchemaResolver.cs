@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json.Serialization;
 
-namespace TestFramework.Azure.DB.CosmosDB;
+namespace TestFramework.Azure.DB.CosmosDb;
 
 /// <summary>
 /// Resolves Cosmos document identity metadata from CLR models and JSON serialization attributes.

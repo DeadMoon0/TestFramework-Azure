@@ -6,7 +6,7 @@ using TestFramework.Azure.Identifier;
 using TestFramework.Config;
 using TestFramework.Core.Steps;
 
-namespace TestFramework.Azure.DB.SqlServer;
+namespace TestFramework.Azure.DB.SqlDatabase;
 
 /// <summary>
 /// Says how a SQL identifier turns into an EF Core <c>DbContext</c>.

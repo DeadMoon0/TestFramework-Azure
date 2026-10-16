@@ -16,7 +16,7 @@
 		<PackageTags>Test;UnitTest;IntegrationTest;Framework;Fluent;Timeline;Azure;Functions</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<Copyright>Copyright (c) DeadMoon0 2026</Copyright>
-		<PackageReleaseNotes>First release: in-process Function App execution and attribute-driven endpoint selection, moved out of TestFramework.Azure.</PackageReleaseNotes>
+		<PackageReleaseNotes>First release: in-process Function App execution and attribute-driven endpoint selection, moved out of TestFramework.Azure. Its extensions sit on AzureExt.FunctionAppTriggers, and [HttpTrigger] is read typed from Microsoft.Azure.Functions.Worker.Extensions.Http 3.3.0, which the package now brings.</PackageReleaseNotes>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -27,11 +27,12 @@
 		     reaches through that package's public surface, as any other consumer would. -->
 	</ItemGroup>
 
-	<!-- ASP.NET Core for the in-process HTTP request and IActionResult; the Functions Worker for the typed
-	     [Function] attribute. These are why this package exists apart from TestFramework.Azure. -->
+	<!-- ASP.NET Core for the in-process HTTP request and IActionResult; the Functions Worker and its HTTP extension for the typed
+	     [Function] and [HttpTrigger] attributes. These are why this package exists apart from TestFramework.Azure. -->
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 		<PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.1.0" />
+		<PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.3.0" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageReference Include="TestFramework.Core" Version="0.7.0" />
 	</ItemGroup>

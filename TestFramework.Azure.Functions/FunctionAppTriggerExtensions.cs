@@ -15,7 +15,7 @@ namespace TestFramework.Azure.Functions;
 /// attributes, and in-process HTTP execution.
 /// </summary>
 /// <remarks>
-/// They extend <see cref="AzureExt.FunctionAppTrigger"/>, so the call reads <c>AzureExt.Trigger.FunctionApp.InProcessHttp&lt;T&gt;(...)</c>
+/// They extend <see cref="AzureExt.FunctionAppTriggers"/>, so the call reads <c>AzureExt.Trigger.FunctionApp.InProcessHttp&lt;T&gt;(...)</c>
 /// as it does for the remote triggers.
 /// </remarks>
 public static class FunctionAppTriggerExtensions
@@ -35,7 +35,7 @@ public static class FunctionAppTriggerExtensions
     /// <c>ManagedFunction(identifier, functionName)</c>, or reach an HTTP-triggered one over
     /// <c>Http(identifier).SelectFunction(name, method)</c>.
     /// </remarks>
-    public static Step<ManagedResult> Managed<TFunction>(this AzureExt.FunctionAppTrigger trigger, FunctionAppIdentifier identifier, string methodName)
+    public static Step<ManagedResult> Managed<TFunction>(this AzureExt.FunctionAppTriggers trigger, FunctionAppIdentifier identifier, string methodName)
         where TFunction : notnull
     {
         ArgumentNullException.ThrowIfNull(trigger);
@@ -49,7 +49,7 @@ public static class FunctionAppTriggerExtensions
     /// <param name="trigger">The Function App trigger factory.</param>
     /// <param name="action">The delegate that executes the in-process function logic.</param>
     /// <returns>The payload stage for building the request.</returns>
-    public static IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(this AzureExt.FunctionAppTrigger trigger, Action<TFunction, FunctionAppHttpInProcessCallProxy> action)
+    public static IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(this AzureExt.FunctionAppTriggers trigger, Action<TFunction, FunctionAppHttpInProcessCallProxy> action)
         where TFunction : notnull
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -67,7 +67,7 @@ public static class FunctionAppTriggerExtensions
     /// <param name="trigger">The Function App trigger factory.</param>
     /// <param name="action">The asynchronous delegate that executes the in-process function logic.</param>
     /// <returns>The payload stage for building the request.</returns>
-    public static IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(this AzureExt.FunctionAppTrigger trigger, Func<TFunction, FunctionAppHttpInProcessCallProxy, Task> action)
+    public static IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(this AzureExt.FunctionAppTriggers trigger, Func<TFunction, FunctionAppHttpInProcessCallProxy, Task> action)
         where TFunction : notnull
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -85,7 +85,7 @@ public static class FunctionAppTriggerExtensions
     /// <param name="trigger">The Function App trigger factory.</param>
     /// <param name="func">The delegate that executes the in-process function logic.</param>
     /// <returns>The payload stage for building the request.</returns>
-    public static IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(this AzureExt.FunctionAppTrigger trigger, Func<TFunction, FunctionAppHttpInProcessCallProxy, IActionResult> func)
+    public static IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(this AzureExt.FunctionAppTriggers trigger, Func<TFunction, FunctionAppHttpInProcessCallProxy, IActionResult> func)
         where TFunction : notnull
     {
         ArgumentNullException.ThrowIfNull(func);
@@ -99,7 +99,7 @@ public static class FunctionAppTriggerExtensions
     /// <param name="trigger">The Function App trigger factory.</param>
     /// <param name="func">The asynchronous delegate that executes the in-process function logic.</param>
     /// <returns>The payload stage for building the request.</returns>
-    public static IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(this AzureExt.FunctionAppTrigger trigger, Func<TFunction, FunctionAppHttpInProcessCallProxy, Task<IActionResult>> func)
+    public static IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(this AzureExt.FunctionAppTriggers trigger, Func<TFunction, FunctionAppHttpInProcessCallProxy, Task<IActionResult>> func)
         where TFunction : notnull
     {
         ArgumentNullException.ThrowIfNull(func);
@@ -108,7 +108,7 @@ public static class FunctionAppTriggerExtensions
 
     // One shape for all four overloads: the request is composed by the same payload stage a remote call uses, and only
     // the step that receives it differs.
-    private static FunctionAppHttpPayloadBuilder InProcess<TFunction>(AzureExt.FunctionAppTrigger trigger, Func<TFunction, FunctionAppHttpInProcessCallProxy, Task<IActionResult?>> action)
+    private static FunctionAppHttpPayloadBuilder InProcess<TFunction>(AzureExt.FunctionAppTriggers trigger, Func<TFunction, FunctionAppHttpInProcessCallProxy, Task<IActionResult?>> action)
         where TFunction : notnull
     {
         ArgumentNullException.ThrowIfNull(trigger);

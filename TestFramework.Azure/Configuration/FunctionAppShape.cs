@@ -35,7 +35,7 @@ namespace TestFramework.Azure.Configuration;
 internal sealed class FunctionAppShape(IConfigProvider provider) : ConfigShape<FunctionAppConfig>
 {
     /// <inheritdoc />
-    public override string Section => DefaultConfigProvider.FunctionAppBaseSelector;
+    public override string Section => DefaultConfigProvider.FunctionAppSelector;
 
     /// <inheritdoc />
     public override ResourceKind Kind => AzureResourceKinds.FunctionAppKind;

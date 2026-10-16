@@ -14,7 +14,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration.SpecificConfigs;
-using TestFramework.Azure.DB.CosmosDB;
+using TestFramework.Azure.DB.CosmosDb;
 
 using TestFramework.Azure.ServiceBus;
 
@@ -69,7 +69,7 @@ internal readonly record struct TableReadResponse<T>(bool Found, T? Entity) wher
 
 internal interface ICosmosComponentFactory
 {
-    ICosmosContainerAdapter CreateContainer(Resolved<CosmosContainerDbConfig> container);
+    ICosmosContainerAdapter CreateContainer(Resolved<CosmosDbConfig> container);
 }
 
 internal interface ICosmosContainerAdapter
@@ -175,9 +175,9 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
 
     private sealed class DefaultCosmosComponentFactory(IServiceProvider serviceProvider, AzureClientCache clientCache, IHttpComponentFactory http) : ICosmosComponentFactory
     {
-        public ICosmosContainerAdapter CreateContainer(Resolved<CosmosContainerDbConfig> container)
+        public ICosmosContainerAdapter CreateContainer(Resolved<CosmosDbConfig> container)
         {
-            CosmosContainerDbConfig config = container.Value;
+            CosmosDbConfig config = container.Value;
 
             // Keyed by the whole config record: CosmosClient is a documented singleton, and the
             // options provider may return different options for different configurations.
@@ -303,7 +303,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         }
     }
 
-    private sealed class DefaultCosmosContainerAdapter(CosmosClient client, CosmosContainerDbConfig config, IHttpRequestSender http) : ICosmosContainerAdapter
+    private sealed class DefaultCosmosContainerAdapter(CosmosClient client, CosmosDbConfig config, IHttpRequestSender http) : ICosmosContainerAdapter
     {
         private Container GetContainer()
         {
@@ -372,7 +372,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
                 await page.Content.CopyToAsync(buffer, cancellationToken);
                 buffer.Position = 0;
 
-                foreach (TItem item in TestFramework.Azure.DB.CosmosDB.CosmosJson.ReadQueryPage<TItem>(buffer))
+                foreach (TItem item in TestFramework.Azure.DB.CosmosDb.CosmosJson.ReadQueryPage<TItem>(buffer))
                 {
                     yield return item;
                 }
@@ -441,7 +441,7 @@ internal sealed class DefaultAzureComponentFactory : IAzureComponentFactory
         {
             // Queue first, as the receive mode decides: the entry names one entity, and this asks the same question
             // the mode did rather than a second one that could answer differently.
-            if (config.RequiredSession)
+            if (config.RequiresSession)
             {
                 _sessionProcessor = config.IsQueue
                     ? client.CreateSessionProcessor(config.QueueName, new ServiceBusSessionProcessorOptions { AutoCompleteMessages = false })

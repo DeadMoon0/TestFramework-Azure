@@ -26,19 +26,19 @@ public enum AzureKnownResourceKind
     ServiceBus,
 
     /// <summary>
-    /// Azure Storage.
+    /// Azure Storage Account.
     /// </summary>
-    Storage,
+    StorageAccount,
 
     /// <summary>
     /// Azure Cosmos DB.
     /// </summary>
-    Cosmos,
+    CosmosDb,
 
     /// <summary>
-    /// Azure SQL.
+    /// Azure SQL Database.
     /// </summary>
-    Sql
+    SqlDatabase
 }
 
 internal static class AzureKnownResourceKindResolver
@@ -50,9 +50,9 @@ internal static class AzureKnownResourceKindResolver
             AzureResourceKinds.FunctionApp => AzureKnownResourceKind.FunctionApp,
             AzureResourceKinds.LogicApp => AzureKnownResourceKind.LogicApp,
             AzureResourceKinds.ServiceBus => AzureKnownResourceKind.ServiceBus,
-            AzureResourceKinds.Storage => AzureKnownResourceKind.Storage,
-            AzureResourceKinds.Cosmos => AzureKnownResourceKind.Cosmos,
-            AzureResourceKinds.Sql => AzureKnownResourceKind.Sql,
+            AzureResourceKinds.StorageAccount => AzureKnownResourceKind.StorageAccount,
+            AzureResourceKinds.CosmosDb => AzureKnownResourceKind.CosmosDb,
+            AzureResourceKinds.SqlDatabase => AzureKnownResourceKind.SqlDatabase,
             _ => AzureKnownResourceKind.Unknown
         };
     }

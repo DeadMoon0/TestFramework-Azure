@@ -13,7 +13,7 @@ using TestFramework.Core.Exceptions;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Variables;
 
-namespace TestFramework.Azure.DB.CosmosDB;
+namespace TestFramework.Azure.DB.CosmosDb;
 
 /// <summary>
 /// Sets up and tears down Cosmos DB item artifacts.
@@ -57,7 +57,7 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
     public override async Task Deconstruct(RunContext context, CosmosDbItemArtifactReference<TItem> reference)
     {
         ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory()
-            .Cosmos.CreateContainer(AzureResources.For<CosmosContainerDbConfig>(context, reference.DbIdentifier));
+            .Cosmos.CreateContainer(AzureResources.For<CosmosDbConfig>(context, reference.DbIdentifier));
 
         await container.DeleteItemAsync<TItem>(reference.GetId(context.Variables), reference.GetPartitionKey(context.Variables), context.Deadline.Token);
 
@@ -69,8 +69,8 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
     /// </summary>
     public override async Task Setup(RunContext context, CosmosDbItemArtifactData<TItem> data, CosmosDbItemArtifactReference<TItem> reference)
     {
-        Resolved<CosmosContainerDbConfig> cosmos = AzureResources.For<CosmosContainerDbConfig>(context, reference.DbIdentifier);
-        CosmosContainerDbConfig config = cosmos.Value;
+        Resolved<CosmosDbConfig> cosmos = AzureResources.For<CosmosDbConfig>(context, reference.DbIdentifier);
+        CosmosDbConfig config = cosmos.Value;
         ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory().Cosmos.CreateContainer(cosmos);
 
         ICosmosDbIdentifierResolver resolver = context.Services.GetService<ICosmosDbIdentifierResolver>() ?? new DefaultCosmosDbIdentifierResolver();
@@ -90,7 +90,7 @@ public class CosmosDbItemArtifactDescriber<TItem> : ArtifactDescriber<CosmosDbIt
                     RecoverySteps =
                     [
                         "Give the reference the item's own id and partition key.",
-                        "Or let setup read them from the item: AddCosmosItemArtifact(name, container, item).",
+                        "Or let setup read them from the item: AddCosmosDbItemArtifact(name, container, item).",
                     ],
                 };
             }

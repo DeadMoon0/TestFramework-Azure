@@ -73,15 +73,15 @@ public class AzureSurfaceTests
         var serviceBus = AzureExt.Trigger.IsLive.ServiceBus("bus", AlivenessLevel.Authenticated);
         var blob = AzureExt.Trigger.IsLive.Blob("storage", AlivenessLevel.Authenticated);
         var table = AzureExt.Trigger.IsLive.Table("storage", AlivenessLevel.Authenticated);
-        var cosmos = AzureExt.Trigger.IsLive.Cosmos("cosmos", AlivenessLevel.Authenticated);
-        var sql = AzureExt.Trigger.IsLive.Sql("sql", AlivenessLevel.Authenticated);
+        var cosmos = AzureExt.Trigger.IsLive.CosmosDb("cosmos", AlivenessLevel.Authenticated);
+        var sql = AzureExt.Trigger.IsLive.SqlDatabase("sql", AlivenessLevel.Authenticated);
 
         Assert.Equal("LogicApp IsLive Trigger", logicApp.Name);
         Assert.Equal("FunctionApp IsLive Trigger", functionApp.Name);
         Assert.Equal("ServiceBus IsLive Trigger", serviceBus.Name);
-        Assert.Equal("Blob Storage IsLive Trigger", blob.Name);
-        Assert.Equal("Table Storage IsLive Trigger", table.Name);
-        Assert.Equal("Cosmos Container IsLive Trigger", cosmos.Name);
+        Assert.Equal("StorageAccount Blob IsLive Trigger", blob.Name);
+        Assert.Equal("StorageAccount Table IsLive Trigger", table.Name);
+        Assert.Equal("CosmosDb IsLive Trigger", cosmos.Name);
         Assert.Equal("SqlDatabase IsLive Trigger", sql.Name);
         Assert.Equal("logic", Assert.Single(((IHasEnvironmentRequirements)logicApp).GetEnvironmentRequirements(null!)).ResourceIdentifier);
         Assert.Equal("bus", Assert.Single(((IHasEnvironmentRequirements)serviceBus).GetEnvironmentRequirements(null!)).ResourceIdentifier);
@@ -161,7 +161,7 @@ public class AzureSurfaceTests
 
     private sealed class StubCosmosFactory : ICosmosComponentFactory
     {
-        public ICosmosContainerAdapter CreateContainer(Resolved<Configuration.SpecificConfigs.CosmosContainerDbConfig> cosmos) => throw new NotSupportedException();
+        public ICosmosContainerAdapter CreateContainer(Resolved<Configuration.SpecificConfigs.CosmosDbConfig> cosmos) => throw new NotSupportedException();
     }
 
     private sealed class StubBlobFactory : IBlobComponentFactory

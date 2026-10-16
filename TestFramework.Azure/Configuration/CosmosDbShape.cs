@@ -29,13 +29,13 @@ namespace TestFramework.Azure.Configuration;
 /// depends on who is asking.
 /// </remarks>
 /// <param name="provider">Reads an entry, including whatever validation the caller configured.</param>
-internal sealed class CosmosDbShape(IConfigProvider provider) : ConfigShape<CosmosContainerDbConfig>
+internal sealed class CosmosDbShape(IConfigProvider provider) : ConfigShape<CosmosDbConfig>
 {
     /// <inheritdoc />
     public override string Section => DefaultConfigProvider.CosmosDbSelector;
 
     /// <inheritdoc />
-    public override ResourceKind Kind => AzureResourceKinds.CosmosKind;
+    public override ResourceKind Kind => AzureResourceKinds.CosmosDbKind;
 
     /// <inheritdoc />
     public override IReadOnlyList<string> Identifiers(IConfiguration configuration)
@@ -46,7 +46,7 @@ internal sealed class CosmosDbShape(IConfigProvider provider) : ConfigShape<Cosm
     }
 
     /// <inheritdoc />
-    public override CosmosContainerDbConfig Read(IConfiguration configuration, string identifier)
+    public override CosmosDbConfig Read(IConfiguration configuration, string identifier)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -54,7 +54,7 @@ internal sealed class CosmosDbShape(IConfigProvider provider) : ConfigShape<Cosm
     }
 
     /// <inheritdoc />
-    public override IReadOnlyDictionary<ValueKey, string> Values(CosmosContainerDbConfig config, string identifier)
+    public override IReadOnlyDictionary<ValueKey, string> Values(CosmosDbConfig config, string identifier)
     {
         ArgumentNullException.ThrowIfNull(config);
 
@@ -92,12 +92,12 @@ internal sealed class CosmosDbShape(IConfigProvider provider) : ConfigShape<Cosm
     /// provisioning rather than a step reads while running - which is a difference in who asks, not in what
     /// the value is, so they travel the same way as everything else.
     /// </remarks>
-    public override CosmosContainerDbConfig Read(IReadOnlyDictionary<string, string> values, string identifier)
+    public override CosmosDbConfig Read(IReadOnlyDictionary<string, string> values, string identifier)
     {
         ArgumentNullException.ThrowIfNull(values);
         ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
 
-        CosmosContainerDbConfig config = new CosmosContainerDbConfig
+        CosmosDbConfig config = new CosmosDbConfig
         {
             ConnectionString = Text(values, ValueNames.ConnectionString) ?? throw Missing(ValueNames.ConnectionString, identifier, values),
             DatabaseName = Text(values, AzureResourceKinds.DatabaseNameValue) ?? throw Missing(AzureResourceKinds.DatabaseNameValue, identifier, values),

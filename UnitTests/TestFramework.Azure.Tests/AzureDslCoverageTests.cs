@@ -66,8 +66,8 @@ public class AzureDslCoverageTests
     [Fact]
     public void ArtifactProxies_CreateExpectedReferenceTypes()
     {
-        object cosmosRef = AzureExt.Artifact.DB.CosmosRef<object>("cosmos", "id-1", new PartitionKey("tenant"));
-        object sqlRef = AzureExt.Artifact.DB.SqlRef<DummyRow>("sql", Var.Const("pk"));
+        object cosmosRef = AzureExt.Artifact.DB.CosmosDbRef<object>("cosmos", "id-1", new PartitionKey("tenant"));
+        object sqlRef = AzureExt.Artifact.DB.SqlDatabaseRef<DummyRow>("sql", Var.Const("pk"));
         object tableRef = AzureExt.Artifact.StorageAccount.TableRef<DummyTableEntity>("storage", Var.Const("orders"), Var.Const("tenant"), Var.Const("row"));
         object blobRef = AzureExt.Artifact.StorageAccount.BlobRef("storage", Var.Const("samples/a.txt"));
 
@@ -80,9 +80,9 @@ public class AzureDslCoverageTests
     [Fact]
     public void ArtifactFinderProxies_CreateExpectedFinderTypes()
     {
-        object cosmosQuery = AzureExt.ArtifactFinder.DB.CosmosQuery<object>("cosmos", Var.Const(new QueryDefinition("SELECT * FROM c")));
-        object sqlQuery = AzureExt.ArtifactFinder.DB.SqlQuery<DummyRow>("sql", query => query);
-        TableStorageEntityArtifactQueryFinder<DummyTableEntity> tableQuery = AzureExt.ArtifactFinder.StorageAccount.TableQuery<DummyTableEntity>("storage", Var.Const("orders"), "PartitionKey ne ''");
+        object cosmosQuery = AzureExt.ArtifactFinder.DB.CosmosDbQuery<object>("cosmos", Var.Const(new QueryDefinition("SELECT * FROM c")));
+        object sqlQuery = AzureExt.ArtifactFinder.DB.SqlDatabaseQuery<DummyRow>("sql", query => query);
+        StorageAccountTableEntityArtifactQueryFinder<DummyTableEntity> tableQuery = AzureExt.ArtifactFinder.StorageAccount.TableQuery<DummyTableEntity>("storage", Var.Const("orders"), "PartitionKey ne ''");
 
         Assert.NotNull(cosmosQuery);
         Assert.NotNull(sqlQuery);

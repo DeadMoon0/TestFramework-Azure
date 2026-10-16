@@ -5,7 +5,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using TestFramework.Azure.DB.SqlServer;
+using TestFramework.Azure.DB.SqlDatabase;
 using TestFramework.Azure.Extensions;
 using TestFramework.Core.Environment;
 using TestFramework.Core.Exceptions;
@@ -257,7 +257,7 @@ public class SqlDbContextRegistryTests(ITestOutputHelper output)
         public override Task<object?> CreateAsync(IEnvironmentProvider environment, RunContext context)
         {
             PublishOn(context).Produce(
-                AzureResourceKinds.SqlKind,
+                AzureResourceKinds.SqlDatabaseKind,
                 identifier,
                 ValueNames.ConnectionString,
                 ResourceVantage.Host,

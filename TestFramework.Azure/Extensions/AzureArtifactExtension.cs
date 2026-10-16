@@ -1,8 +1,8 @@
 ﻿using Azure.Data.Tables;
 using System.Collections.Generic;
 using System.Text;
-using TestFramework.Azure.DB.CosmosDB;
-using TestFramework.Azure.DB.SqlServer;
+using TestFramework.Azure.DB.CosmosDb;
+using TestFramework.Azure.DB.SqlDatabase;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.StorageAccount.Blob;
 using TestFramework.Azure.StorageAccount.Table;
@@ -26,7 +26,7 @@ public static class AzureArtifactExtension
     /// <param name="store">The artifact store to read from.</param>
     /// <param name="identifier">The artifact identifier.</param>
     /// <returns>The typed Cosmos artifact instance.</returns>
-    public static ArtifactInstance<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>> GetCosmosItemArtifact<TItem>(this ArtifactStore store, ArtifactIdentifier identifier)
+    public static ArtifactInstance<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>> GetCosmosDbItemArtifact<TItem>(this ArtifactStore store, ArtifactIdentifier identifier)
     {
         return store.GetArtifact(CosmosDbItemArtifactKind<TItem>.Kind, identifier);
     }
@@ -40,7 +40,7 @@ public static class AzureArtifactExtension
     /// <param name="dbIdentifier">The Cosmos container identifier.</param>
     /// <param name="item">The item to upsert during setup.</param>
     /// <returns>The builder for fluent chaining.</returns>
-    public static ITimelineRunBuilder AddCosmosItemArtifact<TItem>(this ITimelineRunBuilder run, ArtifactIdentifier identifier, CosmosContainerIdentifier dbIdentifier, TItem item)
+    public static ITimelineRunBuilder AddCosmosDbItemArtifact<TItem>(this ITimelineRunBuilder run, ArtifactIdentifier identifier, CosmosDbIdentifier dbIdentifier, TItem item)
     {
         return run.AddArtifact(identifier, new CosmosDbItemArtifactReference<TItem>(dbIdentifier), new CosmosDbItemArtifactData<TItem>(item));
     }
@@ -52,9 +52,9 @@ public static class AzureArtifactExtension
     /// <param name="store">The artifact store to read from.</param>
     /// <param name="identifier">The artifact identifier.</param>
     /// <returns>The typed table artifact instance.</returns>
-    public static ArtifactInstance<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>> GetTableEntityArtifact<T>(this ArtifactStore store, ArtifactIdentifier identifier) where T : class, ITableEntity
+    public static ArtifactInstance<StorageAccountTableEntityArtifactDescriber<T>, StorageAccountTableEntityArtifactData<T>, StorageAccountTableEntityArtifactReference<T>> GetTableEntityArtifact<T>(this ArtifactStore store, ArtifactIdentifier identifier) where T : class, ITableEntity
     {
-        return store.GetArtifact(TableStorageEntityArtifactKind<T>.Kind, identifier);
+        return store.GetArtifact(StorageAccountTableEntityArtifactKind<T>.Kind, identifier);
     }
 
     /// <summary>
@@ -63,13 +63,13 @@ public static class AzureArtifactExtension
     /// <typeparam name="T">The table entity type.</typeparam>
     /// <param name="run">The timeline run builder.</param>
     /// <param name="artifactId">The artifact identifier.</param>
-    /// <param name="storageId">The Storage Account identifier.</param>
+    /// <param name="storageAccountId">The Storage Account identifier.</param>
     /// <param name="tableName">The table name that contains the entity.</param>
     /// <param name="entity">The entity to upsert during setup.</param>
     /// <returns>The builder for fluent chaining.</returns>
-    public static ITimelineRunBuilder AddTableEntityArtifact<T>(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, StorageAccountIdentifier storageId, string tableName, T entity) where T : class, ITableEntity
+    public static ITimelineRunBuilder AddTableEntityArtifact<T>(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, StorageAccountIdentifier storageAccountId, string tableName, T entity) where T : class, ITableEntity
     {
-        return run.AddArtifact(artifactId, new TableStorageEntityArtifactReference<T>(storageId, tableName, entity.PartitionKey, entity.RowKey), new TableStorageEntityArtifactData<T>(entity));
+        return run.AddArtifact(artifactId, new StorageAccountTableEntityArtifactReference<T>(storageAccountId, tableName, entity.PartitionKey, entity.RowKey), new StorageAccountTableEntityArtifactData<T>(entity));
     }
 
     /// <summary>
@@ -89,26 +89,26 @@ public static class AzureArtifactExtension
     /// <remarks>Uses <c>null</c> for <c>metadata</c>; the other overload states it.</remarks>
     /// <param name="run">The timeline run builder.</param>
     /// <param name="artifactId">The artifact identifier.</param>
-    /// <param name="storageId">The Storage Account identifier.</param>
+    /// <param name="storageAccountId">The Storage Account identifier.</param>
     /// <param name="path">The blob path inside the configured container.</param>
     /// <param name="data">The blob payload.</param>
     /// <returns>The builder for fluent chaining.</returns>
-    public static ITimelineRunBuilder AddBlobArtifact(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, StorageAccountIdentifier storageId, string path, byte[] data)
-        => run.AddBlobArtifact(artifactId, storageId, path, data, null);
+    public static ITimelineRunBuilder AddBlobArtifact(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, StorageAccountIdentifier storageAccountId, string path, byte[] data)
+        => run.AddBlobArtifact(artifactId, storageAccountId, path, data, null);
 
     /// <summary>
     /// Registers a blob artifact for timeline setup and cleanup.
     /// </summary>
     /// <param name="run">The timeline run builder.</param>
     /// <param name="artifactId">The artifact identifier.</param>
-    /// <param name="storageId">The Storage Account identifier.</param>
+    /// <param name="storageAccountId">The Storage Account identifier.</param>
     /// <param name="path">The blob path inside the configured container.</param>
     /// <param name="data">The blob payload.</param>
     /// <param name="metadata">Optional blob metadata.</param>
     /// <returns>The builder for fluent chaining.</returns>
-    public static ITimelineRunBuilder AddBlobArtifact(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, StorageAccountIdentifier storageId, string path, byte[] data, Dictionary<string, string>? metadata)
+    public static ITimelineRunBuilder AddBlobArtifact(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, StorageAccountIdentifier storageAccountId, string path, byte[] data, Dictionary<string, string>? metadata)
     {
-        return run.AddArtifact(artifactId, new StorageAccountBlobArtifactReference(storageId, path), new StorageAccountBlobArtifactData(data, metadata ?? []));
+        return run.AddArtifact(artifactId, new StorageAccountBlobArtifactReference(storageAccountId, path), new StorageAccountBlobArtifactData(data, metadata ?? []));
     }
 
     // ── Typed TimelineRun assertion handles ──────────────────────────────────
@@ -153,7 +153,7 @@ public static class AzureArtifactExtension
     /// <param name="run">The completed timeline run.</param>
     /// <param name="identifier">The artifact identifier.</param>
     /// <returns>An assertion handle for the Cosmos artifact.</returns>
-    public static ArtifactHandle<CosmosDbItemArtifactData<TItem>> CosmosArtifact<TItem>(this TimelineRun run, ArtifactIdentifier identifier)
+    public static ArtifactHandle<CosmosDbItemArtifactData<TItem>> CosmosDbArtifact<TItem>(this TimelineRun run, ArtifactIdentifier identifier)
         => run.Artifact<CosmosDbItemArtifactData<TItem>>(identifier);
 
     /// <summary>
@@ -175,19 +175,19 @@ public static class AzureArtifactExtension
     /// <param name="run">The completed timeline run.</param>
     /// <param name="identifier">The artifact identifier.</param>
     /// <returns>An assertion handle for the table artifact.</returns>
-    public static ArtifactHandle<TableStorageEntityArtifactData<T>> TableArtifact<T>(this TimelineRun run, ArtifactIdentifier identifier) where T : class, ITableEntity
-        => run.Artifact<TableStorageEntityArtifactData<T>>(identifier);
+    public static ArtifactHandle<StorageAccountTableEntityArtifactData<T>> TableArtifact<T>(this TimelineRun run, ArtifactIdentifier identifier) where T : class, ITableEntity
+        => run.Artifact<StorageAccountTableEntityArtifactData<T>>(identifier);
 
     /// <summary>
     /// Returns the latest table entity as a value handle.
     /// </summary>
-    public static ValueHandle<T> Entity<T>(this ArtifactHandle<TableStorageEntityArtifactData<T>> handle) where T : class, ITableEntity
+    public static ValueHandle<T> Entity<T>(this ArtifactHandle<StorageAccountTableEntityArtifactData<T>> handle) where T : class, ITableEntity
         => handle.Select(data => data.Entity);
 
     /// <summary>
     /// Projects the latest table entity to a specific value.
     /// </summary>
-    public static ValueHandle<TValue> Entity<T, TValue>(this ArtifactHandle<TableStorageEntityArtifactData<T>> handle, System.Func<T, TValue> selector) where T : class, ITableEntity
+    public static ValueHandle<TValue> Entity<T, TValue>(this ArtifactHandle<StorageAccountTableEntityArtifactData<T>> handle, System.Func<T, TValue> selector) where T : class, ITableEntity
         => handle.Entity().Select(selector);
 
     // ── SQL ──────────────────────────────────────────────────────────────────
@@ -199,8 +199,8 @@ public static class AzureArtifactExtension
     /// <param name="store">The artifact store to read from.</param>
     /// <param name="identifier">The artifact identifier.</param>
     /// <returns>The typed SQL artifact instance.</returns>
-    public static ArtifactInstance<AzureSqlRowArtifactDescriber<T>, AzureSqlRowArtifactData<T>, AzureSqlRowArtifactReference<T>> GetSqlArtifact<T>(this ArtifactStore store, ArtifactIdentifier identifier) where T : class
-        => store.GetArtifact(AzureSqlRowArtifactKind<T>.Kind, identifier);
+    public static ArtifactInstance<SqlDatabaseRowArtifactDescriber<T>, SqlDatabaseRowArtifactData<T>, SqlDatabaseRowArtifactReference<T>> GetSqlDatabaseArtifact<T>(this ArtifactStore store, ArtifactIdentifier identifier) where T : class
+        => store.GetArtifact(SqlDatabaseRowArtifactKind<T>.Kind, identifier);
 
     /// <summary>
     /// Registers a SQL artifact for timeline setup and cleanup.
@@ -212,8 +212,8 @@ public static class AzureArtifactExtension
     /// <param name="row">The row to insert or update during setup.</param>
     /// <param name="primaryKeyValues">Primary key values used to resolve the row later.</param>
     /// <returns>The builder for fluent chaining.</returns>
-    public static ITimelineRunBuilder AddSqlArtifact<T>(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, SqlDatabaseIdentifier dbIdentifier, T row, params VariableReference<string>[] primaryKeyValues) where T : class
-        => run.AddArtifact(artifactId, new AzureSqlRowArtifactReference<T>(dbIdentifier, primaryKeyValues), new AzureSqlRowArtifactData<T>(row));
+    public static ITimelineRunBuilder AddSqlDatabaseArtifact<T>(this ITimelineRunBuilder run, ArtifactIdentifier artifactId, SqlDatabaseIdentifier dbIdentifier, T row, params VariableReference<string>[] primaryKeyValues) where T : class
+        => run.AddArtifact(artifactId, new SqlDatabaseRowArtifactReference<T>(dbIdentifier, primaryKeyValues), new SqlDatabaseRowArtifactData<T>(row));
 
     /// <summary>
     /// Returns an assertion handle for a SQL artifact in a completed run.
@@ -222,18 +222,18 @@ public static class AzureArtifactExtension
     /// <param name="run">The completed timeline run.</param>
     /// <param name="identifier">The artifact identifier.</param>
     /// <returns>An assertion handle for the SQL artifact.</returns>
-    public static ArtifactHandle<AzureSqlRowArtifactData<T>> SqlArtifact<T>(this TimelineRun run, ArtifactIdentifier identifier) where T : class
-        => run.Artifact<AzureSqlRowArtifactData<T>>(identifier);
+    public static ArtifactHandle<SqlDatabaseRowArtifactData<T>> SqlDatabaseArtifact<T>(this TimelineRun run, ArtifactIdentifier identifier) where T : class
+        => run.Artifact<SqlDatabaseRowArtifactData<T>>(identifier);
 
     /// <summary>
     /// Returns the latest SQL row as a value handle.
     /// </summary>
-    public static ValueHandle<T> Row<T>(this ArtifactHandle<AzureSqlRowArtifactData<T>> handle) where T : class
+    public static ValueHandle<T> Row<T>(this ArtifactHandle<SqlDatabaseRowArtifactData<T>> handle) where T : class
         => handle.Select(data => data.Row);
 
     /// <summary>
     /// Projects the latest SQL row to a specific value.
     /// </summary>
-    public static ValueHandle<TValue> Row<T, TValue>(this ArtifactHandle<AzureSqlRowArtifactData<T>> handle, System.Func<T, TValue> selector) where T : class
+    public static ValueHandle<TValue> Row<T, TValue>(this ArtifactHandle<SqlDatabaseRowArtifactData<T>> handle, System.Func<T, TValue> selector) where T : class
         => handle.Row().Select(selector);
 }

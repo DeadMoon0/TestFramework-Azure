@@ -52,7 +52,7 @@ public static class AzureConfigShapes
         return configType switch
         {
             Type type when type == typeof(StorageAccountConfig) => new StorageAccountShape(provider),
-            Type type when type == typeof(CosmosContainerDbConfig) => new CosmosDbShape(provider),
+            Type type when type == typeof(CosmosDbConfig) => new CosmosDbShape(provider),
             Type type when type == typeof(SqlDatabaseConfig) => new SqlDatabaseShape(provider),
             Type type when type == typeof(ServiceBusConfig) => new ServiceBusShape(provider),
             Type type when type == typeof(FunctionAppConfig) => new FunctionAppShape(provider),

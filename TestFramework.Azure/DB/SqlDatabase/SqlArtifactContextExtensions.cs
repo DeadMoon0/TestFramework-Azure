@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Linq;
 using System;
 
-namespace TestFramework.Azure.DB.SqlServer;
+namespace TestFramework.Azure.DB.SqlDatabase;
 
 /// <summary>
 /// Registers the SQL services required by SQL-backed Azure artifacts and query finders.

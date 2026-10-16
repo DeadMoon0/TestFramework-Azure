@@ -62,7 +62,7 @@ public sealed record ServiceBusConfig
     /// <summary>
     /// When true, send and receive flows use session-capable Service Bus clients.
     /// </summary>
-    public bool RequiredSession { get; init; }
+    public bool RequiresSession { get; init; }
 
     /// <summary>
     /// Gets the active queue or topic entity name.

@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.Runtime;
 
-namespace TestFramework.Azure.DB.CosmosDB;
+namespace TestFramework.Azure.DB.CosmosDb;
 
 /// <summary>
 /// Minimal REST-based helper for creating Cosmos databases and containers when SDK metadata setup is insufficient.
@@ -34,7 +34,7 @@ internal static class CosmosSchemaRestClient
     /// after that probe comes back empty, and only when it is allowed for the target account.
     /// </remarks>
     public static async Task EnsureDatabaseAndContainerExistAsync(
-        CosmosContainerDbConfig config,
+        CosmosDbConfig config,
         string partitionKeyPath,
         CancellationToken cancellationToken)
     {
@@ -82,14 +82,14 @@ internal static class CosmosSchemaRestClient
     /// <summary>
     /// Refuses to create schema on anything but a local emulator unless the caller opted in.
     /// </summary>
-    private static void EnsureSchemaCreationAllowed(CosmosContainerDbConfig config, Uri endpoint)
+    private static void EnsureSchemaCreationAllowed(CosmosDbConfig config, Uri endpoint)
     {
         if (config.AllowSchemaCreation || LocalEndpoints.IsLocalDevelopmentHost(endpoint))
             return;
 
         throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
             $"Cosmos container '{config.DatabaseName}/{config.ContainerName}' does not exist on '{endpoint.Host}', " +
-            $"which is not a local emulator. Create it out of band, or set '{nameof(CosmosContainerDbConfig.AllowSchemaCreation)}' " +
+            $"which is not a local emulator. Create it out of band, or set '{nameof(CosmosDbConfig.AllowSchemaCreation)}' " +
             $"to true on the Cosmos configuration to let the framework provision it.");
     }
 
@@ -146,7 +146,7 @@ internal static class CosmosSchemaRestClient
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task CreateContainerIfNotExistsAsync(HttpClient httpClient, Uri endpoint, string key, CosmosContainerDbConfig config, string partitionKeyPath, CancellationToken cancellationToken)
+    private static async Task CreateContainerIfNotExistsAsync(HttpClient httpClient, Uri endpoint, string key, CosmosDbConfig config, string partitionKeyPath, CancellationToken cancellationToken)
     {
         string databaseName = config.DatabaseName;
         string resourceLink = $"dbs/{databaseName}";

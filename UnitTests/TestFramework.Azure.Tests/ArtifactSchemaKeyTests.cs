@@ -1,8 +1,8 @@
 using Azure;
 using Azure.Data.Tables;
 using System;
-using TestFramework.Azure.DB.CosmosDB;
-using TestFramework.Azure.DB.SqlServer;
+using TestFramework.Azure.DB.CosmosDb;
+using TestFramework.Azure.DB.SqlDatabase;
 using TestFramework.Azure.StorageAccount.Blob;
 using TestFramework.Azure.StorageAccount.Table;
 
@@ -39,14 +39,14 @@ public class ArtifactSchemaKeyTests
 
     [Fact]
     public void SqlRowArtifactReportsTheCanonicalSchemaKey()
-        => Assert.Equal("tf.artifact.sql.row", new AzureSqlRowArtifactDescriber<SampleRow>().DebugValueSchemaKey);
+        => Assert.Equal("tf.artifact.sql.row", new SqlDatabaseRowArtifactDescriber<SampleRow>().DebugValueSchemaKey);
 
     [Fact]
     public void SqlRowSharesItsSchemaKeyWithTheWebImplementation()
     {
         // The EF-backed row here and the ADO-backed row in TestFramework.Web are different types
         // presenting the same thing, so a consumer should draw them with one icon and one inspector.
-        Assert.Equal("tf.artifact.sql.row", new AzureSqlRowArtifactDescriber<SampleRow>().DebugValueSchemaKey);
+        Assert.Equal("tf.artifact.sql.row", new SqlDatabaseRowArtifactDescriber<SampleRow>().DebugValueSchemaKey);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class ArtifactSchemaKeyTests
 
     [Fact]
     public void TableEntityArtifactReportsTheCanonicalSchemaKey()
-        => Assert.Equal("tf.artifact.table.entity", new TableStorageEntityArtifactDescriber<SampleEntity>().DebugValueSchemaKey);
+        => Assert.Equal("tf.artifact.table.entity", new StorageAccountTableEntityArtifactDescriber<SampleEntity>().DebugValueSchemaKey);
 
     [Fact]
     public void EveryShippedArtifactOverridesTheDefaultSchemaKey()
@@ -68,10 +68,10 @@ public class ArtifactSchemaKeyTests
         // an implementation detail, so renaming its class breaks every consumer that drew it.
         object[] describers =
         [
-            new AzureSqlRowArtifactDescriber<SampleRow>(),
+            new SqlDatabaseRowArtifactDescriber<SampleRow>(),
             new CosmosDbItemArtifactDescriber<SampleItem>(),
             new StorageAccountBlobArtifactDescriber(),
-            new TableStorageEntityArtifactDescriber<SampleEntity>()
+            new StorageAccountTableEntityArtifactDescriber<SampleEntity>()
         ];
 
         foreach (object describer in describers)

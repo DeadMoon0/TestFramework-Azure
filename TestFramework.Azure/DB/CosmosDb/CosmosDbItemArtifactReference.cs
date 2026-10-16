@@ -16,13 +16,13 @@ using TestFramework.Core.Logging;
 using TestFramework.Core.Steps.Options;
 using TestFramework.Core.Variables;
 
-namespace TestFramework.Azure.DB.CosmosDB;
+namespace TestFramework.Azure.DB.CosmosDb;
 
 /// <summary>
 /// Reference to a Cosmos DB item addressed by id and partition key.
 /// </summary>
 /// <remarks>
-/// Made with <c>AzureExt.Artifact.DB.CosmosRef(...)</c>, which names the item, or by <c>AddCosmosItemArtifact</c>,
+/// Made with <c>AzureExt.Artifact.DB.CosmosDbRef(...)</c>, which names the item, or by <c>AddCosmosDbItemArtifact</c>,
 /// which leaves it to setup to read the id and partition key from the item it writes. Either way the reference
 /// addresses exactly one item, so teardown deletes that one.
 /// </remarks>
@@ -40,7 +40,7 @@ public sealed class CosmosDbItemArtifactReference<TItem> : ArtifactReference<Cos
     /// <param name="dbIdentifier">The Cosmos container identifier.</param>
     /// <param name="partitionKey">The partition key.</param>
     /// <param name="id">The document id.</param>
-    internal CosmosDbItemArtifactReference(CosmosContainerIdentifier dbIdentifier, VariableReference<PartitionKey> partitionKey, VariableReference<string> id)
+    internal CosmosDbItemArtifactReference(CosmosDbIdentifier dbIdentifier, VariableReference<PartitionKey> partitionKey, VariableReference<string> id)
     {
         ArgumentNullException.ThrowIfNull(dbIdentifier);
         ArgumentNullException.ThrowIfNull(partitionKey);
@@ -57,7 +57,7 @@ public sealed class CosmosDbItemArtifactReference<TItem> : ArtifactReference<Cos
     /// A reference whose item setup names: the id and partition key are read from the item it writes.
     /// </summary>
     /// <param name="dbIdentifier">The Cosmos container identifier.</param>
-    internal CosmosDbItemArtifactReference(CosmosContainerIdentifier dbIdentifier)
+    internal CosmosDbItemArtifactReference(CosmosDbIdentifier dbIdentifier)
     {
         ArgumentNullException.ThrowIfNull(dbIdentifier);
 
@@ -77,7 +77,7 @@ public sealed class CosmosDbItemArtifactReference<TItem> : ArtifactReference<Cos
     /// <summary>
     /// The Cosmos container identifier used to resolve the container.
     /// </summary>
-    public CosmosContainerIdentifier DbIdentifier { get; }
+    public CosmosDbIdentifier DbIdentifier { get; }
 
     /// <summary>
     /// Pins the reference to concrete id and partition key values.
@@ -94,7 +94,7 @@ public sealed class CosmosDbItemArtifactReference<TItem> : ArtifactReference<Cos
     public override async Task<ArtifactResolveResult<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
         ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory()
-            .Cosmos.CreateContainer(AzureResources.For<CosmosContainerDbConfig>(context, DbIdentifier));
+            .Cosmos.CreateContainer(AzureResources.For<CosmosDbConfig>(context, DbIdentifier));
 
         CosmosReadResponse itemResp = await container.ReadItemAsync(GetId(context.Variables), GetPartitionKey(context.Variables), context.Deadline.Token);
         if (!itemResp.Found)

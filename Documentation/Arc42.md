@@ -153,7 +153,7 @@ The base package references neither ASP.NET Core nor the Azure Functions Worker,
 that. Both are needed only to run a function in-process (`HttpRequest`, `IActionResult`) and to read its `[Function]`
 attribute, so those live in **TestFramework.Azure.Functions**, which references TestFramework.Azure, the
 `Microsoft.AspNetCore.App` framework and `Microsoft.Azure.Functions.Worker`. It adds no builder of its own: its entry
-points are extension methods on `AzureExt.FunctionAppTrigger` and `IFunctionAppHttpConnectionStage`, and it composes
+points are extension methods on `AzureExt.FunctionAppTriggers` and `IFunctionAppHttpConnectionStage`, and it composes
 its request through the base's public `FunctionAppHttpPayloadBuilder`, the payload stage the remote call uses too.
 
 ---
@@ -187,7 +187,7 @@ graph TB
         end
         subgraph Artifacts
             BLOB[StorageAccountBlobArtifact*]
-            TBL["TableStorageEntityArtifact*&lt;T&gt;"]
+            TBL["StorageAccountTableEntityArtifact*&lt;T&gt;"]
             COSM["CosmosDbItemArtifact*&lt;T&gt;"]
             SQLR["SqlRowArtifact*&lt;T&gt;"]
         end
@@ -196,8 +196,8 @@ graph TB
         end
         subgraph Finders
             COSMF["CosmosDbItemArtifactQueryFinder&lt;T&gt;"]
-            SQLF["SqlEFCoreArtifactQueryFinder&lt;T&gt;"]
-            TBLF["TableStorageEntityArtifactQueryFinder&lt;T&gt;"]
+            SQLF["SqlDatabaseRowArtifactQueryFinder&lt;T&gt;"]
+            TBLF["StorageAccountTableEntityArtifactQueryFinder&lt;T&gt;"]
         end
         subgraph Configuration
             CL[ConfigLoader]
@@ -239,12 +239,12 @@ classDiagram
         +Send(id, message) ServiceBusSendTrigger
     }
     class DbArtifactProxy {
-        +CosmosRef~T~(id, docId, pk) CosmosDbItemArtifactReference~T~
-        +SqlRef~T~(id, keys) AzureSqlRowArtifactReference~T~
+        +CosmosDbRef~T~(id, docId, pk) CosmosDbItemArtifactReference~T~
+        +SqlDatabaseRef~T~(id, keys) SqlDatabaseRowArtifactReference~T~
     }
     class StorageAccountArtifactProxy {
         +BlobRef(id, path) StorageAccountBlobArtifactReference
-        +TableRef~T~(id, table, pk, rk) TableStorageEntityArtifactReference~T~
+        +TableRef~T~(id, table, pk, rk) StorageAccountTableEntityArtifactReference~T~
     }
     class ServiceBusEventProxy {
         +MessageReceived(id) ServiceBusProcessEvent
@@ -278,19 +278,19 @@ classDiagram
         +Deconstruct() delete blob
     }
 
-    class TableStorageEntityArtifactReference~T~ {
+    class StorageAccountTableEntityArtifactReference~T~ {
         +StorageAccountIdentifier Identifier
         +VariableReference~string~ TableName, PartitionKey, RowKey
         +ResolveToDataAsync() GetEntity
     }
-    class TableStorageEntityArtifactData~T~ { +T Entity }
-    class TableStorageEntityArtifactDescriber~T~ {
+    class StorageAccountTableEntityArtifactData~T~ { +T Entity }
+    class StorageAccountTableEntityArtifactDescriber~T~ {
         +Setup() UpsertEntity
         +Deconstruct() DeleteEntity
     }
 
     class CosmosDbItemArtifactReference~T~ {
-        +CosmosContainerIdentifier Identifier
+        +CosmosDbIdentifier Identifier
         +string Id, PartitionKey
         +ResolveToDataAsync() ReadItemStream
     }
@@ -300,29 +300,29 @@ classDiagram
         +Deconstruct() DeleteItemAsync
     }
 
-    class AzureSqlRowArtifactReference~T~ {
+    class SqlDatabaseRowArtifactReference~T~ {
         +SqlDatabaseIdentifier Identifier
         +string[] PrimaryKeyValues
         +ResolveToDataAsync() FindAsync via EF Core
     }
-    class AzureSqlRowArtifactData~T~ { +T Row }
-    class AzureSqlRowArtifactDescriber~T~ {
+    class SqlDatabaseRowArtifactData~T~ { +T Row }
+    class SqlDatabaseRowArtifactDescriber~T~ {
         +Setup() Add/Update + SaveChangesAsync
         +Deconstruct() Remove + SaveChangesAsync
     }
 
     ArtifactReferenceGeneric <|-- StorageAccountBlobArtifactReference
-    ArtifactReferenceGeneric <|-- TableStorageEntityArtifactReference~T~
+    ArtifactReferenceGeneric <|-- StorageAccountTableEntityArtifactReference~T~
     ArtifactReferenceGeneric <|-- CosmosDbItemArtifactReference~T~
-    ArtifactReferenceGeneric <|-- AzureSqlRowArtifactReference~T~
+    ArtifactReferenceGeneric <|-- SqlDatabaseRowArtifactReference~T~
     ArtifactDataGeneric <|-- StorageAccountBlobArtifactData
-    ArtifactDataGeneric <|-- TableStorageEntityArtifactData~T~
+    ArtifactDataGeneric <|-- StorageAccountTableEntityArtifactData~T~
     ArtifactDataGeneric <|-- CosmosDbItemArtifactData~T~
-    ArtifactDataGeneric <|-- AzureSqlRowArtifactData~T~
+    ArtifactDataGeneric <|-- SqlDatabaseRowArtifactData~T~
     ArtifactDescriberGeneric <|-- StorageAccountBlobArtifactDescriber
-    ArtifactDescriberGeneric <|-- TableStorageEntityArtifactDescriber~T~
+    ArtifactDescriberGeneric <|-- StorageAccountTableEntityArtifactDescriber~T~
     ArtifactDescriberGeneric <|-- CosmosDbItemArtifactDescriber~T~
-    ArtifactDescriberGeneric <|-- AzureSqlRowArtifactDescriber~T~
+    ArtifactDescriberGeneric <|-- SqlDatabaseRowArtifactDescriber~T~
 ```
 
 ### 5.4 Function App Trigger — Three Modes
@@ -385,14 +385,14 @@ classDiagram
     class DefaultConfigProvider {
         +Load~FunctionAppConfig~(config, id) reads "FunctionApp:id"
         +Load~StorageAccountConfig~(config, id) reads "StorageAccount:id"
-        +Load~CosmosContainerDbConfig~(config, id) reads "CosmosDb:id"
+        +Load~CosmosDbConfig~(config, id) reads "CosmosDb:id"
         +Load~ServiceBusConfig~(config, id) reads "ServiceBus:id"
         +Load~SqlDatabaseConfig~(config, id) reads "SqlDatabase:id"
     }
     class FunctionAppConfig { +string BaseUrl, Code, AdminCode }
-    class StorageAccountConfig { +string ConnectionString, BlobContainerName, TableContainerName }
-    class CosmosContainerDbConfig { +string ConnectionString, DatabaseName, ContainerName }
-    class ServiceBusConfig { +string ConnectionString, QueueName, TopicName, SubscriptionName, RequiredSession }
+    class StorageAccountConfig { +string ConnectionString, BlobContainerName, TableName }
+    class CosmosDbConfig { +string ConnectionString, DatabaseName, ContainerName }
+    class ServiceBusConfig { +string ConnectionString, QueueName, TopicName, SubscriptionName, RequiresSession }
     class SqlDatabaseConfig { +string ConnectionString, DatabaseName }
     IConfigProvider <|.. DefaultConfigProvider
 ```
@@ -401,7 +401,7 @@ classDiagram
 
 ```mermaid
 graph TD
-    REQ["AzureSqlRowArtifactDescriber needs DbContext"] --> RES[SqlDbContextResolver]
+    REQ["SqlDatabaseRowArtifactDescriber needs DbContext"] --> RES[SqlDbContextResolver]
     RES --> COORD["SqlDatabaseResources.Resolve(run, identifier)"]
     COORD --> OPTS["DbContextOptions pointed at the run's database"]
     OPTS --> T1{"1. Registration for this identifier?"}
@@ -592,7 +592,7 @@ public record StorageAccountIdentifier(string Identifier)
     "MainStorage": {
       "ConnectionString": "UseDevelopmentStorage=true",
       "BlobContainerName": "test-blobs",
-      "TableContainerName": "test-tables"
+      "TableName": "test-tables"
     }
   },
   "FunctionApp": {
@@ -674,7 +674,7 @@ The in-process trigger turns the returned `IActionResult` into the step's `HttpR
 | Topic + subscription | `ConnectionString`, `TopicName`, `SubscriptionName` | `MessageReceived(...)` uses the configured subscription. |
 | Topic + temp subscription | `ConnectionString`, `TopicName` | `MessageReceived(...).WithTempSubscription()` creates a filtered temp subscription during pre-step and deletes it during cleanup. |
 
-`RequiredSession` applies to queue and topic receive modes.
+`RequiresSession` applies to queue and topic receive modes.
 
 ### 8.6 Service Bus Temp Subscription Lifecycle
 
@@ -701,13 +701,13 @@ stateDiagram-v2
 
 Register `ICosmosClientOptionsProvider` or call `ConfigureCosmosClientOptions(...)` to customize `CosmosClientOptions` for Cosmos SDK behavior.
 
-`AzureExt.Trigger.IsLive.Cosmos(...)` does not use a separate Cosmos config timeout. It uses the normal step timeout configured by the timeline, for example `.WithTimeout(...)` on the builder.
+`AzureExt.Trigger.IsLive.CosmosDb(...)` does not use a separate Cosmos config timeout. It uses the normal step timeout configured by the timeline, for example `.WithTimeout(...)` on the builder.
 
 ### 8.8 SQL Migration Tracking
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CheckTracker : AzureSqlRowArtifactDescriber.Setup()
+    [*] --> CheckTracker : SqlDatabaseRowArtifactDescriber.Setup()
     CheckTracker --> AlreadyMigrated : DB already checked this process
     AlreadyMigrated --> Ready
 
@@ -805,7 +805,7 @@ mindmap
 
 | Scenario | Goal | Expected behaviour |
 |----------|------|--------------------|
-| Write new Cosmos test | Usability | `AzureExt.Artifact.DB.CosmosRef<T>(…)` returns type-safe ref; describer handles upsert/delete |
+| Write new Cosmos test | Usability | `AzureExt.Artifact.DB.CosmosDbRef<T>(…)` returns type-safe ref; describer handles upsert/delete |
 | Test blob not cleaned up | Reliability | Cleanup stage calls `BlobClient.DeleteAsync()` for every artifact that was set up |
 | Add new SQL database | Maintainability | Only add a config section entry; optionally register a DbContext |
 | Service Bus test interferes | Testability | Temp subscription with CorrelationId filter isolates the test |

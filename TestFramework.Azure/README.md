@@ -67,7 +67,7 @@ That means the usual shape stays:
 
 1. build the run provider with `ConfigInstance`
 2. let `LoadAzureConfig()` register the shapes that describe each section
-3. ask the run for a record when a step needs one: `context.Configured<CosmosContainerDbConfig>("MainDb")`
+3. ask the run for a record when a step needs one: `context.Configured<CosmosDbConfig>("MainDb")`
 
 `Configured<T>` is the only way to read a configured resource, and it deliberately does not tell you where the
 answer came from. An entry someone wrote in a file and an address a container published while starting arrive
@@ -82,10 +82,10 @@ placeholder for anything a container had to start before its address existed.
 
 ```csharp
 // before
-var config = provider.GetRequiredService<ConfigStore<CosmosContainerDbConfig>>().GetConfig("MainDb");
+var config = provider.GetRequiredService<ConfigStore<CosmosDbConfig>>().GetConfig("MainDb");
 
 // now
-var config = context.Configured<CosmosContainerDbConfig>("MainDb");
+var config = context.Configured<CosmosDbConfig>("MainDb");
 ```
 
 `AddAzure(...)` takes no `IConfiguration` either, for the same reason: the run holds the
@@ -112,9 +112,9 @@ Supported record types:
 |---------|-------------|-----------------|-----------------|---------|
 | `FunctionApp:{identifier}` | `FunctionAppConfig` | `BaseUrl` | `Code` (absent or `""` sends no key, for an anonymous or locally hosted app), `AdminCode`, `RoutePrefix` | Remote Function App HTTP triggers and Function App liveness checks |
 | `LogicApp:{identifier}` | `LogicAppConfig` | no single global required field | `HostingMode`, `WorkflowName`, nested `Standard` and `Consumption` settings | Logic App request triggers, timer triggers, run events, and Logic App liveness checks |
-| `CosmosDb:{identifier}` | `CosmosContainerDbConfig` | `ConnectionString`, `DatabaseName`, `ContainerName` | None | Cosmos artifacts, query finders, and Cosmos liveness checks |
-| `ServiceBus:{identifier}` | `ServiceBusConfig` | `ConnectionString` plus either `QueueName` or `TopicName` | `SubscriptionName`, `RequiredSession` | Service Bus send triggers and message-received events |
-| `StorageAccount:{identifier}` | `StorageAccountConfig` | `ConnectionString` | `QueueContainerName`, `BlobContainerName`, `TableContainerName` | Blob artifacts, table artifacts, and storage liveness checks |
+| `CosmosDb:{identifier}` | `CosmosDbConfig` | `ConnectionString`, `DatabaseName`, `ContainerName` | None | Cosmos artifacts, query finders, and Cosmos liveness checks |
+| `ServiceBus:{identifier}` | `ServiceBusConfig` | `ConnectionString` plus either `QueueName` or `TopicName` | `SubscriptionName`, `RequiresSession` | Service Bus send triggers and message-received events |
+| `StorageAccount:{identifier}` | `StorageAccountConfig` | `ConnectionString` | `QueueName`, `BlobContainerName`, `TableName` | Blob artifacts, table artifacts, and storage liveness checks |
 | `SqlDatabase:{identifier}` | `SqlDatabaseConfig` | `ConnectionString`, `DatabaseName` | — | SQL row artifacts, SQL query finders, and SQL liveness checks |
 
 > **Breaking change:** `FunctionAppConfig.BaseUrl` is now strictly the site root and the `api/` prefix
@@ -133,9 +133,10 @@ Configuration expectations:
 - For Consumption request-trigger calls, `Consumption.InvokeUrl` is enough. Think of that as invoke-only Consumption.
 - For Consumption run polling, timer triggers, recurrence triggers, and management-backed liveness checks, set `Consumption.WorkflowResourceId` and register `ILogicAppConsumptionManagementRequestAuthorizer` in DI. Think of that as managed Consumption.
 - The framework still does not discover Consumption URLs, resource IDs, or tokens from Azure on the user's behalf.
-- `CosmosContainerDbConfig` is container-specific. One identifier points to one database/container pair.
+- `CosmosDbConfig` is container-specific. One identifier points to one database/container pair.
 - `ServiceBusConfig` should define either queue mode or topic mode. Queue mode uses `QueueName`. Topic mode uses `TopicName`, and fixed-subscription receives also require `SubscriptionName`.
-- `StorageAccountConfig` only requires container names for the features you use. Blob and table liveness checks rely on `BlobContainerName` and `TableContainerName` respectively.
+- `StorageAccountConfig` only requires container names for the features you use. Blob and table liveness checks rely on `BlobContainerName` and `TableName` respectively.
+- The keys `QueueContainerName`, `TableContainerName` (storage account) and `RequiredSession` (Service Bus) are now `QueueName`, `TableName` and `RequiresSession`. An entry that still uses an old key is refused when it is loaded, with a message naming the new one.
 - A `DbContext` is registered through the SQL registry and nowhere else. There is no `AddDbContext` beside it
   and no `ContextType` in configuration: the options handed to your callback already point at the database this
   run is using, whether you wrote its address down or a container published one while starting.
@@ -195,20 +196,20 @@ Example JSON:
         "MainSBQueue": {
             "ConnectionString": "Endpoint=sb://...",
             "QueueName": "orders",
-            "RequiredSession": false
+            "RequiresSession": false
         },
         "MainSBTopic": {
             "ConnectionString": "Endpoint=sb://...",
             "TopicName": "events",
             "SubscriptionName": "integration-tests",
-            "RequiredSession": false
+            "RequiresSession": false
         }
     },
     "StorageAccount": {
         "MainStorage": {
             "ConnectionString": "DefaultEndpointsProtocol=https;...",
             "BlobContainerName": "exports",
-            "TableContainerName": "OrderAudit"
+            "TableName": "OrderAudit"
         }
     },
     "SqlDatabase": {
@@ -406,7 +407,7 @@ Timeline timeline = Timeline.Create()
 
 Use `ConfigureCosmosClientOptions(...)` when you need to customize the underlying Cosmos SDK client.
 
-For `AzureExt.Trigger.IsLive.Cosmos(...)`, timeout control comes from the normal timeline step timeout, for example via `.WithTimeout(...)` on the builder. The overload taking an `AlivenessLevel` lets you choose whether the check should stop at endpoint reachability, account authentication, or require the configured container to exist; without it the container must exist (`AlivenessLevel.Resource`).
+For `AzureExt.Trigger.IsLive.CosmosDb(...)`, timeout control comes from the normal timeline step timeout, for example via `.WithTimeout(...)` on the builder. The overload taking an `AlivenessLevel` lets you choose whether the check should stop at endpoint reachability, account authentication, or require the configured container to exist; without it the container must exist (`AlivenessLevel.Resource`).
 
 ```csharp
 using Microsoft.Azure.Cosmos;
@@ -428,7 +429,7 @@ ConfigInstance config = ConfigInstance.FromJsonFile("local.testsettings.json")
     .Build();
 
 Timeline timeline = Timeline.Create()
-    .Trigger(AzureExt.Trigger.IsLive.Cosmos("MainDb", AlivenessLevel.Authenticated))
+    .Trigger(AzureExt.Trigger.IsLive.CosmosDb("MainDb", AlivenessLevel.Authenticated))
         .WithTimeout(TimeSpan.FromSeconds(5))
     .Build();
 ```
@@ -442,7 +443,7 @@ using TestFramework.Azure;
 Timeline timeline = Timeline.Create()
     .FindArtifacts(
         "cosmosItemQuery",
-        AzureExt.ArtifactFinder.DB.CosmosQuery<MyCosmosItem>(
+        AzureExt.ArtifactFinder.DB.CosmosDbQuery<MyCosmosItem>(
             "MainDb",
             new QueryDefinition("SELECT * FROM c WHERE c.number = 1")))
     .Build();

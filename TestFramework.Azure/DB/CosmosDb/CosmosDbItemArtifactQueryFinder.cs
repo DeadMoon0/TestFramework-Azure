@@ -13,7 +13,7 @@ using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Variables;
 
-namespace TestFramework.Azure.DB.CosmosDB;
+namespace TestFramework.Azure.DB.CosmosDb;
 
 /// <summary>
 /// Finds Cosmos DB artifacts by executing a query against the configured container.
@@ -21,7 +21,7 @@ namespace TestFramework.Azure.DB.CosmosDB;
 /// <typeparam name="TItem">The item type returned by the query.</typeparam>
 /// <param name="dbIdentifier">The Cosmos container identifier.</param>
 /// <param name="query">The query definition variable.</param>
-public class CosmosDbItemArtifactQueryFinder<TItem>(CosmosContainerIdentifier dbIdentifier, VariableReference<QueryDefinition> query) : ArtifactFinder<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>>
+public class CosmosDbItemArtifactQueryFinder<TItem>(CosmosDbIdentifier dbIdentifier, VariableReference<QueryDefinition> query) : ArtifactFinder<CosmosDbItemArtifactDescriber<TItem>, CosmosDbItemArtifactData<TItem>, CosmosDbItemArtifactReference<TItem>>
 {
     /// <summary>
     /// Finds the first matching Cosmos item.
@@ -29,7 +29,7 @@ public class CosmosDbItemArtifactQueryFinder<TItem>(CosmosContainerIdentifier db
     public override async Task<ArtifactFinderResult?> FindAsync(RunContext context)
     {
         ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory()
-            .Cosmos.CreateContainer(AzureResources.For<CosmosContainerDbConfig>(context, dbIdentifier));
+            .Cosmos.CreateContainer(AzureResources.For<CosmosDbConfig>(context, dbIdentifier));
 
         bool found = false;
         TItem? data = default;
@@ -51,7 +51,7 @@ public class CosmosDbItemArtifactQueryFinder<TItem>(CosmosContainerIdentifier db
     public override async Task<ArtifactFinderResultMulti> FindMultiAsync(RunContext context)
     {
         ICosmosContainerAdapter container = context.Services.GetAzureComponentFactory()
-            .Cosmos.CreateContainer(AzureResources.For<CosmosContainerDbConfig>(context, dbIdentifier));
+            .Cosmos.CreateContainer(AzureResources.For<CosmosDbConfig>(context, dbIdentifier));
 
         ICosmosDbIdentifierResolver resolver = context.Services.GetService<ICosmosDbIdentifierResolver>() ?? new DefaultCosmosDbIdentifierResolver();
 

@@ -67,7 +67,7 @@ public class ServiceBusSendTrigger(ServiceBusIdentifier identifier, VariableRefe
         await using IServiceBusSenderAdapter sender = context.Services.GetAzureComponentFactory().ServiceBus.CreateSender(serviceBus);
 
         ServiceBusMessage toSend = CopyForSending(message.GetRequiredValue(context.Variables));
-        if (config.RequiredSession && toSend.SessionId is null)
+        if (config.RequiresSession && toSend.SessionId is null)
         {
             toSend.SessionId = Guid.NewGuid().ToString();
         }

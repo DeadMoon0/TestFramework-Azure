@@ -7,7 +7,7 @@ namespace TestFramework.Azure.Configuration.SpecificConfigs;
 /// The identifier maps to a named entry under the <c>CosmosDb</c> section.
 /// The first three properties are required because the runtime resolves a concrete container, not just an account.
 /// </remarks>
-public sealed record CosmosContainerDbConfig
+public sealed record CosmosDbConfig
 {
     // Its text redacts its credentials; see ConfigRecordText.
     private bool PrintMembers(System.Text.StringBuilder builder) => ConfigRecordText.PrintMembers(this, builder);

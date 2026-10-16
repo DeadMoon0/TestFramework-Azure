@@ -81,7 +81,7 @@ internal sealed class ServiceBusShape(IConfigProvider provider) : ConfigShape<Se
             values[new ValueKey(AzureResourceKinds.SubscriptionNameValue)] = subscriptionName;
         }
 
-        values[new ValueKey(AzureResourceKinds.RequiredSessionValue)] = config.RequiredSession ? "true" : "false";
+        values[new ValueKey(AzureResourceKinds.RequiresSessionValue)] = config.RequiresSession ? "true" : "false";
 
         return values;
     }
@@ -102,7 +102,7 @@ internal sealed class ServiceBusShape(IConfigProvider provider) : ConfigShape<Se
             QueueName = Text(values, AzureResourceKinds.QueueNameValue),
             TopicName = Text(values, AzureResourceKinds.TopicNameValue),
             SubscriptionName = Text(values, AzureResourceKinds.SubscriptionNameValue),
-            RequiredSession = Flag(values, AzureResourceKinds.RequiredSessionValue, identifier, fallback: false),
+            RequiresSession = Flag(values, AzureResourceKinds.RequiresSessionValue, identifier, fallback: false),
         }.EnsureNamesOneEntity(identifier);
     }
 

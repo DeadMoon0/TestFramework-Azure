@@ -5,7 +5,7 @@ using TestFramework.Azure.Identifier;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
 
-namespace TestFramework.Azure.DB.SqlServer;
+namespace TestFramework.Azure.DB.SqlDatabase;
 
 internal class SqlDbContextResolver(SqlDbContextRegistry registry, SqlMigrationTracker migrationTracker) : ISqlDbContextResolver
 {

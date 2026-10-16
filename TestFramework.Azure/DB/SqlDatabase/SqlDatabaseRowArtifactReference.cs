@@ -10,13 +10,13 @@ using TestFramework.Core.Logging;
 using TestFramework.Core.Steps.Options;
 using TestFramework.Core.Variables;
 
-namespace TestFramework.Azure.DB.SqlServer;
+namespace TestFramework.Azure.DB.SqlDatabase;
 
 /// <summary>
 /// Reference to a SQL row addressed by its primary key values.
 /// </summary>
 /// <typeparam name="TRow">The row entity type.</typeparam>
-public class AzureSqlRowArtifactReference<TRow> : ArtifactReference<AzureSqlRowArtifactReference<TRow>, AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>>
+public class SqlDatabaseRowArtifactReference<TRow> : ArtifactReference<SqlDatabaseRowArtifactReference<TRow>, SqlDatabaseRowArtifactDescriber<TRow>, SqlDatabaseRowArtifactData<TRow>>
     where TRow : class
 {
     private readonly VariableReference<string>[] _primaryKeyValues;
@@ -32,7 +32,7 @@ public class AzureSqlRowArtifactReference<TRow> : ArtifactReference<AzureSqlRowA
     /// </summary>
     /// <param name="dbIdentifier">The SQL database identifier.</param>
     /// <param name="primaryKeyValues">Primary key values in entity key order.</param>
-    public AzureSqlRowArtifactReference(SqlDatabaseIdentifier dbIdentifier, params VariableReference<string>[] primaryKeyValues)
+    public SqlDatabaseRowArtifactReference(SqlDatabaseIdentifier dbIdentifier, params VariableReference<string>[] primaryKeyValues)
     {
         if (primaryKeyValues.Length == 0)
             throw new ArgumentException("At least one primary key value must be provided.", nameof(primaryKeyValues));
@@ -72,7 +72,7 @@ public class AzureSqlRowArtifactReference<TRow> : ArtifactReference<AzureSqlRowA
 
     /// <summary>
     /// Pins this reference with pre-resolved PK string values.
-    /// Used by <see cref="SqlEFCoreArtifactQueryFinder{TRow}"/> to create immediately-usable references
+    /// Used by <see cref="SqlDatabaseRowArtifactQueryFinder{TRow}"/> to create immediately-usable references
     /// without a live VariableStore (all PK values are known at query time).
     /// </summary>
     internal void PinWithValues(string[] values)
@@ -83,7 +83,7 @@ public class AzureSqlRowArtifactReference<TRow> : ArtifactReference<AzureSqlRowA
     /// <summary>
     /// Resolves the reference into concrete artifact data.
     /// </summary>
-    public override async Task<ArtifactResolveResult<AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactReference<TRow>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
+    public override async Task<ArtifactResolveResult<SqlDatabaseRowArtifactDescriber<TRow>, SqlDatabaseRowArtifactData<TRow>, SqlDatabaseRowArtifactReference<TRow>>> ResolveToDataAsync(RunContext context, ArtifactVersionIdentifier versionIdentifier)
     {
         ISqlDbContextResolver resolver = context.Services.GetRequiredService<ISqlDbContextResolver>();
         await using DbContext dbContext = resolver.Resolve(context, DbIdentifier);
@@ -93,12 +93,12 @@ public class AzureSqlRowArtifactReference<TRow> : ArtifactReference<AzureSqlRowA
         TRow? row = await dbContext.Set<TRow>().FindAsync(keyValues, context.Deadline.Token);
 
         if (row is null)
-            return new ArtifactResolveResult<AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactReference<TRow>> { Found = false };
+            return new ArtifactResolveResult<SqlDatabaseRowArtifactDescriber<TRow>, SqlDatabaseRowArtifactData<TRow>, SqlDatabaseRowArtifactReference<TRow>> { Found = false };
 
-        return new ArtifactResolveResult<AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactReference<TRow>>
+        return new ArtifactResolveResult<SqlDatabaseRowArtifactDescriber<TRow>, SqlDatabaseRowArtifactData<TRow>, SqlDatabaseRowArtifactReference<TRow>>
         {
             Found = true,
-            Data = new AzureSqlRowArtifactData<TRow>(row) { Identifier = versionIdentifier }
+            Data = new SqlDatabaseRowArtifactData<TRow>(row) { Identifier = versionIdentifier }
         };
     }
 

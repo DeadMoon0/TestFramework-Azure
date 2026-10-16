@@ -11,7 +11,7 @@ using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Variables;
 
-namespace TestFramework.Azure.DB.SqlServer;
+namespace TestFramework.Azure.DB.SqlDatabase;
 
 /// <summary>
 /// Finds SQL row artifacts by executing an EF Core query.
@@ -19,10 +19,10 @@ namespace TestFramework.Azure.DB.SqlServer;
 /// <typeparam name="TRow">The row entity type returned by the query.</typeparam>
 /// <param name="dbIdentifier">The SQL database identifier.</param>
 /// <param name="queryModifier">A delegate that shapes the query before execution.</param>
-public class SqlEFCoreArtifactQueryFinder<TRow>(
+public class SqlDatabaseRowArtifactQueryFinder<TRow>(
     SqlDatabaseIdentifier dbIdentifier,
     Func<IQueryable<TRow>, IQueryable<TRow>> queryModifier)
-    : ArtifactFinder<AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactReference<TRow>>
+    : ArtifactFinder<SqlDatabaseRowArtifactDescriber<TRow>, SqlDatabaseRowArtifactData<TRow>, SqlDatabaseRowArtifactReference<TRow>>
     where TRow : class
 {
     /// <summary>
@@ -40,7 +40,7 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
         TRow? entity = await queryModifier(dbContext.Set<TRow>()).FirstOrDefaultAsync(context.Deadline.Token);
         if (entity is null) return null;
 
-        AzureSqlRowArtifactReference<TRow> reference = BuildReference(dbContext, entity);
+        SqlDatabaseRowArtifactReference<TRow> reference = BuildReference(dbContext, entity);
         return new ArtifactFinderResult(reference);
     }
 
@@ -62,7 +62,7 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
         return new ArtifactFinderResultMulti(results.ToArray());
     }
 
-    private AzureSqlRowArtifactReference<TRow> BuildReference(DbContext dbContext, TRow entity)
+    private SqlDatabaseRowArtifactReference<TRow> BuildReference(DbContext dbContext, TRow entity)
     {
         var entityType = dbContext.Model.FindEntityType(typeof(TRow))
             ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException($"Entity type '{typeof(TRow).Name}' is not registered in the DbContext.");
@@ -82,7 +82,7 @@ public class SqlEFCoreArtifactQueryFinder<TRow>(
 
         VariableReference<string>[] pkRefs = pkStringValues.Select(v => Var.Const(v)).ToArray();
 
-        AzureSqlRowArtifactReference<TRow> reference = new AzureSqlRowArtifactReference<TRow>(dbIdentifier, pkRefs);
+        SqlDatabaseRowArtifactReference<TRow> reference = new SqlDatabaseRowArtifactReference<TRow>(dbIdentifier, pkRefs);
         // Pre-pin with already-resolved values so reference is immediately usable for cleanup
         reference.PinWithValues(pkStringValues);
         return reference;

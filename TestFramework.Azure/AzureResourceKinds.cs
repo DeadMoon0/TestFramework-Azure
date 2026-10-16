@@ -24,17 +24,17 @@ public static class AzureResourceKinds
     /// <summary>
     /// Storage Account environment requirement kind.
     /// </summary>
-    public const string Storage = "azure.storage";
+    public const string StorageAccount = "azure.storageaccount";
 
     /// <summary>
     /// Cosmos DB environment requirement kind.
     /// </summary>
-    public const string Cosmos = "azure.cosmos";
+    public const string CosmosDb = "azure.cosmosdb";
 
     /// <summary>
     /// SQL database environment requirement kind.
     /// </summary>
-    public const string Sql = "azure.sql";
+    public const string SqlDatabase = "azure.sqldatabase";
 
     /// <summary>
     /// The value name a resource publishes a container, queue, topic, subscription or database name under.
@@ -61,7 +61,7 @@ public static class AzureResourceKinds
     public const string BlobContainerNameValue = "BlobContainerName";
 
     /// <inheritdoc cref="QueueNameValue"/>
-    public const string TableContainerNameValue = "TableContainerName";
+    public const string TableNameValue = "TableName";
 
     /// <summary>
     /// The value name a Function App resource publishes its function key under.
@@ -76,7 +76,7 @@ public static class AzureResourceKinds
     /// <summary>
     /// The value name a Service Bus resource publishes its session requirement under.
     /// </summary>
-    public const string RequiredSessionValue = "RequiredSession";
+    public const string RequiresSessionValue = "RequiresSession";
 
     /// <summary>
     /// The value name a Cosmos resource publishes its provisioned throughput under.
@@ -153,25 +153,25 @@ public static class AzureResourceKinds
         .Offers(QueueNameValue, ValueTraits.Optional)
         .Offers(TopicNameValue, ValueTraits.Optional)
         .Offers(SubscriptionNameValue, ValueTraits.Optional)
-        .Offers(RequiredSessionValue, ValueTraits.Optional)
+        .Offers(RequiresSessionValue, ValueTraits.Optional)
         .Build();
 
     /// <summary>
     /// What a storage account offers: how to connect, and the containers declared on it.
     /// </summary>
-    public static readonly ResourceKind StorageKind = ResourceKind
-        .Named(Storage)
+    public static readonly ResourceKind StorageAccountKind = ResourceKind
+        .Named(StorageAccount)
         .OffersPerVantage(ValueNames.ConnectionString, ValueTraits.Secret)
         .Offers(QueueNameValue, ValueTraits.Optional)
         .Offers(BlobContainerNameValue, ValueTraits.Optional)
-        .Offers(TableContainerNameValue, ValueTraits.Optional)
+        .Offers(TableNameValue, ValueTraits.Optional)
         .Build();
 
     /// <summary>
     /// What a Cosmos container offers: how to connect, and which database and container it is.
     /// </summary>
-    public static readonly ResourceKind CosmosKind = ResourceKind
-        .Named(Cosmos)
+    public static readonly ResourceKind CosmosDbKind = ResourceKind
+        .Named(CosmosDb)
         .OffersPerVantage(ValueNames.ConnectionString, ValueTraits.Secret)
         .Offers(DatabaseNameValue)
         .Offers(ContainerNameValue)
@@ -182,8 +182,8 @@ public static class AzureResourceKinds
     /// <summary>
     /// What a SQL database offers: how to connect, and what it is called.
     /// </summary>
-    public static readonly ResourceKind SqlKind = ResourceKind
-        .Named(Sql)
+    public static readonly ResourceKind SqlDatabaseKind = ResourceKind
+        .Named(SqlDatabase)
         .OffersPerVantage(ValueNames.ConnectionString, ValueTraits.Secret)
         .Offers(DatabaseNameValue)
         .Build();

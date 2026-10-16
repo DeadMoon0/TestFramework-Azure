@@ -80,8 +80,8 @@ public class StorageAccountResourceTests(ITestOutputHelper output)
             environment: null,
             ("StorageAccount:files:ConnectionString", "UseDevelopmentStorage=true"),
             ("StorageAccount:files:BlobContainerName", "blobs"),
-            ("StorageAccount:files:QueueContainerName", "queues"),
-            ("StorageAccount:files:TableContainerName", "tables"));
+            ("StorageAccount:files:QueueName", "queues"),
+            ("StorageAccount:files:TableName", "tables"));
 
         run.EnsureRanToCompletion();
 
@@ -152,7 +152,7 @@ public class StorageAccountResourceTests(ITestOutputHelper output)
         public override Task<object?> CreateAsync(IEnvironmentProvider environment, RunContext context)
         {
             context.Resources?.Produce(
-                AzureResourceKinds.StorageKind,
+                AzureResourceKinds.StorageAccountKind,
                 identifier,
                 ValueNames.ConnectionString,
                 ResourceVantage.Host,
@@ -188,8 +188,8 @@ public class StorageAccountResourceTests(ITestOutputHelper output)
 
             context.Variables.SetVariable("connection", resolved.ConnectionString);
             context.Variables.SetVariable("container", resolved.BlobContainerName);
-            context.Variables.SetVariable("queue", resolved.QueueContainerName);
-            context.Variables.SetVariable("table", resolved.TableContainerName);
+            context.Variables.SetVariable("queue", resolved.QueueName);
+            context.Variables.SetVariable("table", resolved.TableName);
 
             return Task.FromResult<EmptyStepResultContext?>(EmptyStepResultContext.Instance);
         }

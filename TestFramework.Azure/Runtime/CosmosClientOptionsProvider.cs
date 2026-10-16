@@ -15,12 +15,12 @@ public interface ICosmosClientOptionsProvider
     /// </summary>
     /// <param name="config">The resolved Cosmos DB configuration.</param>
     /// <returns>The Cosmos client options to use.</returns>
-    CosmosClientOptions CreateOptions(CosmosContainerDbConfig config);
+    CosmosClientOptions CreateOptions(CosmosDbConfig config);
 }
 
 internal static class CosmosClientOptionsResolver
 {
-    internal static CosmosClientOptions Resolve(IServiceProvider serviceProvider, CosmosContainerDbConfig config)
+    internal static CosmosClientOptions Resolve(IServiceProvider serviceProvider, CosmosDbConfig config)
     {
         return serviceProvider.GetService<ICosmosClientOptionsProvider>()?.CreateOptions(config)
             ?? new CosmosClientOptions();

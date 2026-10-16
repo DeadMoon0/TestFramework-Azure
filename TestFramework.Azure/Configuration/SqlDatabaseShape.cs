@@ -34,7 +34,7 @@ internal sealed class SqlDatabaseShape(IConfigProvider provider) : ConfigShape<S
     public override string Section => DefaultConfigProvider.SqlDatabaseSelector;
 
     /// <inheritdoc />
-    public override ResourceKind Kind => AzureResourceKinds.SqlKind;
+    public override ResourceKind Kind => AzureResourceKinds.SqlDatabaseKind;
 
     /// <inheritdoc />
     public override IReadOnlyList<string> Identifiers(IConfiguration configuration)

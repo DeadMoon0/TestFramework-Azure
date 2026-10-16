@@ -67,16 +67,16 @@ public static class AzureServiceCollectionExtension
     /// Configures how CosmosClientOptions are created for Cosmos-backed triggers and artifacts.
     /// </summary>
     /// <param name="serviceCollection">The service collection to register the options provider in.</param>
-    /// <param name="configure">A delegate that creates client options for each resolved <see cref="CosmosContainerDbConfig"/>.</param>
+    /// <param name="configure">A delegate that creates client options for each resolved <see cref="CosmosDbConfig"/>.</param>
     /// <returns>The service collection for fluent chaining.</returns>
-    public static IServiceCollection ConfigureCosmosClientOptions(this IServiceCollection serviceCollection, Func<CosmosContainerDbConfig, CosmosClientOptions> configure)
+    public static IServiceCollection ConfigureCosmosClientOptions(this IServiceCollection serviceCollection, Func<CosmosDbConfig, CosmosClientOptions> configure)
     {
         serviceCollection.AddSingleton<ICosmosClientOptionsProvider>(new DelegateCosmosClientOptionsProvider(configure));
         return serviceCollection;
     }
 
-    private sealed class DelegateCosmosClientOptionsProvider(Func<CosmosContainerDbConfig, CosmosClientOptions> configure) : ICosmosClientOptionsProvider
+    private sealed class DelegateCosmosClientOptionsProvider(Func<CosmosDbConfig, CosmosClientOptions> configure) : ICosmosClientOptionsProvider
     {
-        public CosmosClientOptions CreateOptions(CosmosContainerDbConfig config) => configure(config);
+        public CosmosClientOptions CreateOptions(CosmosDbConfig config) => configure(config);
     }
 }

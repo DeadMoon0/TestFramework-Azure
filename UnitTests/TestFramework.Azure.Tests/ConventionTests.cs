@@ -2,7 +2,7 @@
 using System.IO;
 using System.Linq;
 using Microsoft.Azure.Cosmos;
-using TestFramework.Azure.DB.CosmosDB;
+using TestFramework.Azure.DB.CosmosDb;
 using TestFramework.Core.Conventions;
 using Xunit.Abstractions;
 

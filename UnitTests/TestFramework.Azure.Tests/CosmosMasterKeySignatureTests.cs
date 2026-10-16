@@ -1,6 +1,6 @@
 using System;
 using System.Net;
-using TestFramework.Azure.DB.CosmosDB;
+using TestFramework.Azure.DB.CosmosDb;
 using Xunit;
 
 namespace TestFramework.Azure.Tests;

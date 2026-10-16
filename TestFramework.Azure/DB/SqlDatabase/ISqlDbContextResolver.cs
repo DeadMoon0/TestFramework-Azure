@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Identifier;
 using TestFramework.Core.Steps;
 
-namespace TestFramework.Azure.DB.SqlServer;
+namespace TestFramework.Azure.DB.SqlDatabase;
 
 /// <summary>
 /// Builds EF Core <c>DbContext</c> instances for SQL-backed Azure artifacts and triggers.

@@ -1,13 +1,13 @@
 ﻿using Newtonsoft.Json;
 using TestFramework.Core.Artifacts;
 
-namespace TestFramework.Azure.DB.SqlServer;
+namespace TestFramework.Azure.DB.SqlDatabase;
 
 /// <summary>
 /// Artifact payload that stores a SQL row snapshot.
 /// </summary>
 /// <typeparam name="TRow">The row entity type.</typeparam>
-public class AzureSqlRowArtifactData<TRow>(TRow row) : ArtifactData<AzureSqlRowArtifactData<TRow>, AzureSqlRowArtifactDescriber<TRow>, AzureSqlRowArtifactReference<TRow>>
+public class SqlDatabaseRowArtifactData<TRow>(TRow row) : ArtifactData<SqlDatabaseRowArtifactData<TRow>, SqlDatabaseRowArtifactDescriber<TRow>, SqlDatabaseRowArtifactReference<TRow>>
     where TRow : class
 {
     /// <summary>

@@ -6,8 +6,8 @@ using System.Linq;
 using TestFramework.Azure.Builder.FunctionAppBuilder;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http.Stages;
 using TestFramework.Azure.Builder.LogicAppBuilder;
-using TestFramework.Azure.DB.CosmosDB;
-using TestFramework.Azure.DB.SqlServer;
+using TestFramework.Azure.DB.CosmosDb;
+using TestFramework.Azure.DB.SqlDatabase;
 using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.FunctionApp.Trigger;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
@@ -16,8 +16,8 @@ using TestFramework.Azure.LogicApp;
 using TestFramework.Azure.LogicApp.Events;
 using TestFramework.Azure.ServiceBus;
 using TestFramework.Azure.StorageAccount.Blob;
-using TestFramework.Azure.Trigger.IsLive;
 using TestFramework.Azure.StorageAccount.Table;
+using TestFramework.Azure.Trigger.IsLive;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Variables;
 
@@ -56,28 +56,28 @@ public static class AzureExt
         /// <summary>
         /// Access Logic App trigger builders.
         /// </summary>
-        public LogicAppTrigger LogicApp { get; } = new LogicAppTrigger();
+        public LogicAppTriggers LogicApp { get; } = new LogicAppTriggers();
 
         /// <summary>
         /// Access Function App trigger builders.
         /// </summary>
-        public FunctionAppTrigger FunctionApp { get; } = new FunctionAppTrigger();
+        public FunctionAppTriggers FunctionApp { get; } = new FunctionAppTriggers();
 
         /// <summary>
         /// Access Service Bus trigger builders.
         /// </summary>
-        public ServiceBusTrigger ServiceBus { get; } = new ServiceBusTrigger();
+        public ServiceBusTriggers ServiceBus { get; } = new ServiceBusTriggers();
 
         /// <summary>
         /// Access Azure liveness triggers.
         /// </summary>
-        public IsLiveTrigger IsLive { get; } = new IsLiveTrigger();
+        public IsLiveTriggers IsLive { get; } = new IsLiveTriggers();
     }
 
     /// <summary>
     /// Creates Logic App triggers for remote Standard workflow execution.
     /// </summary>
-    public class LogicAppTrigger
+    public class LogicAppTriggers
     {
         /// <summary>
         /// Starts a remote HTTP Logic App trigger builder for a configured Logic App identifier.
@@ -94,7 +94,7 @@ public static class AzureExt
     /// Creates Function App triggers for remote and managed execution. In-process execution comes with the
     /// <c>TestFramework.Azure.Functions</c> package, as extensions on this type.
     /// </summary>
-    public class FunctionAppTrigger
+    public class FunctionAppTriggers
     {
         /// <summary>
         /// Starts a remote HTTP Function App trigger builder for a configured Function App identifier.
@@ -126,7 +126,7 @@ public static class AzureExt
     /// <summary>
     /// Creates Service Bus triggers.
     /// </summary>
-    public class ServiceBusTrigger
+    public class ServiceBusTriggers
     {
         /// <summary>
         /// Creates a trigger that sends a Service Bus message.
@@ -169,8 +169,8 @@ public static class AzureExt
         /// <param name="id">The document id.</param>
         /// <param name="partitionKey">The document partition key.</param>
         /// <returns>A Cosmos artifact reference.</returns>
-        public CosmosDbItemArtifactReference<TItem> CosmosRef<TItem>(CosmosContainerIdentifier identifier, string id, PartitionKey partitionKey)
-            => CosmosRef<TItem>(identifier, Var.Const(id), Var.Const(partitionKey));
+        public CosmosDbItemArtifactReference<TItem> CosmosDbRef<TItem>(CosmosDbIdentifier identifier, string id, PartitionKey partitionKey)
+            => CosmosDbRef<TItem>(identifier, Var.Const(id), Var.Const(partitionKey));
 
         /// <summary>
         /// Creates a reference to a Cosmos DB item named by variables, resolved when the reference is pinned.
@@ -180,7 +180,7 @@ public static class AzureExt
         /// <param name="id">The document id.</param>
         /// <param name="partitionKey">The document partition key.</param>
         /// <returns>A Cosmos artifact reference.</returns>
-        public CosmosDbItemArtifactReference<TItem> CosmosRef<TItem>(CosmosContainerIdentifier identifier, VariableReference<string> id, VariableReference<PartitionKey> partitionKey)
+        public CosmosDbItemArtifactReference<TItem> CosmosDbRef<TItem>(CosmosDbIdentifier identifier, VariableReference<string> id, VariableReference<PartitionKey> partitionKey)
             => new(identifier, partitionKey, id);
 
         /// <summary>
@@ -190,9 +190,9 @@ public static class AzureExt
         /// <param name="identifier">The SQL database identifier.</param>
         /// <param name="primaryKeyValues">Primary key values in key-order.</param>
         /// <returns>A SQL row artifact reference.</returns>
-        public AzureSqlRowArtifactReference<TRow> SqlRef<TRow>(SqlDatabaseIdentifier identifier, params VariableReference<string>[] primaryKeyValues) where TRow : class
+        public SqlDatabaseRowArtifactReference<TRow> SqlDatabaseRef<TRow>(SqlDatabaseIdentifier identifier, params VariableReference<string>[] primaryKeyValues) where TRow : class
         {
-            return new AzureSqlRowArtifactReference<TRow>(identifier, primaryKeyValues);
+            return new SqlDatabaseRowArtifactReference<TRow>(identifier, primaryKeyValues);
         }
     }
 
@@ -210,9 +210,9 @@ public static class AzureExt
         /// <param name="partitionKey">The partition key variable.</param>
         /// <param name="rowKey">The row key variable.</param>
         /// <returns>A table entity artifact reference.</returns>
-        public TableStorageEntityArtifactReference<T> TableRef<T>(StorageAccountIdentifier identifier, VariableReference<string> tableName, VariableReference<string> partitionKey, VariableReference<string> rowKey) where T : class, ITableEntity
+        public StorageAccountTableEntityArtifactReference<T> TableRef<T>(StorageAccountIdentifier identifier, VariableReference<string> tableName, VariableReference<string> partitionKey, VariableReference<string> rowKey) where T : class, ITableEntity
         {
-            return new TableStorageEntityArtifactReference<T>(identifier, tableName, partitionKey, rowKey);
+            return new StorageAccountTableEntityArtifactReference<T>(identifier, tableName, partitionKey, rowKey);
         }
 
         /// <summary>
@@ -255,7 +255,7 @@ public static class AzureExt
         /// <param name="dbIdentifier">The Cosmos container identifier.</param>
         /// <param name="query">The query definition variable.</param>
         /// <returns>A Cosmos query finder.</returns>
-        public CosmosDbItemArtifactQueryFinder<TItem> CosmosQuery<TItem>(CosmosContainerIdentifier dbIdentifier, VariableReference<QueryDefinition> query)
+        public CosmosDbItemArtifactQueryFinder<TItem> CosmosDbQuery<TItem>(CosmosDbIdentifier dbIdentifier, VariableReference<QueryDefinition> query)
         {
             return new CosmosDbItemArtifactQueryFinder<TItem>(dbIdentifier, query);
         }
@@ -267,9 +267,9 @@ public static class AzureExt
         /// <param name="dbIdentifier">The SQL database identifier.</param>
         /// <param name="queryModifier">A delegate that shapes the EF Core query.</param>
         /// <returns>A SQL query finder.</returns>
-        public SqlEFCoreArtifactQueryFinder<TRow> SqlQuery<TRow>(SqlDatabaseIdentifier dbIdentifier, Func<IQueryable<TRow>, IQueryable<TRow>> queryModifier) where TRow : class
+        public SqlDatabaseRowArtifactQueryFinder<TRow> SqlDatabaseQuery<TRow>(SqlDatabaseIdentifier dbIdentifier, Func<IQueryable<TRow>, IQueryable<TRow>> queryModifier) where TRow : class
         {
-            return new SqlEFCoreArtifactQueryFinder<TRow>(dbIdentifier, queryModifier);
+            return new SqlDatabaseRowArtifactQueryFinder<TRow>(dbIdentifier, queryModifier);
         }
     }
 
@@ -286,9 +286,9 @@ public static class AzureExt
         /// <param name="tableName">The table name variable.</param>
         /// <param name="filter">The Azure Table filter expression.</param>
         /// <returns>A table query finder.</returns>
-        public TableStorageEntityArtifactQueryFinder<T> TableQuery<T>(StorageAccountIdentifier identifier, VariableReference<string> tableName, string filter) where T : class, ITableEntity
+        public StorageAccountTableEntityArtifactQueryFinder<T> TableQuery<T>(StorageAccountIdentifier identifier, VariableReference<string> tableName, string filter) where T : class, ITableEntity
         {
-            return new TableStorageEntityArtifactQueryFinder<T>(identifier, tableName, filter);
+            return new StorageAccountTableEntityArtifactQueryFinder<T>(identifier, tableName, filter);
         }
     }
 

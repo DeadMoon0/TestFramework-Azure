@@ -17,7 +17,7 @@ namespace TestFramework.Azure.StorageAccount.Table;
 /// Sets up and tears down Azure Table entity artifacts.
 /// </summary>
 /// <typeparam name="T">The table entity type.</typeparam>
-public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>
+public class StorageAccountTableEntityArtifactDescriber<T> : ArtifactDescriber<StorageAccountTableEntityArtifactDescriber<T>, StorageAccountTableEntityArtifactData<T>, StorageAccountTableEntityArtifactReference<T>>
     where T : class, ITableEntity
 {
     /// <summary>
@@ -40,7 +40,7 @@ public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableSto
     {
         ArgumentNullException.ThrowIfNull(instance);
 
-        if (instance.Reference is not TableStorageEntityArtifactReference<T>)
+        if (instance.Reference is not StorageAccountTableEntityArtifactReference<T>)
             return null;
 
         return new JObject
@@ -53,7 +53,7 @@ public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableSto
     /// <summary>
     /// Upserts the referenced entity during artifact setup.
     /// </summary>
-    public override async Task Setup(RunContext context, TableStorageEntityArtifactData<T> data, TableStorageEntityArtifactReference<T> reference)
+    public override async Task Setup(RunContext context, StorageAccountTableEntityArtifactData<T> data, StorageAccountTableEntityArtifactReference<T> reference)
     {
         ITableAdapter tableClient = context.Services.GetAzureComponentFactory()
             .Table.CreateTable(AzureResources.For<StorageAccountConfig>(context, reference.Identifier), reference.GetTableName(context.Variables));
@@ -66,7 +66,7 @@ public class TableStorageEntityArtifactDescriber<T> : ArtifactDescriber<TableSto
     /// <summary>
     /// Deletes the referenced entity during artifact cleanup.
     /// </summary>
-    public override async Task Deconstruct(RunContext context, TableStorageEntityArtifactReference<T> reference)
+    public override async Task Deconstruct(RunContext context, StorageAccountTableEntityArtifactReference<T> reference)
     {
         ITableAdapter tableClient = context.Services.GetAzureComponentFactory()
             .Table.CreateTable(AzureResources.For<StorageAccountConfig>(context, reference.Identifier), reference.GetTableName(context.Variables));

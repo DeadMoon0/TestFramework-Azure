@@ -22,8 +22,8 @@ namespace TestFramework.Azure.StorageAccount.Table;
 /// <param name="identifier">The Storage Account identifier.</param>
 /// <param name="tableName">The table name variable.</param>
 /// <param name="filter">The Azure Table filter expression.</param>
-public class TableStorageEntityArtifactQueryFinder<T>(StorageAccountIdentifier identifier, VariableReference<string> tableName, string filter)
-    : ArtifactFinder<TableStorageEntityArtifactDescriber<T>, TableStorageEntityArtifactData<T>, TableStorageEntityArtifactReference<T>>
+public class StorageAccountTableEntityArtifactQueryFinder<T>(StorageAccountIdentifier identifier, VariableReference<string> tableName, string filter)
+    : ArtifactFinder<StorageAccountTableEntityArtifactDescriber<T>, StorageAccountTableEntityArtifactData<T>, StorageAccountTableEntityArtifactReference<T>>
     where T : class, ITableEntity
 {
     /// <summary>
@@ -36,7 +36,7 @@ public class TableStorageEntityArtifactQueryFinder<T>(StorageAccountIdentifier i
 
         await foreach (T entity in tableClient.QueryEntitiesAsync<T>(filter, context.Deadline.Token))
         {
-            return new ArtifactFinderResult(new TableStorageEntityArtifactReference<T>(identifier, tableName, entity.PartitionKey, entity.RowKey));
+            return new ArtifactFinderResult(new StorageAccountTableEntityArtifactReference<T>(identifier, tableName, entity.PartitionKey, entity.RowKey));
         }
 
         return null;
@@ -53,7 +53,7 @@ public class TableStorageEntityArtifactQueryFinder<T>(StorageAccountIdentifier i
         List<ArtifactFinderResult> data = [];
         await foreach (T entity in tableClient.QueryEntitiesAsync<T>(filter, context.Deadline.Token))
         {
-            data.Add(new ArtifactFinderResult(new TableStorageEntityArtifactReference<T>(identifier, tableName, entity.PartitionKey, entity.RowKey)));
+            data.Add(new ArtifactFinderResult(new StorageAccountTableEntityArtifactReference<T>(identifier, tableName, entity.PartitionKey, entity.RowKey)));
         }
 
         return new ArtifactFinderResultMulti([.. data]);

@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using TestFramework.Core.Artifacts;
 
-namespace TestFramework.Azure.DB.CosmosDB;
+namespace TestFramework.Azure.DB.CosmosDb;
 
 /// <summary>
 /// Artifact payload that stores a Cosmos DB item snapshot.

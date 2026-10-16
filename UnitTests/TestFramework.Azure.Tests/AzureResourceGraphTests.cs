@@ -118,11 +118,11 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
 
         Assert.Equal(
             "UseDevelopmentStorage=true",
-            await Read(AzureResourceKinds.Storage, "files", ValueNames.ConnectionString, configured));
+            await Read(AzureResourceKinds.StorageAccount, "files", ValueNames.ConnectionString, configured));
 
         Assert.Equal(
             "documents",
-            await Read(AzureResourceKinds.Storage, "files", AzureResourceKinds.BlobContainerNameValue, configured));
+            await Read(AzureResourceKinds.StorageAccount, "files", AzureResourceKinds.BlobContainerNameValue, configured));
     }
 
     [Fact]
@@ -135,8 +135,8 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
             ("CosmosDb:orders:ContainerName", "orders"),
         ];
 
-        Assert.Equal("shop", await Read(AzureResourceKinds.Cosmos, "orders", AzureResourceKinds.DatabaseNameValue, configured));
-        Assert.Equal("orders", await Read(AzureResourceKinds.Cosmos, "orders", AzureResourceKinds.ContainerNameValue, configured));
+        Assert.Equal("shop", await Read(AzureResourceKinds.CosmosDb, "orders", AzureResourceKinds.DatabaseNameValue, configured));
+        Assert.Equal("orders", await Read(AzureResourceKinds.CosmosDb, "orders", AzureResourceKinds.ContainerNameValue, configured));
     }
 
     [Fact]
@@ -150,9 +150,9 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
 
         Assert.Equal(
             "Server=localhost;Database=orders;Integrated Security=true",
-            await Read(AzureResourceKinds.Sql, "orders-db", ValueNames.ConnectionString, configured));
+            await Read(AzureResourceKinds.SqlDatabase, "orders-db", ValueNames.ConnectionString, configured));
 
-        Assert.Equal("orders", await Read(AzureResourceKinds.Sql, "orders-db", AzureResourceKinds.DatabaseNameValue, configured));
+        Assert.Equal("orders", await Read(AzureResourceKinds.SqlDatabase, "orders-db", AzureResourceKinds.DatabaseNameValue, configured));
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public class AzureResourceGraphTests(ITestOutputHelper output)
         Assert.Equal(
             "UseDevelopmentStorage=true",
             await Read(
-                AzureResourceKinds.Storage,
+                AzureResourceKinds.StorageAccount,
                 "files",
                 ValueNames.ConnectionString,
                 ResourceVantage.Network,

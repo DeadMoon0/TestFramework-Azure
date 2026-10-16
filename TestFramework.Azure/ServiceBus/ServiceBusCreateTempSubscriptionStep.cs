@@ -54,7 +54,7 @@ internal class ServiceBusCreateTempSubscriptionStep(
         {
             DefaultMessageTimeToLive = ttl,
             AutoDeleteOnIdle = ttl + ttl,    // self-cleans if cleanup step doesn't run
-            RequiresSession = config.RequiredSession,
+            RequiresSession = config.RequiresSession,
         };
 
         // Build a server-side filter from the qualifiers that are known at pre-process time.

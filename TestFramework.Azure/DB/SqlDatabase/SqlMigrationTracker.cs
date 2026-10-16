@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.Identifier;
 using TestFramework.Core.Logging;
 
-namespace TestFramework.Azure.DB.SqlServer;
+namespace TestFramework.Azure.DB.SqlDatabase;
 
 /// <summary>
 /// Singleton service that tracks per-database migration state.

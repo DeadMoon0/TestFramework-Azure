@@ -22,7 +22,7 @@ public class DefaultConfigProvider : IConfigProvider
     /// <summary>
     /// Configuration section name for <see cref="FunctionAppConfig"/> records.
     /// </summary>
-    public const string FunctionAppBaseSelector = "FunctionApp";
+    public const string FunctionAppSelector = "FunctionApp";
 
     /// <summary>
     /// Configuration section name for <see cref="StorageAccountConfig"/> records.
@@ -30,7 +30,7 @@ public class DefaultConfigProvider : IConfigProvider
     public const string StorageAccountSelector = "StorageAccount";
 
     /// <summary>
-    /// Configuration section name for <see cref="CosmosContainerDbConfig"/> records.
+    /// Configuration section name for <see cref="CosmosDbConfig"/> records.
     /// </summary>
     public const string CosmosDbSelector = "CosmosDb";
 
@@ -51,7 +51,7 @@ public class DefaultConfigProvider : IConfigProvider
     public string[] LoadAllCosmosDbIdentifier(IConfiguration configuration) => [.. configuration.GetSection(CosmosDbSelector).GetChildren().Select(x => x.Key)];
 
     /// <inheritdoc />
-    public string[] LoadAllFunctionAppIdentifier(IConfiguration configuration) => [.. configuration.GetSection(FunctionAppBaseSelector).GetChildren().Select(x => x.Key)];
+    public string[] LoadAllFunctionAppIdentifier(IConfiguration configuration) => [.. configuration.GetSection(FunctionAppSelector).GetChildren().Select(x => x.Key)];
 
     /// <inheritdoc />
     public string[] LoadAllStorageAccountIdentifier(IConfiguration configuration) => [.. configuration.GetSection(StorageAccountSelector).GetChildren().Select(x => x.Key)];
@@ -103,21 +103,21 @@ public class DefaultConfigProvider : IConfigProvider
     }
 
     /// <inheritdoc />
-    public CosmosContainerDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier)
+    public CosmosDbConfig LoadCosmosDbConfig(IConfiguration configuration, string identifier)
     {
         IConfigurationSection entry = configuration.GetSection(CosmosDbSelector).GetSection(identifier);
 
-        return new CosmosContainerDbConfig
+        return new CosmosDbConfig
         {
-            ConnectionString = Required(entry, CosmosDbSelector, identifier, nameof(CosmosContainerDbConfig.ConnectionString)),
-            DatabaseName = Required(entry, CosmosDbSelector, identifier, nameof(CosmosContainerDbConfig.DatabaseName)),
-            ContainerName = Required(entry, CosmosDbSelector, identifier, nameof(CosmosContainerDbConfig.ContainerName)),
+            ConnectionString = Required(entry, CosmosDbSelector, identifier, nameof(CosmosDbConfig.ConnectionString)),
+            DatabaseName = Required(entry, CosmosDbSelector, identifier, nameof(CosmosDbConfig.DatabaseName)),
+            ContainerName = Required(entry, CosmosDbSelector, identifier, nameof(CosmosDbConfig.ContainerName)),
 
             // Read, not dropped: the record documents that creation "must be opted into explicitly" -
             // an opt-in that a file cannot express is no opt-in, and a configured throughput that never
             // reaches container creation is a silently different container.
-            AllowSchemaCreation = ReadOptionalFlag(entry, CosmosDbSelector, identifier, nameof(CosmosContainerDbConfig.AllowSchemaCreation)),
-            ProvisionedThroughput = ReadOptionalCount(entry, CosmosDbSelector, identifier, nameof(CosmosContainerDbConfig.ProvisionedThroughput)),
+            AllowSchemaCreation = ReadOptionalFlag(entry, CosmosDbSelector, identifier, nameof(CosmosDbConfig.AllowSchemaCreation)),
+            ProvisionedThroughput = ReadOptionalCount(entry, CosmosDbSelector, identifier, nameof(CosmosDbConfig.ProvisionedThroughput)),
         };
     }
 
@@ -125,6 +125,7 @@ public class DefaultConfigProvider : IConfigProvider
     public ServiceBusConfig LoadServiceBusConfig(IConfiguration configuration, string identifier)
     {
         IConfigurationSection entry = configuration.GetSection(ServiceBusSelector).GetSection(identifier);
+        RefuseRenamedSetting(entry, ServiceBusSelector, identifier, "RequiredSession", nameof(ServiceBusConfig.RequiresSession));
 
         return new ServiceBusConfig
         {
@@ -135,18 +136,18 @@ public class DefaultConfigProvider : IConfigProvider
 
             // A named refusal instead of bool.Parse's raw FormatException - the values-path reader
             // already refuses this way, and two readers for one section must agree.
-            RequiredSession = ReadOptionalFlag(entry, ServiceBusSelector, identifier, nameof(ServiceBusConfig.RequiredSession)),
+            RequiresSession = ReadOptionalFlag(entry, ServiceBusSelector, identifier, nameof(ServiceBusConfig.RequiresSession)),
         }.EnsureNamesOneEntity(identifier);
     }
 
     /// <inheritdoc />
     public FunctionAppConfig LoadFunctionAppConfig(IConfiguration configuration, string identifier)
     {
-        IConfigurationSection entry = configuration.GetSection(FunctionAppBaseSelector).GetSection(identifier);
+        IConfigurationSection entry = configuration.GetSection(FunctionAppSelector).GetSection(identifier);
 
         FunctionAppConfig config = new()
         {
-            BaseUrl = Required(entry, FunctionAppBaseSelector, identifier, nameof(FunctionAppConfig.BaseUrl)),
+            BaseUrl = Required(entry, FunctionAppSelector, identifier, nameof(FunctionAppConfig.BaseUrl)),
             Code = entry.GetSection(nameof(FunctionAppConfig.Code)).Value,
             AdminCode = entry.GetSection(nameof(FunctionAppConfig.AdminCode)).Value,
         };
@@ -161,12 +162,16 @@ public class DefaultConfigProvider : IConfigProvider
     /// <inheritdoc />
     public StorageAccountConfig LoadStorageAccountConfig(IConfiguration configuration, string identifier)
     {
+        IConfigurationSection entry = configuration.GetSection(StorageAccountSelector).GetSection(identifier);
+        RefuseRenamedSetting(entry, StorageAccountSelector, identifier, "QueueContainerName", nameof(StorageAccountConfig.QueueName));
+        RefuseRenamedSetting(entry, StorageAccountSelector, identifier, "TableContainerName", nameof(StorageAccountConfig.TableName));
+
         return new StorageAccountConfig
         {
-            ConnectionString = Required(configuration.GetSection(StorageAccountSelector).GetSection(identifier), StorageAccountSelector, identifier, nameof(StorageAccountConfig.ConnectionString)),
-            BlobContainerName = configuration.GetSection(StorageAccountSelector).GetSection(identifier).GetSection(nameof(StorageAccountConfig.BlobContainerName)).Value,
-            QueueContainerName = configuration.GetSection(StorageAccountSelector).GetSection(identifier).GetSection(nameof(StorageAccountConfig.QueueContainerName)).Value,
-            TableContainerName = configuration.GetSection(StorageAccountSelector).GetSection(identifier).GetSection(nameof(StorageAccountConfig.TableContainerName)).Value,
+            ConnectionString = Required(entry, StorageAccountSelector, identifier, nameof(StorageAccountConfig.ConnectionString)),
+            BlobContainerName = entry.GetSection(nameof(StorageAccountConfig.BlobContainerName)).Value,
+            QueueName = entry.GetSection(nameof(StorageAccountConfig.QueueName)).Value,
+            TableName = entry.GetSection(nameof(StorageAccountConfig.TableName)).Value,
         };
     }
 
@@ -222,6 +227,26 @@ public class DefaultConfigProvider : IConfigProvider
                 : $"'{path}' is missing: there is no '{selector}:{identifier}' entry in the configuration.")
         {
             RecoverySteps = [$"Set it in the configuration, for example \"{selector}\": {{ \"{identifier}\": {{ \"{property}\": \"...\" }} }} in the test settings file."],
+        };
+    }
+
+    /// <summary>
+    /// Refuses an entry that still spells a setting by the name it had before, naming the one it has now.
+    /// </summary>
+    /// <remarks>
+    /// There is no bridge from the old name. Read as it is, an entry under the old name would load as if the setting
+    /// were absent, and the run would fail later on a missing queue or table - or, for a session flag, build the wrong
+    /// receiver without failing at all. Refusing it here names the one line to change.
+    /// </remarks>
+    private static void RefuseRenamedSetting(IConfigurationSection entry, string selector, string identifier, string oldName, string newName)
+    {
+        if (!entry.GetSection(oldName).Exists())
+            return;
+
+        throw new FrameworkConfigurationException(
+            $"'{selector}:{identifier}:{oldName}' is no longer read: the setting is now called '{newName}'.")
+        {
+            RecoverySteps = [$"Rename '{oldName}' to '{newName}' in the '{selector}:{identifier}' entry."],
         };
     }
 
