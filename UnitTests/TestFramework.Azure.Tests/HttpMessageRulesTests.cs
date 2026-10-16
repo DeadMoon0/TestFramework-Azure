@@ -5,12 +5,8 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Http;
-using TestFramework.Core.Timelines;
-using TestFramework.Core.Variables;
 using Xunit;
 
 namespace TestFramework.Azure.Tests;
@@ -69,7 +65,7 @@ public class HttpMessageRulesTests
     {
         CommonHttpRequest request = HttpShaping.ComposeRequest(null, [new("Cookie", ["a=1", "b=2"])]);
 
-        Assert.Equal(["a=1; b=2"], HttpShaping.ReadHeaders(request)["cookie"]);
+        Assert.Equal(["a=1; b=2"], request.ReadHeaders()["cookie"]);
     }
 
     [Fact]
@@ -78,7 +74,7 @@ public class HttpMessageRulesTests
         CommonHttpRequest request = HttpShaping.ComposeRequest(new StringContent("<a/>"), [new("content-TYPE", ["application/xml"])]);
 
         Assert.Equal("application/xml", request.Content!.Headers.ContentType!.MediaType);
-        Assert.Equal(["application/xml"], HttpShaping.ReadHeaders(request)["Content-Type"]);
+        Assert.Equal(["application/xml"], request.ReadHeaders()["Content-Type"]);
     }
 
     [Fact]
@@ -121,32 +117,5 @@ public class HttpMessageRulesTests
         Assert.Equal(["1"], copy.Headers.GetValues("x-attempt"));
         Assert.Equal("text/plain", copy.Content!.Headers.ContentType!.MediaType);
         Assert.Equal("order", await copy.Content.ReadAsStringAsync());
-    }
-
-    public sealed class EchoFunction
-    {
-    }
-
-    [Fact]
-    public async Task AnInProcessFunction_ReadsARepeatedRequestHeaderAsOneCommaJoinedValue_WhateverTheNamesCase()
-    {
-        string? seen = null;
-        Timeline timeline = Timeline.Create()
-            .Trigger(AzureExt.Trigger.FunctionApp
-                .InProcessHttp<EchoFunction>((_, call) =>
-                {
-                    seen = call.HttpRequest.Headers["X-TRACE"];
-                    return new OkResult();
-                })
-                .WithHeader(Var.Const("x-trace"), Var.Const<string[]>(["first", "second"]))
-                .Call()).Label("call")
-            .Build();
-
-        ServiceCollection services = new();
-        services.AddSingleton<EchoFunction>();
-        TimelineRun run = await timeline.SetupRun(RunServices.Owned(services.BuildServiceProvider())).RunAsync();
-
-        run.EnsureRanToCompletion();
-        Assert.Equal("first, second", seen);
     }
 }

@@ -9,7 +9,7 @@ using TestFramework.Core.Steps;
 using TestFramework.Core.Timelines;
 using Xunit;
 
-namespace TestFramework.Azure.Tests;
+namespace TestFramework.Azure.Functions.Tests;
 
 /// <summary>
 /// What an in-process function call answers: the response the Functions host would have sent for the same result,

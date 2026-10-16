@@ -16,7 +16,7 @@
 		<PackageTags>Test;UnitTest;IntegrationTest;Framework;Fluent;Timeline;Azure</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<Copyright>Copyright (c) DeadMoon0 2026</Copyright>
-		<PackageReleaseNotes>BREAKING - needs TestFramework.Core 0.7.0 and TestFramework.Config 0.4.0, and on net10.0 brings EF Core 10 instead of 8. services.LoadAzureConfigs() is renamed services.AddAzure(). MessageReceived(identifier) is narrowed with WithMessageId, WithCorrelationId, Where, CompleteMessage and WithTempSubscription; a Cosmos reference comes from CosmosRef(...); ISqlDbContextResolver.EnsureReadyAsync takes (RunContext, DbContext, SqlDatabaseIdentifier); AzureIsLiveResult.Success and ConfigurationValidationException are gone (catch FrameworkConfigurationException). An in-process Function App call now answers an object as camelCase JSON, as the host does, instead of its ToString(). Configuration records no longer print their credentials, an empty Function App Code means no key, and repeated AddSqlArtifactContexts calls add up. BREAKING - renamed so Azure and Web can be imported together: the SQL-row artifact types are AzureSqlRowArtifact*, the Function App HTTP builder actions are IFunctionApp*Action, and ConfigExtension is AzureConfigExtension. A Service Bus send no longer changes the caller&apos;s message, and its result is a frozen ServiceBusSentMessage instead of the live ServiceBusMessage. AzureEnvironmentResourceKinds is renamed AzureResourceKinds. A repeated response header now reads as one comma-joined value (each Set-Cookie stays its own), the same on Function App and Logic App results.</PackageReleaseNotes>
+		<PackageReleaseNotes>In-process Function App execution and attribute-driven endpoint selection moved to the new TestFramework.Azure.Functions package; the base no longer brings ASP.NET Core or the Functions Worker. BREAKING - needs TestFramework.Core 0.7.0 and TestFramework.Config 0.4.0, and on net10.0 brings EF Core 10 instead of 8. services.LoadAzureConfigs() is renamed services.AddAzure(). MessageReceived(identifier) is narrowed with WithMessageId, WithCorrelationId, Where, CompleteMessage and WithTempSubscription; a Cosmos reference comes from CosmosRef(...); ISqlDbContextResolver.EnsureReadyAsync takes (RunContext, DbContext, SqlDatabaseIdentifier); AzureIsLiveResult.Success and ConfigurationValidationException are gone (catch FrameworkConfigurationException). An in-process Function App call now answers an object as camelCase JSON, as the host does, instead of its ToString(). Configuration records no longer print their credentials, an empty Function App Code means no key, and repeated AddSqlArtifactContexts calls add up. BREAKING - renamed so Azure and Web can be imported together: the SQL-row artifact types are AzureSqlRowArtifact*, the Function App HTTP builder actions are IFunctionApp*Action, and ConfigExtension is AzureConfigExtension. A Service Bus send no longer changes the caller&apos;s message, and its result is a frozen ServiceBusSentMessage instead of the live ServiceBusMessage. AzureEnvironmentResourceKinds is renamed AzureResourceKinds. A repeated response header now reads as one comma-joined value (each Set-Cookie stays its own), the same on Function App and Logic App results.</PackageReleaseNotes>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -29,15 +29,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 		<PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
 		<PackageReference Include="Azure.Data.Tables" Version="12.9.1" />
 		<PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
 		<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.59.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
-		<PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.1.0" />
-		<PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" Version="4.3.1" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageReference Include="TestFramework.Config" Version="0.4.0" />
 		<PackageReference Include="TestFramework.Core" Version="0.7.0" />

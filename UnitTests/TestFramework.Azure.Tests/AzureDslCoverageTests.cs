@@ -7,11 +7,8 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Data.Tables;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Azure.Functions.Worker;
 using TestFramework.Azure;
-using TestFramework.Azure.FunctionApp.InProcessProxies;
 using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.LogicApp;
 using TestFramework.Azure.StorageAccount.Table;
@@ -33,25 +30,17 @@ public class AzureDslCoverageTests
     }
 
     [Fact]
-    public void FunctionApp_ManagedBuilder_ReturnsStep()
+    public void FunctionApp_ManagedFunctionByName_ReturnsStep()
     {
-        Step<ManagedResult> step = AzureExt.Trigger.FunctionApp.Managed<DummyFunction>("func", "Run");
+        Step<ManagedResult> step = AzureExt.Trigger.FunctionApp.ManagedFunction("func", "cleanup");
 
         Assert.NotNull(step);
     }
 
     [Fact]
-    public void FunctionApp_InProcessHttpOverloads_ReturnBuilderInstances()
+    public void FunctionApp_ManagedFunctionWithoutAName_IsRefused()
     {
-        object actionBuilder = AzureExt.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => { });
-        object taskBuilder = AzureExt.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => Task.CompletedTask);
-        object resultBuilder = AzureExt.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => new OkResult());
-        object taskResultBuilder = AzureExt.Trigger.FunctionApp.InProcessHttp<DummyFunction>((_, _) => Task.FromResult<IActionResult>(new OkResult()));
-
-        Assert.NotNull(actionBuilder);
-        Assert.NotNull(taskBuilder);
-        Assert.NotNull(resultBuilder);
-        Assert.NotNull(taskResultBuilder);
+        Assert.ThrowsAny<ArgumentException>(() => AzureExt.Trigger.FunctionApp.ManagedFunction("func", " "));
     }
 
     [Fact]
@@ -98,14 +87,6 @@ public class AzureDslCoverageTests
         Assert.NotNull(cosmosQuery);
         Assert.NotNull(sqlQuery);
         Assert.NotNull(tableQuery);
-    }
-
-    private sealed class DummyFunction
-    {
-        [Function("Run")]
-        public void Run()
-        {
-        }
     }
 
     private sealed class DummyRow;

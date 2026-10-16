@@ -1,42 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net.Http;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http.Stages;
-using TestFramework.Azure.FunctionApp;
-using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.FunctionApp.Trigger;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
-using TestFramework.Core.Steps;
 using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.Builder.FunctionAppBuilder;
 
-internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
-    : IFunctionAppHttpConnectionStage, IFunctionAppHttpPayloadStage
+internal sealed class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier) : IFunctionAppHttpConnectionStage
 {
-    private VariableReference<TriggerHttpRouting>? _routing;
-    private readonly FunctionAppHttpRequestBuilderState _request = new();
-
-    public IFunctionAppHttpPayloadStage SelectEndpointWithMethod<TFunctionType>(string methodName)
-    {
-        _routing = FunctionAppMethodAnalyzer.GetHttpTriggerRouting<TFunctionType>(methodName);
-        return this;
-    }
-
-    public IFunctionAppHttpPayloadStage SelectEndpointWithMethod<TFunctionType>(string methodName, HttpMethod method)
-    {
-        ArgumentNullException.ThrowIfNull(method);
-        _routing = FunctionAppMethodAnalyzer.GetHttpTriggerRouting<TFunctionType>(methodName, method);
-        return this;
-    }
-
-    public IFunctionAppHttpPayloadStage SelectEndpoint(VariableReference<string> subPath, VariableReference<HttpMethod> method)
-    {
-        _routing = new ComposedRoutingVariable(subPath, method);
-        return this;
-    }
+    public IFunctionAppHttpPayloadStage SelectEndpoint(VariableReference<string> subPath, VariableReference<HttpMethod> method) =>
+        Payload(new ComposedRoutingVariable(subPath, method));
 
     public IFunctionAppHttpPayloadStage SelectFunction(string functionName, HttpMethod method)
     {
@@ -44,55 +20,12 @@ internal class RemoteFunctionAppBuilder(FunctionAppIdentifier appIdentifier)
         return SelectFunction(Var.Const(functionName), Var.Const(method));
     }
 
-    public IFunctionAppHttpPayloadStage SelectFunction(VariableReference<string> functionName, VariableReference<HttpMethod> method)
-    {
-        _routing = new DefaultFunctionRoutingVariable(functionName, method);
-        return this;
-    }
+    public IFunctionAppHttpPayloadStage SelectFunction(VariableReference<string> functionName, VariableReference<HttpMethod> method) =>
+        Payload(new DefaultFunctionRoutingVariable(functionName, method));
 
-    public Step<HttpResponseResultContext> Call()
-    {
-        if (_routing is null)
-            throw new TestFramework.Core.Exceptions.FrameworkStateException($"Function App '{appIdentifier}' has no selected HTTP endpoint. Call SelectFunction(...), SelectEndpoint(...), or SelectEndpointWithMethod(...) first.");
-
-        return new HttpRemoteFunctionAppTrigger(appIdentifier, _routing, _request.BuildVariable());
-    }
-
-    public IFunctionAppHttpPayloadStage WithBody(VariableReference<string> text)
-    {
-        _request.SetBody(text);
-        return this;
-    }
-
-    public IFunctionAppHttpPayloadStage WithBody(VariableReference<byte[]> data)
-    {
-        _request.SetBody(data);
-        return this;
-    }
-
-    public IFunctionAppHttpPayloadStage WithHeader(VariableReference<string> key, VariableReference<string> value)
-    {
-        _request.AddHeader(key, value);
-        return this;
-    }
-
-    public IFunctionAppHttpPayloadStage WithHeader(VariableReference<string> key, VariableReference<string[]> values)
-    {
-        _request.AddHeader(key, values);
-        return this;
-    }
-
-    public IFunctionAppHttpPayloadStage WithHeaders(VariableReference<Dictionary<string, string>> headers)
-    {
-        _request.AddHeaders(headers);
-        return this;
-    }
-
-    public IFunctionAppHttpPayloadStage WithHeaders(VariableReference<Dictionary<string, string[]>> headers)
-    {
-        _request.AddHeaders(headers);
-        return this;
-    }
+    // The payload stage exists only once an endpoint is chosen, so a call without one does not compile.
+    private FunctionAppHttpPayloadBuilder Payload(VariableReference<TriggerHttpRouting> routing) =>
+        new(request => new HttpRemoteFunctionAppTrigger(appIdentifier, routing, request));
 
     private sealed class ComposedRoutingVariable(VariableReference<string> path, VariableReference<HttpMethod> method)
         : VariableReference<TriggerHttpRouting>

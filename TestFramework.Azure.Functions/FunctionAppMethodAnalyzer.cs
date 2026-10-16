@@ -3,19 +3,18 @@ using System;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
-using TestFramework.Azure.FunctionApp.TriggerConfigs;
 
-namespace TestFramework.Azure.FunctionApp;
+namespace TestFramework.Azure.Functions;
 
 internal static class FunctionAppMethodAnalyzer
 {
-    internal static TriggerRouting GetTriggerRouting<TFunctionType>(string methodName)
+    internal static string GetFunctionName<TFunctionType>(string methodName)
     {
         (_, FunctionAttribute functionAttr) = GetMethodAndFunctionAttribute<TFunctionType>(methodName);
-        return new TriggerRouting(functionAttr.Name);
+        return functionAttr.Name;
     }
 
-    internal static TriggerHttpRouting GetHttpTriggerRouting<TFunctionType>(string methodName)
+    internal static FunctionAppHttpEndpoint GetHttpEndpoint<TFunctionType>(string methodName)
     {
         HttpTriggerMetadata trigger = GetHttpTriggerMetadata<TFunctionType>(methodName);
 
@@ -35,10 +34,10 @@ internal static class FunctionAppMethodAnalyzer
             ? new HttpMethod(trigger.Methods[0])
             : HttpMethod.Get;
 
-        return new TriggerHttpRouting(trigger.Path, httpMethod);
+        return new FunctionAppHttpEndpoint(trigger.Path, httpMethod);
     }
 
-    internal static TriggerHttpRouting GetHttpTriggerRouting<TFunctionType>(string methodName, HttpMethod httpMethod)
+    internal static FunctionAppHttpEndpoint GetHttpEndpoint<TFunctionType>(string methodName, HttpMethod httpMethod)
     {
         HttpTriggerMetadata trigger = GetHttpTriggerMetadata<TFunctionType>(methodName);
 
@@ -55,7 +54,7 @@ internal static class FunctionAppMethodAnalyzer
             };
         }
 
-        return new TriggerHttpRouting(trigger.Path, httpMethod);
+        return new FunctionAppHttpEndpoint(trigger.Path, httpMethod);
     }
 
     private readonly record struct HttpTriggerMetadata(string Path, string[]? Methods);
@@ -66,6 +65,8 @@ internal static class FunctionAppMethodAnalyzer
 
         foreach (ParameterInfo parameter in method.GetParameters())
         {
+            // Matched by name: [HttpTrigger] comes from the Worker's HTTP extension package, not the Worker itself, and a
+            // function project brings whichever HTTP extension it uses. Only Methods and Route are read off it.
             Attribute? httpAttr = parameter.GetCustomAttributes()
                 .FirstOrDefault(a => a.GetType().Name == "HttpTriggerAttribute");
 

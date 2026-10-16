@@ -1,0 +1,57 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<Title>TestFramework.Azure.Functions</Title>
+		<Version>0.1.0</Version>
+		<Authors>DeadMoon0</Authors>
+		<Product>TestFramework</Product>
+		<Description>Run Azure Function App handlers in-process inside a TestFramework Timeline, and select Function App endpoints from their isolated-worker attributes.</Description>
+		<PackageProjectUrl>https://github.com/DeadMoon0/TestFramework-Azure</PackageProjectUrl>
+		<PackageIcon>Icon.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryUrl>https://github.com/DeadMoon0/TestFramework-Azure.git</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageTags>Test;UnitTest;IntegrationTest;Framework;Fluent;Timeline;Azure;Functions</PackageTags>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<Copyright>Copyright (c) DeadMoon0 2026</Copyright>
+		<PackageReleaseNotes>First release: in-process Function App execution and attribute-driven endpoint selection, moved out of TestFramework.Azure.</PackageReleaseNotes>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+			<_Parameter1>TestFramework.Azure.Functions.Tests</_Parameter1>
+		</AssemblyAttribute>
+		<!-- The only grant is the package's own test assembly. What this package needs from TestFramework.Azure it
+		     reaches through that package's public surface, as any other consumer would. -->
+	</ItemGroup>
+
+	<!-- ASP.NET Core for the in-process HTTP request and IActionResult; the Functions Worker for the typed
+	     [Function] attribute. These are why this package exists apart from TestFramework.Azure. -->
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+		<PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.1.0" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+		<PackageReference Include="TestFramework.Core" Version="0.7.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\TestFramework.Azure\TestFramework.Azure.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="$(PackageIconSourcePath)">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+</Project>

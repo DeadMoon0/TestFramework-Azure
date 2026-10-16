@@ -10,17 +10,15 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using TestFramework.Azure.FunctionApp.InProcessProxies;
 using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
-using TestFramework.Azure.Http;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
 using TestFramework.Core.Steps.Options;
 using TestFramework.Core.Variables;
 
-namespace TestFramework.Azure.FunctionApp.Trigger;
+namespace TestFramework.Azure.Functions.InProcess;
 
 internal class InProcessHttpFunctionAppTrigger<TFunction>(
     Func<TFunction, FunctionAppHttpInProcessCallProxy, Task<IActionResult?>> action,
@@ -52,7 +50,7 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
 
         // The same headers, combined the same way, that the remote path puts on the wire - so a function
         // reads one value for a repeated header whether it is called in-process or deployed.
-        foreach ((string name, string[] values) in HttpShaping.ReadHeaders(commonRequest))
+        foreach ((string name, string[] values) in commonRequest.ReadHeaders())
             httpRequest.Headers[name] = new StringValues(values);
 
         if (commonRequest.Content is not null)

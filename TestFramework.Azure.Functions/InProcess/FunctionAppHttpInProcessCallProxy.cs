@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using TestFramework.Core.Variables;
 
-namespace TestFramework.Azure.FunctionApp.InProcessProxies;
+namespace TestFramework.Azure.Functions.InProcess;
 
 /// <summary>
 /// Provides access to the current HTTP request, services, and timeline variables during an in-process Function App invocation.

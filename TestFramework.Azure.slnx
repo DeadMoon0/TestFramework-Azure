@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="UnitTests/TestFramework.Azure.Tests/TestFramework.Azure.Tests.csproj" />
+  <Project Path="UnitTests/TestFramework.Azure.Functions.Tests/TestFramework.Azure.Functions.Tests.csproj" />
   <Project Path="TestFramework.Azure/TestFramework.Azure.csproj" />
+  <Project Path="TestFramework.Azure.Functions/TestFramework.Azure.Functions.csproj" />
 </Solution>

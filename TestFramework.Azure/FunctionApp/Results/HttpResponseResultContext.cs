@@ -36,7 +36,14 @@ public sealed record HttpResponseResultContext : StepResultContext
     /// </summary>
     public IReadOnlyDictionary<string, string[]> Headers { get; }
 
-    internal static async Task<HttpResponseResultContext> FromHttpResponseAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    /// <summary>
+    /// The result a step reports for <paramref name="response"/>: its status, its body read as text, and its headers
+    /// read by the rules every Function App and Logic App result uses.
+    /// </summary>
+    /// <param name="response">The response to read. It is not disposed.</param>
+    /// <param name="cancellationToken">Cancels reading the body.</param>
+    /// <returns>The result context for the response.</returns>
+    public static async Task<HttpResponseResultContext> FromHttpResponseAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         string? body = response.Content is null
             ? null

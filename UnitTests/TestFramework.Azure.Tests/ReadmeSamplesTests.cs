@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TestFramework.Azure.Configuration;
@@ -26,20 +25,6 @@ using TestFramework.Core.Timelines;
 using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.Tests;
-
-public enum AuthorizationLevel
-{
-    Function,
-}
-
-public sealed class HttpTriggerAttribute(AuthorizationLevel authLevel, params string[] methods) : Attribute
-{
-    public AuthorizationLevel AuthorizationLevel { get; } = authLevel;
-
-    public string[] Methods { get; } = methods;
-
-    public string? Route { get; init; }
-}
 
 // README sync note: these tests mirror the public README samples for TestFramework.Azure.
 // If you update a test here, update the corresponding README sample as well.
@@ -97,7 +82,7 @@ public class ReadmeSamplesTests
     }
 
     [Fact]
-    public async Task FunctionAppHttpCall_RunsThroughSelectEndpointWithMethodSample()
+    public async Task FunctionAppHttpCall_RunsThroughSelectFunctionSample()
     {
         FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.Accepted));
         RuntimeContext runtime = RuntimeContext.Create(services =>
@@ -112,115 +97,42 @@ public class ReadmeSamplesTests
         });
 
         Timeline timeline = Timeline.Create()
-            .Trigger(AzureExt.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<ReadmeHttpFunction>(nameof(ReadmeHttpFunction.Run)).Call())
+            .Trigger(AzureExt.Trigger.FunctionApp.Http("Default").SelectFunction("Run", HttpMethod.Post).Call())
             .Build();
 
         TimelineRun run = await timeline.SetupRun(runtime.ServiceProvider).RunAsync();
 
         run.EnsureRanToCompletion();
-        Assert.NotNull(sender.Request);
-    }
-
-    [Fact]
-    public void FunctionAppHttpCall_MultiVerbTrigger_RefusesToGuessTheVerb()
-    {
-        FrameworkConfigurationException error = Assert.Throws<FrameworkConfigurationException>(() =>
-            AzureExt.Trigger.FunctionApp.Http("Default")
-                .SelectEndpointWithMethod<ReadmeMultiVerbHttpFunction>(nameof(ReadmeMultiVerbHttpFunction.Run)));
-
-        Assert.Contains("get, post", error.Message, StringComparison.Ordinal);
-        Assert.Contains("ambiguous", error.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void FunctionAppHttpCall_StatedVerbTheTriggerDoesNotDeclare_IsRefused()
-    {
-        FrameworkConfigurationException error = Assert.Throws<FrameworkConfigurationException>(() =>
-            AzureExt.Trigger.FunctionApp.Http("Default")
-                .SelectEndpointWithMethod<ReadmeMultiVerbHttpFunction>(nameof(ReadmeMultiVerbHttpFunction.Run), HttpMethod.Delete));
-
-        Assert.Contains("not DELETE", error.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task FunctionAppHttpCall_MultiVerbTrigger_TakesTheRouteFromMetadataAndTheVerbFromTheCaller()
-    {
-        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
-        RuntimeContext runtime = RuntimeContext.Create(services =>
-        {
-            services.Declare("Default", new FunctionAppConfig
-            {
-                BaseUrl = "https://functions.test/",
-                Code = "function-key",
-            });
-            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
-            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
-        });
-
-        TimelineRun run = await Timeline.Create()
-            .Trigger(AzureExt.Trigger.FunctionApp.Http("Default")
-                .SelectEndpointWithMethod<ReadmeMultiVerbHttpFunction>(nameof(ReadmeMultiVerbHttpFunction.Run), HttpMethod.Post)
-                .Call())
-            .Build()
-            .SetupRun(runtime.ServiceProvider)
-            .RunAsync();
-
-        run.EnsureRanToCompletion();
-        Assert.Equal(new Uri("https://functions.test/api/orders"), sender.Request!.RequestUri);
+        Assert.Equal(new Uri("https://functions.test/api/Run"), sender.Request!.RequestUri);
         Assert.Equal(HttpMethod.Post, sender.Request!.Method);
     }
 
     [Fact]
-    public async Task FunctionAppHttpCall_FunctionWithoutRoute_GetsTheHostPrefixExactlyOnce()
+    public async Task ManagedFunctionCall_RunsTheNamedFunctionThroughTheAdminEndpoint()
     {
-        // Regression guard for the /api/api/Run collision: the analyzer emits the route relative to
-        // the host prefix, and only the trigger prepends FunctionAppConfig.RoutePrefix.
-        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
+        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.Accepted));
         RuntimeContext runtime = RuntimeContext.Create(services =>
         {
             services.Declare("Default", new FunctionAppConfig
             {
                 BaseUrl = "https://functions.test/",
                 Code = "function-key",
+                AdminCode = "master-key",
             });
             services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
             services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
         });
 
         TimelineRun run = await Timeline.Create()
-            .Trigger(AzureExt.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<ReadmeRoutelessHttpFunction>(nameof(ReadmeRoutelessHttpFunction.Run)).Call())
+            .Trigger(AzureExt.Trigger.FunctionApp.ManagedFunction("Default", "NightlyCleanup"))
             .Build()
             .SetupRun(runtime.ServiceProvider)
             .RunAsync();
 
         run.EnsureRanToCompletion();
-        Assert.Equal(new Uri("https://functions.test/api/Run"), sender.Request!.RequestUri);
-    }
-
-    [Fact]
-    public async Task FunctionAppHttpCall_EmptyRoutePrefix_CallsTheSiteRootDirectly()
-    {
-        FakeHttpRequestSender sender = new(new HttpResponseMessage(HttpStatusCode.OK));
-        RuntimeContext runtime = RuntimeContext.Create(services =>
-        {
-            services.Declare("Default", new FunctionAppConfig
-            {
-                BaseUrl = "https://functions.test/",
-                Code = "function-key",
-                RoutePrefix = string.Empty,
-            });
-            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
-            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(sender) });
-        });
-
-        TimelineRun run = await Timeline.Create()
-            .Trigger(AzureExt.Trigger.FunctionApp.Http("Default").SelectEndpointWithMethod<ReadmeHttpFunction>(nameof(ReadmeHttpFunction.Run)).Call())
-            .Build()
-            .SetupRun(runtime.ServiceProvider)
-            .RunAsync();
-
-        run.EnsureRanToCompletion();
-        Assert.Equal(new Uri("https://functions.test/orders"), sender.Request!.RequestUri);
+        Assert.Equal(new Uri("https://functions.test/admin/functions/NightlyCleanup"), sender.Request!.RequestUri);
+        Assert.Equal(HttpMethod.Post, sender.Request!.Method);
+        Assert.Equal("master-key", Assert.Single(sender.Request.Headers.GetValues("x-functions-key")));
     }
 
     [Fact]
@@ -559,30 +471,6 @@ public class ReadmeSamplesTests
             new QueryDefinition("SELECT * FROM c WHERE c.number = 1"));
 
         Assert.NotNull(finder);
-    }
-
-    private sealed class ReadmeHttpFunction
-    {
-        [Function("Run")]
-        public void Run([HttpTrigger(AuthorizationLevel.Function, "post", Route = "orders")] object request)
-        {
-        }
-    }
-
-    private sealed class ReadmeMultiVerbHttpFunction
-    {
-        [Function("Run")]
-        public void Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = "orders")] object request)
-        {
-        }
-    }
-
-    private sealed class ReadmeRoutelessHttpFunction
-    {
-        [Function("Run")]
-        public void Run([HttpTrigger(AuthorizationLevel.Function, "post")] object request)
-        {
-        }
     }
 
     private sealed class ReadmeCosmosItem;

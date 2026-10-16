@@ -1,5 +1,7 @@
-﻿using System.Net.Http;
+﻿using System.Collections.Generic;
+using System.Net.Http;
 using System.Net.Http.Headers;
+using TestFramework.Azure.Http;
 using TestFramework.Core;
 
 namespace TestFramework.Azure.FunctionApp.TriggerConfigs;
@@ -30,4 +32,15 @@ public class CommonHttpRequest : IFreezable
     /// Optional body content that will be attached to the outgoing HTTP request.
     /// </summary>
     public HttpContent? Content { get => _content; set { ((IFreezable)this).EnsureNotFrozen(); _content = value; } }
+
+    /// <summary>
+    /// The request's headers, content headers included, as a server reads them after the wire.
+    /// </summary>
+    /// <remarks>
+    /// Names compare case-insensitively and a repeated header carries one comma-joined value (a Cookie header's pairs
+    /// joined with "; "). A request handed to code in-process is read through this, so that code sees the headers a
+    /// deployed app would have received.
+    /// </remarks>
+    /// <returns>One entry per header name.</returns>
+    public IReadOnlyDictionary<string, string[]> ReadHeaders() => HttpShaping.ReadHeaders(this);
 }

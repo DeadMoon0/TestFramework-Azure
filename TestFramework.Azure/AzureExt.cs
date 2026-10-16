@@ -1,17 +1,16 @@
 ﻿using Azure.Data.Tables;
 using Azure.Messaging.ServiceBus;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Cosmos;
 using System;
 using System.Linq;
-using System.Threading.Tasks;
 using TestFramework.Azure.Builder.FunctionAppBuilder;
 using TestFramework.Azure.Builder.FunctionAppBuilder.Http.Stages;
 using TestFramework.Azure.Builder.LogicAppBuilder;
 using TestFramework.Azure.DB.CosmosDB;
 using TestFramework.Azure.DB.SqlServer;
-using TestFramework.Azure.FunctionApp.InProcessProxies;
 using TestFramework.Azure.FunctionApp.Results;
+using TestFramework.Azure.FunctionApp.Trigger;
+using TestFramework.Azure.FunctionApp.TriggerConfigs;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.LogicApp;
 using TestFramework.Azure.LogicApp.Events;
@@ -92,7 +91,8 @@ public static class AzureExt
     }
 
     /// <summary>
-    /// Creates Function App triggers for remote, managed, and in-process execution.
+    /// Creates Function App triggers for remote and managed execution. In-process execution comes with the
+    /// <c>TestFramework.Azure.Functions</c> package, as extensions on this type.
     /// </summary>
     public class FunctionAppTrigger
     {
@@ -107,66 +107,19 @@ public static class AzureExt
         }
 
         /// <summary>
-        /// Calls a managed function by method name and returns its managed result.
+        /// Calls a function through the host's admin endpoint by its function name, and returns its managed result.
         /// </summary>
-        /// <typeparam name="TFunction">The function host type containing the target method.</typeparam>
         /// <param name="identifier">The Function App identifier to resolve.</param>
-        /// <param name="methodName">The method marked with the Azure Functions trigger attributes.</param>
+        /// <param name="functionName">The function's name as the host knows it: the name in its <c>[Function]</c> attribute.</param>
         /// <returns>A step that invokes the function and captures its result.</returns>
         /// <remarks>
-        /// The method needs the isolated-worker <c>[Function]</c> attribute. In-process functions, marked
-        /// <c>[FunctionName]</c>, are not analysed and are refused; there is no managed call for them, so reach an
-        /// HTTP-triggered one over <c>Http(identifier).SelectFunction(name, method)</c> instead.
+        /// Needs no access to the function's code. To take the name from the function method's attributes instead, use
+        /// <c>Managed&lt;T&gt;(identifier, methodName)</c> from <c>TestFramework.Azure.Functions</c>.
         /// </remarks>
-        public Step<ManagedResult> Managed<TFunction>(FunctionAppIdentifier identifier, string methodName) where TFunction : notnull
+        public Step<ManagedResult> ManagedFunction(FunctionAppIdentifier identifier, string functionName)
         {
-            return new ManagedFunctionAppBuilder(identifier)
-                .SelectFunctionWithMethod<TFunction>(methodName)
-                .Call();
-        }
-
-        /// <summary>
-        /// Builds an in-process HTTP Function App trigger from a synchronous delegate.
-        /// </summary>
-        /// <typeparam name="TFunction">The function type to instantiate from DI.</typeparam>
-        /// <param name="action">The delegate that executes the in-process function logic.</param>
-        /// <returns>The payload stage for building the request.</returns>
-        public IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(Action<TFunction, FunctionAppHttpInProcessCallProxy> action) where TFunction : notnull
-        {
-            return new InProcessHttpFunctionAppBuilder<TFunction>(action);
-        }
-
-        /// <summary>
-        /// Builds an in-process HTTP Function App trigger from an asynchronous delegate.
-        /// </summary>
-        /// <typeparam name="TFunction">The function type to instantiate from DI.</typeparam>
-        /// <param name="action">The asynchronous delegate that executes the in-process function logic.</param>
-        /// <returns>The payload stage for building the request.</returns>
-        public IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(Func<TFunction, FunctionAppHttpInProcessCallProxy, Task> action) where TFunction : notnull
-        {
-            return new InProcessHttpFunctionAppBuilder<TFunction>(action);
-        }
-
-        /// <summary>
-        /// Builds an in-process HTTP Function App trigger from a synchronous delegate that returns an action result.
-        /// </summary>
-        /// <typeparam name="TFunction">The function type to instantiate from DI.</typeparam>
-        /// <param name="func">The delegate that executes the in-process function logic.</param>
-        /// <returns>The payload stage for building the request.</returns>
-        public IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(Func<TFunction, FunctionAppHttpInProcessCallProxy, IActionResult> func) where TFunction : notnull
-        {
-            return new InProcessHttpFunctionAppBuilder<TFunction>(func);
-        }
-
-        /// <summary>
-        /// Builds an in-process HTTP Function App trigger from an asynchronous delegate that returns an action result.
-        /// </summary>
-        /// <typeparam name="TFunction">The function type to instantiate from DI.</typeparam>
-        /// <param name="func">The asynchronous delegate that executes the in-process function logic.</param>
-        /// <returns>The payload stage for building the request.</returns>
-        public IFunctionAppHttpPayloadStage InProcessHttp<TFunction>(Func<TFunction, FunctionAppHttpInProcessCallProxy, Task<IActionResult>> func) where TFunction : notnull
-        {
-            return new InProcessHttpFunctionAppBuilder<TFunction>(func);
+            ArgumentException.ThrowIfNullOrWhiteSpace(functionName);
+            return new ManagedRemoteFunctionAppTrigger(identifier, Var.Const(new TriggerRouting(functionName.Trim())));
         }
     }
 

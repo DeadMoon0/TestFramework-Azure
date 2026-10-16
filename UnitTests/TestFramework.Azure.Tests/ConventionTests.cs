@@ -44,8 +44,8 @@ public class ConventionTests(ITestOutputHelper output)
     public void OnlyTheCosmosAttributeReaderNamesSystemTextJson()
     {
         // The rule itself, not only its one exception: the family serialises with Newtonsoft (ARCHITECTURE.md
-        // section 6). This package references System.Text.Json through ASP.NET Core, so the reference cannot be what
-        // the check looks at; the source can. Reading a test author's Cosmos attributes is the one use, and anything
+        // section 6). System.Text.Json ships in the shared framework every package compiles against, so the reference
+        // cannot be what the check looks at; the source can. Reading a test author's Cosmos attributes is the one use, and anything
         // else - a serialiser call slipped in beside it - is what review cannot see and this test does.
         string package = Path.Combine(RepositoryRoot(), "TestFramework.Azure");
         string[] users = [.. Directory.GetFiles(package, "*.cs", SearchOption.AllDirectories)
@@ -55,6 +55,21 @@ public class ConventionTests(ITestOutputHelper output)
             .OfType<string>()];
 
         Assert.Equal(["CosmosModelSchemaResolver.cs"], users);
+    }
+
+    [Theory]
+    [InlineData("Microsoft.AspNetCore")]
+    [InlineData("Microsoft.Azure.Functions.Worker")]
+    public void ThisPackageNeedsNeitherAspNetCoreNorTheFunctionsWorker(string family)
+    {
+        // A consumer that only calls deployed Function Apps must not be handed ASP.NET Core and the Functions Worker.
+        // What needs them - in-process execution, reading a function's attributes - is TestFramework.Azure.Functions.
+        string[] references = [.. typeof(CosmosModelSchemaResolver).Assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .OfType<string>()
+            .Where(name => name == family || name.StartsWith(family + ".", StringComparison.Ordinal))];
+
+        Assert.Empty(references);
     }
 
     private static string RepositoryRoot()
