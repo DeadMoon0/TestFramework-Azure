@@ -420,13 +420,9 @@ FodyWeavers.xsd
 # VS Code C# cache files
 *.lscache
 
-# Live validation lab identity (subscription, resource group, resource names)
-local.labsettings.json
-
 # Local, machine-specific settings. The example/template variants stay tracked.
 local.settings.json
 *.local.testsettings.json
 local.testsettings.json
-local.labsettings.json
 !example.local.testsettings.json
 !*.template.json

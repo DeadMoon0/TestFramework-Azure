@@ -85,6 +85,14 @@ internal static class FunctionAppMethodAnalyzer
             $"Method '{methodName}' on '{typeof(TFunctionType).Name}' has no parameter with [HttpTrigger] attribute.");
     }
 
+    /// <summary>
+    /// Finds the method and its isolated-worker <see cref="FunctionAttribute"/>.
+    /// </summary>
+    /// <remarks>
+    /// Only the isolated-worker <c>[Function]</c> attribute is read. An in-process function, marked
+    /// <c>[FunctionName]</c>, is not analysed and is refused here as missing <c>[Function]</c>: call it over HTTP
+    /// with <c>SelectFunction(name, method)</c> instead.
+    /// </remarks>
     private static (MethodInfo method, FunctionAttribute functionAttr) GetMethodAndFunctionAttribute<TFunctionType>(string methodName)
     {
         MethodInfo method = typeof(TFunctionType).GetMethod(methodName)

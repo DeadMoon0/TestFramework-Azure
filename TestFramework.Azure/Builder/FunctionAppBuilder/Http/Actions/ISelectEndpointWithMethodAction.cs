@@ -6,6 +6,10 @@ namespace TestFramework.Azure.Builder.FunctionAppBuilder.Http.Actions;
 /// <summary>
 /// Selects a remote Function App endpoint from Azure Functions metadata on a method.
 /// </summary>
+/// <remarks>
+/// The method needs the isolated-worker <c>[Function]</c> attribute. In-process functions, marked
+/// <c>[FunctionName]</c>, are not analysed and are refused; select those with <c>SelectFunction(name, method)</c>.
+/// </remarks>
 public interface ISelectEndpointWithMethodAction
 {
     /// <summary>

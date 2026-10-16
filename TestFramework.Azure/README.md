@@ -7,12 +7,16 @@ TestFramework.Azure is an extension package for TestFramework.Core.
 If you are new: TestFramework.Core runs your timeline, and this package adds Azure-specific triggers, events, and artifact helpers.
 You usually install and learn TestFramework.Core first, then add TestFramework.Azure when your tests need Azure resources.
 
-Azure-focused test helpers for TestFramework.Core timelines.
-
 TestFramework.Azure adds fluent building blocks for:
 - Azure Function App calls (remote and in-process)
+- Azure Logic App calls (Standard and Consumption, stateful and stateless)
 - Service Bus send/receive flows
 - Azure artifacts (SQL, Cosmos DB, Table Storage, Blob Storage)
+- `IsLive` checks that a configured resource answers before the run relies on it
+
+The Azure SDK clients are created inside the package: the factory that builds them and its adapters are internal,
+so a consumer cannot substitute or stub them. To run a timeline without real Azure, point it at emulators through
+`TestFramework.Container.Azure` instead.
 
 ## Install
 
@@ -43,7 +47,7 @@ Once those three ideas are clear, the broader support matrix below becomes much 
 using TestFramework.Azure.Extensions;
 using TestFramework.Config;
 
-ConfigInstance config = ConfigInstance.FromJsonFile("local.testSettings.json")
+ConfigInstance config = ConfigInstance.FromJsonFile("local.testsettings.json")
     .LoadAzureConfig()
     .Build();
 ```
@@ -342,11 +346,6 @@ This run-tracking flow is managed Consumption. It needs `Consumption.InvokeUrl` 
 
 Use `CallAndCapture()` when the Consumption workflow is effectively stateless and returns the meaningful result directly in the callback response. That is the invoke-only path and does not require ARM access.
 
-## Live Validation Notes
-
-- The live validation solution inside the repository now mirrors the same Consumption model: callback invoke URL plus workflow resource ID and an injected management-request authorizer.
-- SQL remains the heaviest live-validation surface because it needs both a connection string and a registered `DbContext` shape, which is a larger setup burden than the other Azure resources.
-
 ## Service Bus Support Matrix
 
 `ServiceBusConfig` supports three receive modes:
@@ -402,7 +401,7 @@ using TestFramework.Azure.Extensions;
 using TestFramework.Config;
 using TestFramework.Core.Timelines;
 
-ConfigInstance config = ConfigInstance.FromJsonFile("local.testSettings.json")
+ConfigInstance config = ConfigInstance.FromJsonFile("local.testsettings.json")
     .AddService(services =>
     {
         services.AddAzure()

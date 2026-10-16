@@ -113,6 +113,11 @@ public static class AzureExt
         /// <param name="identifier">The Function App identifier to resolve.</param>
         /// <param name="methodName">The method marked with the Azure Functions trigger attributes.</param>
         /// <returns>A step that invokes the function and captures its result.</returns>
+        /// <remarks>
+        /// The method needs the isolated-worker <c>[Function]</c> attribute. In-process functions, marked
+        /// <c>[FunctionName]</c>, are not analysed and are refused; there is no managed call for them, so reach an
+        /// HTTP-triggered one over <c>Http(identifier).SelectFunction(name, method)</c> instead.
+        /// </remarks>
         public Step<ManagedResult> Managed<TFunction>(FunctionAppIdentifier identifier, string methodName) where TFunction : notnull
         {
             return new ManagedFunctionAppBuilder(identifier)

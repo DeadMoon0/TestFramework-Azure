@@ -98,28 +98,28 @@ public class TableStorageEntityArtifactReference<T>
         contract.Input(_rowKey);
     }
 
-            /// <summary>
-            /// Gets the resolved table name.
-            /// </summary>
-            /// <returns>The table name.</returns>
+    /// <summary>
+    /// Gets the resolved table name.
+    /// </summary>
+    /// <returns>The table name.</returns>
     public string GetTableName(VariableStore variableStore) => IsPinned ? _pinnedTable : _tableName.GetRequiredValue(variableStore);
 
-            /// <summary>
-            /// Gets the resolved partition key.
-            /// </summary>
-            /// <returns>The partition key.</returns>
+    /// <summary>
+    /// Gets the resolved partition key.
+    /// </summary>
+    /// <returns>The partition key.</returns>
     public string GetPartitionKey(VariableStore variableStore) => IsPinned ? _pinnedPartitionKey : _partitionKey.GetRequiredValue(variableStore);
 
-            /// <summary>
-            /// Gets the resolved row key.
-            /// </summary>
-            /// <returns>The row key.</returns>
+    /// <summary>
+    /// Gets the resolved row key.
+    /// </summary>
+    /// <returns>The row key.</returns>
     public string GetRowKey(VariableStore variableStore) => IsPinned ? _pinnedRowKey : _rowKey.GetRequiredValue(variableStore);
 
-            /// <summary>
-            /// Returns a readable string representation of the reference.
-            /// </summary>
-            /// <returns>A string representation of the reference.</returns>
+    /// <summary>
+    /// Returns a readable string representation of the reference.
+    /// </summary>
+    /// <returns>A string representation of the reference.</returns>
     public override string ToString() => IsPinned
         ? $"Azure Table<{typeof(T).Name}>: {_pinnedTable}/{_pinnedPartitionKey}/{_pinnedRowKey}"
         : $"Azure Table<{typeof(T).Name}> (unresolved)";

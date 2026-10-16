@@ -73,7 +73,7 @@ internal sealed class FunctionAppShape(IConfigProvider provider) : ConfigShape<F
         // and skipping it because it is empty would make the reader fall back to the default "api", which is
         // the opposite of what was asked for. "Absent" and "empty" are different answers for a non-nullable
         // property with a default, and only the one that was never written down may take the default.
-        values[new ValueKey(AzureEnvironmentResourceKinds.RoutePrefixValue)] = config.RoutePrefix ?? string.Empty;
+        values[new ValueKey(AzureEnvironmentResourceKinds.RoutePrefixValue)] = config.RoutePrefix;
 
         if (config.Code is { Length: > 0 } code)
         {
