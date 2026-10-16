@@ -1,11 +1,9 @@
-using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using TestFramework.Azure.Http;
 using TestFramework.Core.Steps;
 
 namespace TestFramework.Azure.FunctionApp.Results;
@@ -33,7 +31,8 @@ public sealed record HttpResponseResultContext : StepResultContext
     public string? Body { get; }
 
     /// <summary>
-    /// Headers
+    /// The response's headers, content headers included: names compare case-insensitively, a repeated header
+    /// carries one comma-joined value, and only Set-Cookie keeps one value per cookie.
     /// </summary>
     public IReadOnlyDictionary<string, string[]> Headers { get; }
 
@@ -43,14 +42,6 @@ public sealed record HttpResponseResultContext : StepResultContext
             ? null
             : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
-        IEnumerable<KeyValuePair<string, IEnumerable<string>>> contentHeaders = response.Content?.Headers
-            ?? Enumerable.Empty<KeyValuePair<string, IEnumerable<string>>>();
-
-        Dictionary<string, string[]> headers = response.Headers
-            .Concat(contentHeaders)
-            .GroupBy(header => header.Key, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.SelectMany(x => x.Value).ToArray(), StringComparer.OrdinalIgnoreCase);
-
-        return new HttpResponseResultContext(response.StatusCode, body, new ReadOnlyDictionary<string, string[]>(headers));
+        return new HttpResponseResultContext(response.StatusCode, body, HttpShaping.ReadHeaders(response));
     }
 }

@@ -1,17 +1,16 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Net;
 using System.Net.Http;
-using Microsoft.Extensions.DependencyInjection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
+using TestFramework.Azure.Http;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
 using TestFramework.Config;
@@ -64,7 +63,7 @@ internal static class LogicAppHttpTriggerExecution
         }
 
         using HttpRequestMessage invokeRequest = new(HttpMethod.Post, callbackUrl);
-        await resolvedRequest.ApplyToHttpRequestMessageAsync(invokeRequest, cancellationToken);
+        await HttpShaping.ApplyAsync(resolvedRequest, invokeRequest, cancellationToken);
 
         DateTimeOffset observationStart = DateTimeOffset.UtcNow;
         using HttpResponseMessage invokeResponse = includeResponseBody || !config.SupportsManagementOperations
@@ -81,7 +80,7 @@ internal static class LogicAppHttpTriggerExecution
             LogicAppRoutes.ResolveRunId(invokeResponse),
             invokeResponse.StatusCode,
             responseBody,
-            ReadHeaders(invokeResponse));
+            HttpShaping.ReadHeaders(invokeResponse));
     }
 
     internal static LogicAppRunStatus ResolveCapturedStatus(HttpStatusCode statusCode)
@@ -92,22 +91,6 @@ internal static class LogicAppHttpTriggerExecution
             _ when (int)statusCode is >= 200 and <= 299 => LogicAppRunStatus.Succeeded,
             _ => LogicAppRunStatus.Failed,
         };
-
-    private static IReadOnlyDictionary<string, string[]> ReadHeaders(HttpResponseMessage response)
-    {
-        Dictionary<string, string[]> headers = new(StringComparer.OrdinalIgnoreCase);
-
-        foreach ((string key, IEnumerable<string> values) in response.Headers)
-            headers[key] = values.ToArray();
-
-        if (response.Content is not null)
-        {
-            foreach ((string key, IEnumerable<string> values) in response.Content.Headers)
-                headers[key] = values.ToArray();
-        }
-
-        return headers.Count == 0 ? LogicAppCapturedResult.EmptyHeaders : new ReadOnlyDictionary<string, string[]>(headers);
-    }
 
     private static async Task<string> ReadCallbackUrlPayloadAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
@@ -149,7 +132,7 @@ internal static class LogicAppHttpTriggerExecution
         DateTimeOffset observationStart,
         CancellationToken cancellationToken)
     {
-        HttpRequestMessage ownedInvokeRequest = await CloneHttpRequestMessageAsync(invokeRequest, cancellationToken);
+        HttpRequestMessage ownedInvokeRequest = await HttpShaping.CloneRequestAsync(invokeRequest, cancellationToken);
         CancellationTokenSource invokeLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         CancellationTokenSource observationLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task<HttpResponseMessage> invokeTask = sender.SendAsync(ownedInvokeRequest, invokeLifetime.Token);
@@ -233,27 +216,6 @@ internal static class LogicAppHttpTriggerExecution
             invokeRequest.Dispose();
             cancellationTokenSource.Dispose();
         }
-    }
-
-    private static async Task<HttpRequestMessage> CloneHttpRequestMessageAsync(HttpRequestMessage source, CancellationToken cancellationToken)
-    {
-        HttpRequestMessage clone = new(source.Method, source.RequestUri);
-
-        foreach ((string key, IEnumerable<string> values) in source.Headers)
-            clone.Headers.TryAddWithoutValidation(key, values);
-
-        if (source.Content is not null)
-        {
-            byte[] contentBytes = await source.Content.ReadAsByteArrayAsync(cancellationToken);
-            ByteArrayContent clonedContent = new(contentBytes);
-
-            foreach ((string key, IEnumerable<string> values) in source.Content.Headers)
-                clonedContent.Headers.TryAddWithoutValidation(key, values);
-
-            clone.Content = clonedContent;
-        }
-
-        return clone;
     }
 
     private static HttpResponseMessage CreateObservedRunResponse(string callbackUrl, string runId)

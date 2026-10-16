@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
+using TestFramework.Azure.Http;
 using TestFramework.Core.Variables;
 
 namespace TestFramework.Azure.Builder.FunctionAppBuilder;
@@ -23,41 +22,28 @@ internal sealed class ComposedHttpRequestVariable(
 
     public override CommonHttpRequest? GetValue(VariableStore store)
     {
-        CommonHttpRequest request = new();
+        HttpContent? body = bodyText is not null ? new StringContent(bodyText.GetRequiredValue(store))
+            : bodyBytes is not null ? new ByteArrayContent(bodyBytes.GetRequiredValue(store))
+            : null;
 
-        if (bodyText is not null)
-            request.Content = new StringContent(bodyText.GetRequiredValue(store));
-        else if (bodyBytes is not null)
-            request.Content = new ByteArrayContent(bodyBytes.GetRequiredValue(store));
+        return HttpShaping.ComposeRequest(body, ResolveHeaders(store));
+    }
 
-        void ApplyHeader(string key, IEnumerable<string> values)
-        {
-            if (string.Equals(key, "Content-Type", StringComparison.OrdinalIgnoreCase))
-            {
-                request.Content ??= new ByteArrayContent([]);
-                request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(values.First());
-            }
-            else
-            {
-                request.Headers.Add(key, values);
-            }
-        }
-
+    private IEnumerable<KeyValuePair<string, IEnumerable<string>>> ResolveHeaders(VariableStore store)
+    {
         foreach (var (k, v) in singleHeaders)
-            ApplyHeader(k.GetRequiredValue(store), [v.GetRequiredValue(store)]);
+            yield return new(k.GetRequiredValue(store), [v.GetRequiredValue(store)]);
 
         foreach (var (k, v) in multiHeaders)
-            ApplyHeader(k.GetRequiredValue(store), v.GetRequiredValue(store));
+            yield return new(k.GetRequiredValue(store), v.GetRequiredValue(store));
 
         foreach (var dict in headersDicts)
             foreach (var (k, v) in dict.GetRequiredValue(store))
-                ApplyHeader(k, [v]);
+                yield return new(k, [v]);
 
         foreach (var dict in headersDictMultis)
             foreach (var (k, v) in dict.GetRequiredValue(store))
-                ApplyHeader(k, v);
-
-        return request;
+                yield return new(k, v);
     }
 
     public override VariableReference<TNew> Transform<TNew>(Func<CommonHttpRequest?, TNew?> transform) where TNew : default =>

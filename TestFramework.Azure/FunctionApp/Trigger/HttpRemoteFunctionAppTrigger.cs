@@ -9,6 +9,7 @@ using TestFramework.Azure.Configuration;
 using TestFramework.Azure.Configuration.SpecificConfigs;
 using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
+using TestFramework.Azure.Http;
 using TestFramework.Azure.Identifier;
 using TestFramework.Azure.Runtime;
 using TestFramework.Config;
@@ -94,7 +95,7 @@ internal class HttpRemoteFunctionAppTrigger(FunctionAppIdentifier appIdentifier,
     private static async Task<HttpRequestMessage> CreateRequestMessageAsync(Uri fullTriggerUri, HttpMethod method, CommonHttpRequest request, FunctionAppConfig functionConfig, CancellationToken cancellationToken)
     {
         HttpRequestMessage message = new(method, fullTriggerUri);
-        await request.ApplyToHttpRequestMessageAsync(message, cancellationToken).ConfigureAwait(false);
+        await HttpShaping.ApplyAsync(request, message, cancellationToken).ConfigureAwait(false);
         if (functionConfig.Code is { } functionKey)
             message.Headers.Add("x-functions-key", functionKey);
         return message;

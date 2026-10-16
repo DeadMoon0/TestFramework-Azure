@@ -933,6 +933,53 @@ public class AzureConfigurationTests
     }
 
     [Fact]
+    public async Task ARepeatedResponseHeader_ReadsTheSame_FromAFunctionAppAndFromALogicApp()
+    {
+        static HttpResponseMessage RepeatedHeaders(HttpResponseMessage response)
+        {
+            response.Headers.TryAddWithoutValidation("x-trace", "first");
+            response.Headers.TryAddWithoutValidation("X-Trace", "second");
+            response.Headers.TryAddWithoutValidation("Set-Cookie", "session=1");
+            response.Headers.TryAddWithoutValidation("Set-Cookie", "theme=dark");
+            return response;
+        }
+
+        FakeHttpRequestSender functionSender = new(RepeatedHeaders(new HttpResponseMessage(HttpStatusCode.OK)));
+        RuntimeContext functionRuntime = RuntimeContext.Create(services =>
+        {
+            services.Declare("func", new FunctionAppConfig { BaseUrl = "https://example.test/", Code = "secret", AdminCode = null });
+            services.AddSingleton(new FunctionAppTriggerConfig { DoPing = false });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(functionSender) });
+        });
+        HttpRemoteFunctionAppTrigger functionTrigger = new("func", Var.Const(new TriggerHttpRouting("orders", HttpMethod.Post)), Var.Const(new CommonHttpRequest()));
+
+        HttpResponseMessage logicResponse = RepeatedHeaders(new HttpResponseMessage(HttpStatusCode.Accepted));
+        logicResponse.Headers.Add("x-ms-workflow-run-id", "run-1");
+        FakeHttpRequestSender logicSender = new(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":\"https://logic.test/invoke/manual?sig=abc\"}") },
+            logicResponse);
+        RuntimeContext logicRuntime = RuntimeContext.Create(services =>
+        {
+            services.Declare("logic", new LogicAppConfig
+            {
+                WorkflowName = "OrderProcessor",
+                Standard = new LogicAppStandardConfig { BaseUrl = "https://logic.test/", Code = "logic-code", AdminCode = "logic-admin" },
+            });
+            services.AddSingleton<IAzureComponentFactory>(new FakeAzureComponentFactory { HttpFactory = new FakeHttpComponentFactory(logicSender) });
+        });
+        Step<LogicAppExecutionResult> logicTrigger = AzureExt.Trigger.LogicApp.Http("logic").Workflow("OrderProcessor").Manual().CallAndCapture();
+
+        IReadOnlyDictionary<string, string[]> fromFunctionApp = (await functionTrigger.Execute(functionRuntime.Context))!.Headers;
+        IReadOnlyDictionary<string, string[]> fromLogicApp = (await logicTrigger.Execute(logicRuntime.Context))!.ResponseHeaders!;
+
+        foreach (IReadOnlyDictionary<string, string[]> headers in new[] { fromFunctionApp, fromLogicApp })
+        {
+            Assert.Equal(["first, second"], headers["X-TRACE"]);
+            Assert.Equal(["session=1", "theme=dark"], headers["set-cookie"]);
+        }
+    }
+
+    [Fact]
     public async Task LogicAppHttpCaptureTrigger_MapsFailedHttpResponse_ToFailedStatus()
     {
         FakeHttpRequestSender sender = new(

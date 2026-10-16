@@ -5,7 +5,6 @@ using Microsoft.Extensions.Primitives;
 using Newtonsoft.Json;
 using System;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -14,6 +13,7 @@ using System.Threading.Tasks;
 using TestFramework.Azure.FunctionApp.InProcessProxies;
 using TestFramework.Azure.FunctionApp.Results;
 using TestFramework.Azure.FunctionApp.TriggerConfigs;
+using TestFramework.Azure.Http;
 using TestFramework.Core.Artifacts;
 using TestFramework.Core.Logging;
 using TestFramework.Core.Steps;
@@ -50,28 +50,17 @@ internal class InProcessHttpFunctionAppTrigger<TFunction>(
         DefaultHttpContext httpContext = new() { RequestServices = context.Services };
         HttpRequest httpRequest = httpContext.Request;
 
+        // The same headers, combined the same way, that the remote path puts on the wire - so a function
+        // reads one value for a repeated header whether it is called in-process or deployed.
+        foreach ((string name, string[] values) in HttpShaping.ReadHeaders(commonRequest))
+            httpRequest.Headers[name] = new StringValues(values);
+
         if (commonRequest.Content is not null)
         {
             byte[] bytes = await commonRequest.Content.ReadAsByteArrayAsync(context.Deadline.Token);
             httpRequest.Body = new MemoryStream(bytes);
             httpRequest.ContentLength = bytes.Length;
-            string? contentType = commonRequest.Content.Headers.ContentType?.ToString();
-            if (contentType is not null) httpRequest.ContentType = contentType;
             httpRequest.Method = HttpMethods.Post;
-        }
-
-        foreach (var header in commonRequest.Headers)
-        {
-            string[] values = [.. header.Value];
-            if (values.Length <= 1)
-            {
-                httpRequest.Headers[header.Key] = new StringValues(values);
-            }
-            else
-            {
-                // Match remote HTTP formatting where repeated header values are typically rendered as a single comma-space list.
-                httpRequest.Headers[header.Key] = new StringValues(string.Join(", ", values.Where(v => !string.IsNullOrEmpty(v))));
-            }
         }
 
         TFunction functionInstance = context.Services.GetRequiredService<TFunction>();
