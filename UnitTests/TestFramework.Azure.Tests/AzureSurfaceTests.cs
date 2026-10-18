@@ -103,7 +103,7 @@ public class AzureSurfaceTests
     }
 
     [Fact]
-    public void AzureEnvironmentResourceKinds_ExposesLogicAppKind()
+    public void AzureResourceKinds_ExposesLogicAppKind()
     {
         LogicAppIdentifier identifier = "logic";
 

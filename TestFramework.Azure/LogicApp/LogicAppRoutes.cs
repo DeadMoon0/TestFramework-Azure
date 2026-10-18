@@ -73,8 +73,7 @@ internal static class LogicAppRoutes
         if (config.HostingMode == LogicAppHostingMode.Consumption)
             return request;
 
-        string? hostKey = config.Standard.AdminCode ?? config.Standard.Code;
-        if (!string.IsNullOrWhiteSpace(hostKey))
+        if ((config.Standard.AdminCode ?? config.Standard.Code) is { } hostKey)
             request.Headers.Add("x-functions-key", hostKey);
         return request;
     }

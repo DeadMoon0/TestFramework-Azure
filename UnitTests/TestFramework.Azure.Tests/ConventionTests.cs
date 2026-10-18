@@ -51,10 +51,9 @@ public class ConventionTests(ITestOutputHelper output)
         string[] users = [.. Directory.GetFiles(package, "*.cs", SearchOption.AllDirectories)
             .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Where(file => File.ReadAllText(file).Contains("System.Text.Json", StringComparison.Ordinal))
-            .Select(Path.GetFileName)
-            .OfType<string>()];
+            .Select(file => Path.GetRelativePath(package, file).Replace(Path.DirectorySeparatorChar, '/'))];
 
-        Assert.Equal(["CosmosModelSchemaResolver.cs"], users);
+        Assert.Equal(["DB/CosmosDb/CosmosModelSchemaResolver.cs"], users);
     }
 
     [Theory]
@@ -141,7 +140,7 @@ public class ConventionTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void EveryExceptionThisPackageThrowsIsAFrameworkException()
+    public void EveryExceptionTypeThisPackageDeclaresIsAFrameworkException()
     {
         // One base, so a failure always carries its recovery steps and reads the same way in a run's failure detail.
         // Two used to derive from bare Exception, and one of them said only "Code cannot be Empty or Null".

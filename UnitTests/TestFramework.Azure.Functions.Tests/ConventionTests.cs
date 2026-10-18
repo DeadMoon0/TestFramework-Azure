@@ -52,7 +52,7 @@ public class ConventionTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void EveryExceptionThisPackageThrowsIsAFrameworkException()
+    public void EveryExceptionTypeThisPackageDeclaresIsAFrameworkException()
     {
         string[] strays = [.. Package.GetTypes()
             .Where(type => type.IsPublic && typeof(Exception).IsAssignableFrom(type))

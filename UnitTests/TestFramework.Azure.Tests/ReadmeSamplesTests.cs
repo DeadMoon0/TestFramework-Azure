@@ -31,7 +31,7 @@ namespace TestFramework.Azure.Tests;
 public class ReadmeSamplesTests
 {
     [Fact]
-    public void MinimalSetup_LoadAzureConfig_LetsARunAnswerForEachSection()
+    public async Task MinimalSetup_LoadAzureConfig_LetsARunAnswerForEachSection()
     {
         string tempFile = Path.Combine(Path.GetTempPath(), $"azure-readme-{Guid.NewGuid():N}.json");
 
@@ -65,7 +65,7 @@ public class ReadmeSamplesTests
                 .LoadAzureConfig()
                 .Build();
 
-            using ServiceProvider provider = (ServiceProvider)config.BuildServiceProvider();
+            await using ServiceProvider provider = config.BuildServiceProvider();
             RunContext run = RunContext.Detached(provider);
 
             Assert.Equal("https://functions.test/", run.Configured<FunctionAppConfig>("Default").BaseUrl);
@@ -434,7 +434,7 @@ public class ReadmeSamplesTests
     }
 
     [Fact]
-    public void CosmosClientOptionsNote_RegistersConfiguredClientOptionsProvider()
+    public async Task CosmosClientOptionsNote_RegistersConfiguredClientOptionsProvider()
     {
         // The entry goes on the config instance rather than into a second configuration handed to the loader.
         // The old shape of this test is why AddAzure takes none: it passed a configuration
@@ -456,7 +456,7 @@ public class ReadmeSamplesTests
             })
             .Build();
 
-        using ServiceProvider provider = (ServiceProvider)config.BuildServiceProvider();
+        await using ServiceProvider provider = config.BuildServiceProvider();
         ICosmosClientOptionsProvider optionsProvider = provider.GetRequiredService<ICosmosClientOptionsProvider>();
         CosmosDbConfig cosmosConfig = RunContext.Detached(provider).Configured<CosmosDbConfig>("MainDb");
 

@@ -106,7 +106,7 @@ public sealed record LogicAppStandardConfig
     public string? Code
     {
         get => code;
-        init => code = NoKeyIfEmpty(value);
+        init => code = HostKey.NoneIfEmpty(value);
     }
 
     /// <summary>
@@ -117,14 +117,11 @@ public sealed record LogicAppStandardConfig
     public string? AdminCode
     {
         get => adminCode;
-        init => adminCode = NoKeyIfEmpty(value);
+        init => adminCode = HostKey.NoneIfEmpty(value);
     }
 
     private readonly string? code;
     private readonly string? adminCode;
-
-    // An empty key means "no key", as it does for a Function App.
-    private static string? NoKeyIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
 }
 
 /// <summary>

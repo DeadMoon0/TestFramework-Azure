@@ -95,7 +95,10 @@ internal static class FunctionAppMethodAnalyzer
 
         FunctionAttribute functionAttr = method.GetCustomAttribute<FunctionAttribute>()
             ?? throw new TestFramework.Core.Exceptions.FrameworkConfigurationException(
-                $"Method '{methodName}' on '{typeof(TFunctionType).Name}' is missing the [Function] attribute.");
+                $"Method '{methodName}' on '{typeof(TFunctionType).Name}' is missing the [Function] attribute.")
+            {
+                RecoverySteps = ["Only the isolated worker's [Function] attribute is read. Call a function marked [FunctionName] over HTTP with SelectFunction(name, method)."],
+            };
 
         return (method, functionAttr);
     }

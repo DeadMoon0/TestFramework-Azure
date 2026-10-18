@@ -41,7 +41,7 @@ public sealed record FunctionAppConfig
     public string? Code
     {
         get => code;
-        init => code = NoKeyIfEmpty(value);
+        init => code = HostKey.NoneIfEmpty(value);
     }
 
     /// <summary>
@@ -51,13 +51,9 @@ public sealed record FunctionAppConfig
     public string? AdminCode
     {
         get => adminCode;
-        init => adminCode = NoKeyIfEmpty(value);
+        init => adminCode = HostKey.NoneIfEmpty(value);
     }
 
     private readonly string? code;
     private readonly string? adminCode;
-
-    // An empty key in a settings file means "no key", and is held as one: two spellings of one state would leave
-    // every reader to agree on it, and the one that did not sent an empty x-functions-key header.
-    private static string? NoKeyIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
 }
