@@ -34,7 +34,7 @@
 		<PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.1.0" />
 		<PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.3.0" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-		<PackageReference Include="TestFramework.Core" Version="0.7.1" />
+		<PackageReference Include="TestFramework.Core" Version="0.7.2" />
 	</ItemGroup>
 
 	<ItemGroup>
